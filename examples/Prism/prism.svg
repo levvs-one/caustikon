@@ -1,0 +1,87 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<svg width="1280" height="840" viewBox="0 0 1280 840" role="img" aria-labelledby="title description" xmlns="http://www.w3.org/2000/svg">
+  <title id="title">Caustikon - N-BK7 prism dispersion</title>
+  <desc id="description">Six coincident incident rays refract through a 60 degree N-BK7 prism. The drawing preserves geometry. A separate chart resolves their calculated angular deviations.</desc>
+  <rect width="1280" height="840" fill="#faf9f5" />
+  <style>text { fill: #252824; font-family: 'Consolas', 'Liberation Mono', monospace; font-size: 13px; } .title { font-family: 'Georgia', 'Liberation Serif', serif; font-size: 42px; } .muted { fill: #666b62; } .small { font-size: 11px; }</style>
+  <text x="48" y="42" class="small">CAUSTIKON  /  GEOMETRIC OPTICS</text>
+  <text x="48" y="98" class="title">One prism. Six wavelengths.</text>
+  <text x="48" y="130" class="muted">N-BK7  |  60 deg apex  |  45 deg incidence  |  air / glass / air</text>
+  <text x="1116" y="42" class="small">PLATE 01</text>
+  <line x1="48" y1="152" x2="1232" y2="152" stroke="#d5d7ce" stroke-width="1" />
+  <polygon points="255.000,526.000 585.000,526.000 420.000,240.212" fill="#eceee5" stroke="#464b41" stroke-width="1.5" />
+  <text x="402" y="277" class="small">60 deg</text>
+  <text x="395" y="340">N-BK7</text>
+  <text x="355" y="363" class="small muted">homogeneous glass</text>
+  <text x="69" y="423" class="small muted">coincident input</text>
+  <text x="69" y="443" class="small muted">+15 deg</text>
+  <line x1="73.5" y1="486.3999938964844" x2="315.26409912109375" y2="421.6195068359375" stroke="#252824" stroke-width="1.6" />
+  <polyline points="315.264,421.620 530.104,430.917 783.000,550.217" fill="none" stroke="#794c9b" stroke-width="1.25" />
+  <polyline points="315.264,421.620 529.949,430.650 783.000,548.156" fill="none" stroke="#526caa" stroke-width="1.25" />
+  <polyline points="315.264,421.620 529.761,430.324 783.000,545.681" fill="none" stroke="#238994" stroke-width="1.25" />
+  <polyline points="315.264,421.620 529.601,430.046 783.000,543.604" fill="none" stroke="#497d44" stroke-width="1.25" />
+  <polyline points="315.264,421.620 529.516,429.899 783.000,542.522" fill="none" stroke="#af791c" stroke-width="1.25" />
+  <polyline points="315.264,421.620 529.407,429.710 783.000,541.135" fill="none" stroke="#b64c3e" stroke-width="1.25" />
+  <text x="60" y="560" class="small muted">Ray geometry is to scale. The narrow fan is physical; colors identify wavelengths.</text>
+  <text x="934" y="192" class="small">CALCULATED OUTPUT</text>
+  <text x="934" y="218" class="small muted">nm</text>
+  <text x="1020" y="218" class="small muted">n</text>
+  <text x="1130" y="218" class="small muted">delta</text>
+  <line x1="912" y1="245" x2="925" y2="245" stroke="#794c9b" stroke-width="3" />
+  <text x="934" y="250">404.7</text>
+  <text x="1020" y="250">1.53023</text>
+  <text x="1130" y="250">40.255</text>
+  <line x1="912" y1="280" x2="925" y2="280" stroke="#526caa" stroke-width="3" />
+  <text x="934" y="285">435.8</text>
+  <text x="1020" y="285">1.52669</text>
+  <text x="1130" y="285">39.908</text>
+  <line x1="912" y1="315" x2="925" y2="315" stroke="#238994" stroke-width="3" />
+  <text x="934" y="320">486.1</text>
+  <text x="1020" y="320">1.52238</text>
+  <text x="1130" y="320">39.491</text>
+  <line x1="912" y1="350" x2="925" y2="350" stroke="#497d44" stroke-width="3" />
+  <text x="934" y="355">546.1</text>
+  <text x="1020" y="355">1.51872</text>
+  <text x="1130" y="355">39.139</text>
+  <line x1="912" y1="385" x2="925" y2="385" stroke="#af791c" stroke-width="3" />
+  <text x="934" y="390">587.6</text>
+  <text x="1020" y="390">1.51680</text>
+  <text x="1130" y="390">38.956</text>
+  <line x1="912" y1="420" x2="925" y2="420" stroke="#b64c3e" stroke-width="3" />
+  <text x="934" y="425">656.3</text>
+  <text x="1020" y="425">1.51432</text>
+  <text x="1130" y="425">38.720</text>
+  <text x="934" y="493" class="small muted">delta = angular deviation</text>
+  <text x="934" y="514" class="small muted">from the incident ray, deg</text>
+  <line x1="48" y1="582" x2="1232" y2="582" stroke="#d5d7ce" stroke-width="1" />
+  <text x="48" y="612" class="small">DISPERSION RESOLVED</text>
+  <line x1="105" y1="744" x2="868" y2="744" stroke="#d5d7ce" stroke-width="1" />
+  <text x="48" y="748" class="small muted">38.50</text>
+  <line x1="105" y1="718" x2="868" y2="718" stroke="#d5d7ce" stroke-width="1" />
+  <text x="48" y="722" class="small muted">39.00</text>
+  <line x1="105" y1="692" x2="868" y2="692" stroke="#d5d7ce" stroke-width="1" />
+  <text x="48" y="696" class="small muted">39.50</text>
+  <line x1="105" y1="666" x2="868" y2="666" stroke="#d5d7ce" stroke-width="1" />
+  <text x="48" y="670" class="small muted">40.00</text>
+  <line x1="105" y1="640" x2="868" y2="640" stroke="#d5d7ce" stroke-width="1" />
+  <text x="48" y="644" class="small muted">40.50</text>
+  <polyline points="118.793,652.740 210.059,670.771 357.670,692.490 533.747,710.767 655.534,720.314 857.142,732.560" fill="none" stroke="#777d71" stroke-width="1" />
+  <circle cx="118.79269230769228" cy="652.7397127345938" r="4" fill="#794c9b" />
+  <text x="100.79269230769228" y="768" class="small muted">404.7</text>
+  <circle cx="210.0592307692308" cy="670.7705005878063" r="4" fill="#526caa" />
+  <text x="192.0592307692308" y="768" class="small muted">435.8</text>
+  <circle cx="357.6703846153847" cy="692.4899654655737" r="4" fill="#238994" />
+  <text x="339.6703846153847" y="768" class="small muted">486.1</text>
+  <circle cx="533.7473076923077" cy="710.7669833936562" r="4" fill="#497d44" />
+  <text x="515.7473076923077" y="768" class="small muted">546.1</text>
+  <circle cx="655.5338461538462" cy="720.3135557122503" r="4" fill="#af791c" />
+  <text x="637.5338461538462" y="768" class="small muted">587.6</text>
+  <circle cx="857.1419230769229" cy="732.5595387331186" r="4" fill="#b64c3e" />
+  <text x="839.1419230769229" y="768" class="small muted">656.3</text>
+  <text x="934" y="639" class="small muted">degrees / nanometers</text>
+  <text x="934" y="682" class="small">Sellmeier dispersion</text>
+  <text x="934" y="703" class="small">Vector Snell refraction</text>
+  <text x="934" y="724" class="small">Exact dielectric Fresnel</text>
+  <line x1="48" y1="792" x2="1232" y2="792" stroke="#d5d7ce" stroke-width="1" />
+  <text x="48" y="818" class="small muted">Source: SCHOTT N-BK7 datasheet, 01-Dec-2023. No coatings, bulk absorption or secondary reflections.</text>
+</svg>
