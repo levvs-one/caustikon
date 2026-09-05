@@ -181,9 +181,10 @@ public sealed class GlassRenderer
 
         // A large soft key light and a small cool rim light: what the Fresnel reflection has to show.
         float key = MathF.Max(0f, Vector3.Dot(direction, KeyDirection));
-        sky += new Vector3(1.0f, 0.97f, 0.92f) * (3.2f * MathF.Pow(key, 40f) + 0.35f * MathF.Pow(key, 6f));
+        // A lamp is far brighter than the room: after a few per cent of Fresnel reflection it must still read as white.
+        sky += new Vector3(1.0f, 0.97f, 0.92f) * (40f * MathF.Pow(key, 220f) + 0.6f * MathF.Pow(key, 8f));
         float rim = MathF.Max(0f, Vector3.Dot(direction, RimDirection));
-        sky += new Vector3(0.55f, 0.65f, 0.80f) * (1.6f * MathF.Pow(rim, 60f));
+        sky += new Vector3(0.55f, 0.65f, 0.80f) * (8f * MathF.Pow(rim, 140f));
         return sky;
     }
 
