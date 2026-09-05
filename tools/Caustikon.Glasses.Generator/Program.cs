@@ -90,6 +90,7 @@ JsonSerializerOptions json = new()
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    NewLine = "\n",
 };
 
 foreach (VendorOutput vendor in vendors)

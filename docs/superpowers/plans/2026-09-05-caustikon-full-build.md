@@ -35,15 +35,16 @@ Data facts that shaped the design (surveyed 2026-09-05):
       `src/Caustikon.Glasses/Generated/*.g.cs`
 - [x] `Glass`, `GlassProvenance`, `DispersionFormula`, `GlassCatalog`, vendor classes
 - [x] `DATA-LICENSE.md`
-- [ ] Tests: every glass with catalog nd/Vd reproduces them at the exact d/F/C lines
-      (tolerance measured from the data and recorded); provenance completeness
+- [x] Tests: every glass with catalog nd/Vd reproduces them at the exact d/F/C lines
+      (5e-5 plus printed rounding; Vd by propagation); provenance completeness;
+      N-BK7 τi and dn/dT pinned to the SCHOTT datasheet of 01-Dec-2023
 
 ## Stage 2 — thickness, temperature, colour
 
 - [x] `TabulatedExtinction` → internal transmittance at thickness (Beer–Lambert),
       verified against SCHOTT N-BK7 τi(10 mm)
 - [x] `ThermalDispersion` (SCHOTT formula A), absolute Δn, reference 20 °C
-- [ ] CIE 1931 2° + D65 embedded; `TransmittedColour` → XYZ, linear sRGB, sRGB;
+- [x] CIE 1931 2° + D65 embedded; `TransmittedColour` → XYZ, linear sRGB, sRGB;
       test: empty path reproduces D65 white
 - [ ] README Scope amended to say what stage 2 added and what it still excludes
 
