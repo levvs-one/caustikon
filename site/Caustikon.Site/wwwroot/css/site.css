@@ -310,6 +310,9 @@ th {
     font-weight: 500;
     color: var(--muted);
     white-space: nowrap;
+}
+
+table.catalog th {
     position: sticky;
     top: 52px;
     background: var(--bg);
@@ -368,7 +371,7 @@ table.compact td {
     display: block;
 }
 
-.control > .range-label {
+.control > span.range-label {
     display: flex;
     justify-content: space-between;
     gap: 1rem;
