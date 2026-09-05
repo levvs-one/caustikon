@@ -46,20 +46,22 @@ Data facts that shaped the design (surveyed 2026-09-05):
 - [x] `ThermalDispersion` (SCHOTT formula A), absolute Δn, reference 20 °C
 - [x] CIE 1931 2° + D65 embedded; `TransmittedColour` → XYZ, linear sRGB, sRGB;
       test: empty path reproduces D65 white
-- [ ] README Scope amended to say what stage 2 added and what it still excludes
+- [x] README Scope amended to say what stage 2 added and what it still excludes
 
 ## Stage 3 — site and delivery
 
-- [ ] `site/Caustikon.Site` Blazor WebAssembly: home, catalog with search, glass page
+- [x] `site/Caustikon.Site` Blazor WebAssembly: home, catalog with search, glass page
       (n(λ), τi(λ, d), colour, thermal), playground (glass × angle × thickness),
       formulas page; one typeface, SVG charts drawn from the library, no template CSS
-- [ ] `.github/workflows/pages.yml` (build + deploy site), `release.yml` (pack + push
+- [x] `.github/workflows/pages.yml` (build + deploy site), `release.yml` (pack + push
       NuGet on tag with `NUGET_API_KEY`); verify.yml extended to Glasses tests
-- [ ] README rewritten around NuGet install and a five-line quickstart
-- [ ] CHANGELOG entries
+- [x] README rewritten around NuGet install and a five-line quickstart
+- [x] CHANGELOG entries
 
 ## Owner-only (cannot be done from this machine)
 
-- Rename repository `sidelight` → `caustikon`
-- Settings → Pages → Source: GitHub Actions
+- ~~Rename repository~~ done via gh API 2026-09-05
+- ~~Settings → Pages~~ enabled via gh API (build_type=workflow)
+- Merge the pull request from `design/glass-catalog` (Pages deploys from `main`)
+- DNS: `caustikon.levvs.cc A 157.180.115.153` — the site is already on hel1 under `/srv/caustikon` with a Caddy block; the certificate issues itself once the record exists
 - Add `NUGET_API_KEY` secret; push a `v*` tag to publish
