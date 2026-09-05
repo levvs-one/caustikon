@@ -18,11 +18,15 @@
     public double MaximumDeviation { get; private set; } = double.NaN;
     public double SpreadDegrees => MaximumDeviation - MinimumDeviation;
 
+    /// <summary>Height of the visible spectrum on a screen one meter from the exit face, in millimeters.</summary>
+    public double SpectrumMillimetersAtOneMeter => 1000 * Math.Tan(SpreadDegrees * Math.PI / 180);
+
     protected override void OnParametersSet()
     {
         // Prism in scene units: equilateral, side 1, apex up. Scene scale and placement chosen so the fan fits.
         const double scale = 300;
-        Vector2 origin = new(360, 430);
+        const float screenX = 2.05f; // a screen 1.55 prism-sides to the right of the prism base's right corner
+        Vector2 origin = new(250, 400);
         Vector2 a = new(0, 0), b = new(1, 0), c = new(0.5f, MathF.Sqrt(3) / 2);
         Vector2[] vertices = [a, b, c];
 
@@ -44,6 +48,7 @@
          .Append("\" x2=\"").Append(F(P(entry, origin, scale).X)).Append("\" y2=\"").Append(F(P(entry, origin, scale).Y)).Append("\"/>");
 
         double minDev = double.PositiveInfinity, maxDev = double.NegativeInfinity;
+        System.Text.StringBuilder hits = new();
         s.Append("<g class=\"fan\">");
         for (int i = 0; i < RayCount; i++)
         {
@@ -94,18 +99,28 @@
 
             if (exitDirection is { } exit)
             {
-                Vector2 end = path[^1] + exit * 3f;
+                Vector2 start = path[^1];
+                float travel = exit.X > 0.01f ? (screenX - start.X) / exit.X : 3f;
+                Vector2 end = start + exit * Math.Clamp(travel, 0.1f, 4f);
                 Vector2 p = P(end, origin, scale);
                 s.Append(F(p.X)).Append(',').Append(F(p.Y));
                 double deviation = Math.Acos(Math.Clamp(Vector2.Dot(incident, exit), -1, 1)) * 180 / Math.PI;
                 minDev = Math.Min(minDev, deviation);
                 maxDev = Math.Max(maxDev, deviation);
+                if (exit.X > 0.01f && p.Y > 0 && p.Y < H)
+                {
+                    hits.Append("<line class=\"hit\" style=\"stroke:").Append(colour).Append("\" x1=\"").Append(F(p.X - 4)).Append("\" x2=\"").Append(F(p.X + 10)).Append("\" y1=\"").Append(F(p.Y)).Append("\" y2=\"").Append(F(p.Y)).Append("\"/>");
+                }
             }
 
             s.Append("\"/>");
         }
 
         s.Append("</g>");
+        // The screen: a vertical line where the fan lands, each wavelength marked at its true height.
+        double sx = origin.X + screenX * scale;
+        s.Append("<line class=\"screen\" x1=\"").Append(F(sx)).Append("\" x2=\"").Append(F(sx)).Append("\" y1=\"").Append(F(20)).Append("\" y2=\"").Append(F(H - 20)).Append("\"/>");
+        s.Append("<g class=\"hits\">").Append(hits).Append("</g>");
 
         // Prism outline on top.
         s.Append("<polygon class=\"glass\" points=\"");

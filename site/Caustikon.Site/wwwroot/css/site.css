@@ -595,9 +595,43 @@ button.primary {
 
 .prism .ray {
     fill: none;
-    stroke-width: 1.4;
+    stroke-width: 1.8;
     stroke-linejoin: round;
-    opacity: 0.85;
+    opacity: 0.9;
+    stroke-dasharray: 2400;
+    stroke-dashoffset: 2400;
+    animation: trace 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+.prism .fan {
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
+}
+
+.prism .screen {
+    stroke: rgba(244, 239, 228, 0.35);
+    stroke-width: 1;
+}
+
+.prism .hit {
+    stroke-width: 2.4;
+    mix-blend-mode: screen;
+}
+
+.prism .hits {
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
+}
+
+@keyframes trace {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .prism .ray {
+        animation: none;
+        stroke-dashoffset: 0;
+    }
 }
 
 .prism .glass {
@@ -616,9 +650,18 @@ button.primary {
 
 .hero .readout {
     display: flex;
-    gap: 2rem;
+    flex-wrap: wrap;
+    gap: 0.8rem 1.6rem;
     margin-top: 1rem;
     font-variant-numeric: tabular-nums;
+}
+
+.hero .readout .value {
+    white-space: nowrap;
+}
+
+.hero .readout > div {
+    min-width: 7.5rem;
 }
 
 .hero .readout .value {

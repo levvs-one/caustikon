@@ -28,8 +28,9 @@
             <div><div class="value">@SiteInfo.Number(prism?.MinimumDeviation ?? double.NaN, 2)°</div><div class="label">deviation at 700 nm</div></div>
             <div><div class="value">@SiteInfo.Number(prism?.MaximumDeviation ?? double.NaN, 2)°</div><div class="label">deviation at 400 nm</div></div>
             <div><div class="value">@SiteInfo.Number(prism?.SpreadDegrees ?? double.NaN, 2)°</div><div class="label">spread</div></div>
+            <div><div class="value">@SiteInfo.Number(prism?.SpectrumMillimetersAtOneMeter ?? double.NaN, 0) mm</div><div class="label">spectrum on a screen 1 m away</div></div>
         </div>
-        <p class="muted">Sixty-one wavelengths traced through an equilateral prism with the packages' own refraction, each drawn in its CIE colour and added like light. Change the glass and the fan changes with its dispersion.</p>
+        <p class="muted">Sixty-one wavelengths from 400 to 700 nm traced through an equilateral prism with the packages' own refraction, each drawn in its CIE colour and added like light; the marks on the right are where they land on a screen. Change the glass and the fan changes with its dispersion.</p>
     </div>
     <PrismScene @ref="prism" Glass="prismGlass" IncidenceDegrees="incidence" />
 </div>
@@ -111,7 +112,7 @@ string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</c
     private double nd, rs, rp, tau;
     private string tintHex = "";
     private string prismKeyValue = "schott/N-BK7";
-    private double incidence = 50;
+    private double incidence = 60;
     private Glass prismGlass = GlassCatalog.Find("schott", "N-BK7")!;
     private PrismScene? prism;
 
