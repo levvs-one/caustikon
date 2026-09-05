@@ -104,6 +104,10 @@ h1 {
     font-size: 1.9rem;
 }
 
+h1:focus:not(:focus-visible) {
+    outline: none;
+}
+
 h2 {
     font-size: 1.25rem;
     margin-top: 2.2rem;
