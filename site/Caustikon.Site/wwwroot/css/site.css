@@ -737,3 +737,126 @@ button.primary {
     height: 10px;
     border-radius: 50%;
 }
+
+/* Render page */
+
+.render-stage {
+    display: grid;
+    grid-template-columns: minmax(240px, 480px) minmax(260px, 1fr);
+    gap: 1.5rem 2.5rem;
+    align-items: start;
+}
+
+.render-canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    background: #0c1013;
+    border-radius: var(--radius);
+    image-rendering: auto;
+}
+
+.render-facts h2 {
+    margin-top: 0;
+}
+
+/* Small screens */
+
+@media (max-width: 720px) {
+    .render-stage,
+    .hero {
+        grid-template-columns: 1fr;
+    }
+
+    .hero > .bench {
+        order: -1;
+    }
+
+    header.site .frame {
+        height: auto;
+        min-height: 48px;
+        flex-wrap: wrap;
+        padding-top: 0.4rem;
+        padding-bottom: 0.4rem;
+    }
+
+    nav.primary {
+        margin-left: 0;
+        width: 100%;
+        overflow-x: auto;
+        gap: 1rem;
+        padding-bottom: 0.2rem;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    nav.primary a {
+        white-space: nowrap;
+    }
+
+    nav.primary {
+        scrollbar-width: none;
+    }
+
+    nav.primary::-webkit-scrollbar {
+        display: none;
+    }
+
+    main {
+        padding-top: 1.4rem;
+    }
+
+    .lede {
+        font-size: 1.02rem;
+    }
+
+    .controls {
+        gap: 0.7rem 1rem;
+    }
+
+    .control {
+        flex: 1 1 100%;
+    }
+
+    input[type="range"],
+    select,
+    input[type="search"],
+    input[type="number"] {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .figures {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    table.catalog th {
+        top: 0;
+    }
+
+    table.catalog th:nth-child(n + 5),
+    table.catalog td:nth-child(n + 5) {
+        display: none;
+    }
+
+    table.compact {
+        font-size: 0.8rem;
+    }
+
+    .table-scroll {
+        margin: 0 -1.25rem;
+        padding: 0 1.25rem;
+    }
+
+    pre {
+        font-size: 0.8rem;
+    }
+
+    .kv {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .kv dt {
+        margin-top: 0.4rem;
+    }
+}

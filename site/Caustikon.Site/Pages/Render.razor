@@ -1,0 +1,179 @@
+@page "/render"
+@using Caustikon.Site.Services
+@inject IJSRuntime Js
+@implements IDisposable
+
+<PageTitle>Render · Caustikon</PageTitle>
+
+<h1>Render</h1>
+<p class="lede">A sphere of the chosen glass on a checkered ground, ray-traced in your browser with the packages' own refraction, reflectance and absorption at nine wavelengths. The fringes and the tint are computed, not drawn.</p>
+
+<div class="controls">
+    <label class="control">
+        <span>Glass</span>
+        <select @bind="selectedKey">
+            <optgroup label="Commonly used">
+                @foreach ((string key, string label) in Featured)
+                {
+                    <option value="@key">@label</option>
+                }
+            </optgroup>
+            @foreach (string vendor in GlassCatalog.Vendors)
+            {
+                <optgroup label="@(GlassCatalog.ByVendor(vendor).First().VendorDisplayName)">
+                    @foreach (Glass g in GlassCatalog.ByVendor(vendor).Where(g => g.CatalogIndexD is not null))
+                    {
+                        <option value="@(g.Vendor + "/" + g.Name)">@g.Name (@SiteInfo.Number(g.CatalogIndexD!.Value, 4) / @SiteInfo.Number(g.CatalogAbbeD ?? double.NaN, 1))</option>
+                    }
+                </optgroup>
+            }
+        </select>
+    </label>
+    <label class="control">
+        <span class="range-label"><span>Sphere diameter</span><output>@diameter mm</output></span>
+        <input type="range" min="10" max="200" step="5" @bind="diameter" />
+    </label>
+    <label class="control">
+        <span>Resolution</span>
+        <select @bind="size">
+            <option value="160">160 px, fast</option>
+            <option value="240">240 px</option>
+            <option value="360">360 px, fine</option>
+        </select>
+    </label>
+    <button class="primary" @onclick="Start" disabled="@rendering">@(rendering ? $"Rendering… {progress}%" : "Render")</button>
+</div>
+
+<div class="render-stage">
+    <canvas id="render-canvas" width="@lastSize" height="@lastSize" class="render-canvas"></canvas>
+    @if (glass is { } g0)
+    {
+        <div class="render-facts">
+            <h2>@g0.VendorDisplayName <a href="@Catalog.GlassLink(g0)">@g0.Name</a></h2>
+            <dl class="kv">
+                <dt>n<sub>d</sub> / ν<sub>d</sub></dt><dd>@SiteInfo.Number(g0.IndexD, 5) / @SiteInfo.Number(g0.AbbeD, 2)</dd>
+                <dt>n at 400 and 700 nm</dt><dd>@IndexAt(g0, 400) · @IndexAt(g0, 700)</dd>
+                <dt>τ<sub>i</sub> through @diameter mm at 450 nm</dt><dd>@Tau(g0, 450)</dd>
+                <dt>τ<sub>i</sub> through @diameter mm at 650 nm</dt><dd>@Tau(g0, 650)</dd>
+                <dt>Sampled wavelengths</dt><dd>@string.Join(", ", GlassRenderer.SampledWavelengths.Select(w => w.ToString("0", CultureInfo.InvariantCulture))) nm</dd>
+                @if (lastMilliseconds > 0)
+                {
+                    <dt>Tracing time</dt><dd>@lastSize × @lastSize in @((lastMilliseconds / 1000.0).ToString("0.0", CultureInfo.InvariantCulture)) s</dd>
+                }
+            </dl>
+            <p class="muted">
+                Each pixel traces nine rays, one per wavelength: Fresnel-weighted reflection off the surface, refraction in, up to four
+                internal reflections with Beer–Lambert absorption over every chord from the glass's k(λ) table, refraction out.
+                A flint spreads the checker edges into colour; a thick dense flint goes warm because its own k(λ) says so.
+                Not simulated: shadows, caustics on the ground, coatings, polarization beyond the unpolarized split.
+            </p>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly (string Key, string Label)[] Featured =
+    [
+        ("schott/N-BK7", "SCHOTT N-BK7 — the crown everything is measured against"),
+        ("schott/N-SF11", "SCHOTT N-SF11 — dense flint, strong fringes"),
+        ("schott/SF57", "SCHOTT SF57 — very dense flint, warm when thick"),
+        ("schott/N-SF66", "SCHOTT N-SF66 — the highest dispersion in the catalog"),
+        ("schott/N-LASF9", "SCHOTT N-LASF9 — high index, tight refraction"),
+        ("schott/N-FK58", "SCHOTT N-FK58 — fluor crown, almost no fringes"),
+        ("ohara/S-FPL53", "OHARA S-FPL53 — extra-low dispersion"),
+        ("ohara/S-LAH79", "OHARA S-LAH79 — index above two"),
+        ("hoya/TAFD55", "HOYA TAFD55 — high-index lanthanum flint"),
+        ("cdgm/H-ZF88", "CDGM H-ZF88 — dense flint"),
+    ];
+
+    private string selectedKeyValue = "schott/N-SF11";
+    private double diameter = 60;
+    private int size = 240;
+    private int lastSize = 240;
+    private bool rendering;
+    private int progress;
+    private long lastMilliseconds;
+    private Glass? glass;
+    private CancellationTokenSource? cancel;
+    private bool rendered;
+
+    private string selectedKey
+    {
+        get => selectedKeyValue;
+        set
+        {
+            selectedKeyValue = value;
+            int slash = value.IndexOf('/');
+            glass = GlassCatalog.Find(value[..slash], value[(slash + 1)..]);
+        }
+    }
+
+    protected override void OnInitialized() => selectedKey = selectedKeyValue;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !rendered)
+        {
+            rendered = true;
+            await Start();
+        }
+    }
+
+    private async Task Start()
+    {
+        if (glass is null || rendering)
+        {
+            return;
+        }
+
+        cancel?.Cancel();
+        cancel = new CancellationTokenSource();
+        CancellationToken token = cancel.Token;
+        rendering = true;
+        progress = 0;
+        lastSize = size;
+        StateHasChanged();
+        await Task.Yield();
+
+        GlassRenderer renderer = new(glass, diameter / 2d);
+        byte[] rgba = new byte[size * size * 4];
+        // Only the tracing is timed: the yields between bands are at the browser's mercy and would be reported as physics.
+        System.Diagnostics.Stopwatch watch = new();
+        const int band = 12;
+        for (int row = 0; row < size && !token.IsCancellationRequested; row += band)
+        {
+            int end = Math.Min(size, row + band);
+            watch.Start();
+            renderer.RenderRows(rgba, size, row, end);
+            watch.Stop();
+            progress = end * 100 / size;
+            await Js.InvokeVoidAsync("caustikonCanvas.put", "render-canvas", size, size, rgba);
+            StateHasChanged();
+            await Task.Yield();
+        }
+
+        if (!token.IsCancellationRequested)
+        {
+            lastMilliseconds = watch.ElapsedMilliseconds;
+        }
+
+        rendering = false;
+        StateHasChanged();
+    }
+
+    private static string IndexAt(Glass g, double wavelength) =>
+        g.IndexAt(Math.Clamp(wavelength, g.Model.MinimumWavelengthNanometers, g.Model.MaximumWavelengthNanometers), out double n) == DispersionStatus.Success ? SiteInfo.Number(n, 4) : "—";
+
+    private string Tau(Glass g, double wavelength)
+    {
+        if (g.Extinction is not { } extinction)
+        {
+            return "no k data";
+        }
+
+        extinction.InternalTransmittance(Math.Clamp(wavelength, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers), diameter, out double t);
+        return SiteInfo.Number(t, 3);
+    }
+
+    public void Dispose() => cancel?.Cancel();
+}
