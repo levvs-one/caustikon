@@ -12,17 +12,29 @@ Scalar and span APIs use caller-owned storage. The library targets .NET 8 and .N
 
 ## Use from source
 
-Caustikon is not published to NuGet.org. Clone this repository and add a project reference:
+Caustikon is not published to NuGet.org. With Git and .NET SDK 10.0.400 installed, run the prism example from a new checkout:
 
-```xml
-<ItemGroup>
-  <ProjectReference Include="../caustikon/src/Caustikon/Caustikon.csproj" />
-</ItemGroup>
+```powershell
+git clone https://github.com/levvs-one/caustikon.git
+cd caustikon
+New-Item -ItemType Directory -Force artifacts
+dotnet run --project examples/Prism --configuration Release -- artifacts/prism.svg
 ```
 
-The repository selects .NET SDK 10.0.400 and permits later patches in the same 10.0.4xx feature band. Running the tests for both targets also requires the .NET 8 runtime; a second SDK is not necessary.
+This prints six wavelength/index/deviation rows and writes `artifacts/prism.svg`, which you can open in a browser. It does not replace the checked-in diagram.
+
+The repository selects .NET SDK 10.0.400 and permits later patches in the same 10.0.4xx feature band. The examples need only the .NET 10 runtime included with that SDK. Running the tests for both targets also requires the .NET 8 runtime; a second SDK is not necessary.
 
 ## Refract a ray
+
+To use the library in your own application, create a sibling console project from the repository root:
+
+```powershell
+dotnet new console --output ../RayDemo --framework net10.0
+dotnet reference add src/Caustikon/Caustikon.csproj --project ../RayDemo/RayDemo.csproj
+```
+
+Replace `../RayDemo/Program.cs` with:
 
 ```csharp
 using System.Numerics;
@@ -38,13 +50,23 @@ RefractionKind kind = Dielectric.RefractUnit(
     nTransmitted: 1.5f,
     out Vector3 transmitted);
 
-if (kind is RefractionKind.Refracted or RefractionKind.CriticalAngle)
+switch (kind)
 {
-    float cosIncident = -Vector3.Dot(incident, normal);
-    FresnelPower power = Dielectric.Fresnel(cosIncident, 1f, 1.5f);
-    Console.WriteLine($"T = {transmitted}, R = {power.Unpolarized}");
+    case RefractionKind.Refracted:
+    case RefractionKind.CriticalAngle:
+        float cosIncident = -Vector3.Dot(incident, normal);
+        FresnelPower power = Dielectric.Fresnel(cosIncident, 1f, 1.5f);
+        Console.WriteLine($"{kind}: T = {transmitted}, R = {power.Unpolarized}");
+        break;
+    case RefractionKind.TotalInternalReflection:
+        Console.WriteLine("No transmitted ray; all incident power is reflected.");
+        break;
+    case RefractionKind.InvalidInput:
+        throw new ArgumentException("Check unit vectors, normal orientation, and positive finite indices.");
 }
 ```
+
+Run `dotnet run --project ../RayDemo --configuration Release` from the repository root. For these inputs the result is `Refracted`, with a transmitted direction near `(0.3333333, -0.9428090, 0)` and unpolarized reflectance near `0.04152`.
 
 The direction and normal convention is strict:
 
@@ -81,6 +103,10 @@ if (status is DispersionStatus.Success)
 {
     Console.WriteLine(refractiveIndex);
 }
+else
+{
+    Console.Error.WriteLine($"The model cannot evaluate this wavelength: {status}");
+}
 ```
 
 The coefficients come from the [SCHOTT N-BK7 datasheet](https://media.schott.com/api/public/content/41e799d0bf874807a0bb8e702fbb75b5?v=54856406). At 587.6 nm, the result is approximately `1.51679844`, consistent with the datasheet's rounded `1.51680`. SCHOTT's catalogue relation gives refractive index relative to air at room temperature; see [TIE-29, section 2.3](https://media.schott.com/api/public/content/aaa572afd854434fb7b3faa4bc46103f?v=c0f4fa52) for its conventions.
@@ -99,6 +125,8 @@ The example chooses a 365-2325.4 nm interval within the tabulated values. This i
 | Sellmeier dispersion | `Sellmeier3.EvaluateNanometers` | Wavelength, result, and status spans |
 
 Batch overloads write into spans supplied by the caller. Span lengths must match. Permitted in-place operations and overlap restrictions are specified in [the buffer contract](docs/conventions.md#batch-buffer-rules).
+
+[CriticalBoundary](examples/CriticalBoundary) is a complete batch example: six wavelengths reach a glass-to-air interface at the same angle, with both refraction and total internal reflection in the result. It shows buffer setup, status handling and per-wavelength indices, and checks every batch result against the scalar API.
 
 ## Numerical contracts
 

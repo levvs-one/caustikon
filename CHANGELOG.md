@@ -2,6 +2,13 @@
 
 All notable changes to Caustikon are recorded here.
 
+## Unreleased
+
+- Include XML API documentation in both package targets.
+- Add a runnable spectral batch example across the glass-to-air critical boundary.
+- Document a complete source-reference quickstart and explicit failure handling.
+- Simplify the prism drawing and verify its generated geometry in CI.
+
 ## 0.1.0 - 2026-09-05
 
 ### Added
