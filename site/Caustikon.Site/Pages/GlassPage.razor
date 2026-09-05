@@ -58,7 +58,8 @@ else
             <div>
                 @if (colour is { } c)
                 {
-                    <div class="swatch-block" style="background: @c.Hex"></div>
+                    <SpectrumStrip Transmittance="SpectralTransmittance" Label="@($"Visible spectrum through {thickness} mm of {glass.Name}")" />
+                    <div class="swatch-block" style="background: @c.Hex; margin-top: 0.8rem"></div>
                     <dl class="kv">
                         <dt>sRGB</dt><dd>@c.Hex · @c.Rgb8.Red, @c.Rgb8.Green, @c.Rgb8.Blue</dd>
                         <dt>Luminous transmittance Y</dt><dd>@SiteInfo.Number(c.Y, 4)</dd>
@@ -199,6 +200,24 @@ else
         indexSeries = [new ChartSeries("n", points)];
         BuildCoefficientTable(glass);
         UpdateTransmittance();
+    }
+
+    private double SpectralTransmittance(double wavelength)
+    {
+        if (glass?.Extinction is not { } extinction)
+        {
+            return 1;
+        }
+
+        double clamped = Math.Clamp(wavelength, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers);
+        extinction.InternalTransmittance(clamped, thicknessValue, out double t);
+        if (surfacesValue && glass.IndexAt(Math.Clamp(wavelength, glass.Model.MinimumWavelengthNanometers, glass.Model.MaximumWavelengthNanometers), out double n) == DispersionStatus.Success)
+        {
+            double pass = 1 - Dielectric.NormalReflectance(1f, (float)n);
+            t *= pass * pass;
+        }
+
+        return t;
     }
 
     private void UpdateTransmittance()

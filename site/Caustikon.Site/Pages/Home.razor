@@ -2,12 +2,37 @@
 
 <PageTitle>Caustikon</PageTitle>
 
-<h1>Geometric optics for .NET, with the glass included</h1>
-<p class="lede">
-    Refraction, exact Fresnel reflectance and dispersion as allocation-free value types, and a catalog of
-    @SiteInfo.GlassCount manufacturer glasses that carries dispersion, absorption and temperature data with a
-    citation for every number.
-</p>
+<div class="hero">
+    <div>
+        <h1>Geometric optics for .NET, with the glass included</h1>
+        <p class="lede">
+            Refraction, exact Fresnel reflectance and dispersion as allocation-free value types, and a catalog of
+            @SiteInfo.GlassCount manufacturer glasses with dispersion, absorption and temperature data, each number cited.
+        </p>
+        <div class="controls">
+            <label class="control">
+                <span>Prism glass</span>
+                <select @bind="prismKey">
+                    @foreach ((string key, string label) in PrismChoices)
+                    {
+                        <option value="@key">@label</option>
+                    }
+                </select>
+            </label>
+            <label class="control">
+                <span class="range-label"><span>Angle of incidence</span><output>@incidence°</output></span>
+                <input type="range" min="25" max="75" step="0.5" @bind="incidence" @bind:event="oninput" />
+            </label>
+        </div>
+        <div class="readout">
+            <div><div class="value">@SiteInfo.Number(prism?.MinimumDeviation ?? double.NaN, 2)°</div><div class="label">deviation at 700 nm</div></div>
+            <div><div class="value">@SiteInfo.Number(prism?.MaximumDeviation ?? double.NaN, 2)°</div><div class="label">deviation at 400 nm</div></div>
+            <div><div class="value">@SiteInfo.Number(prism?.SpreadDegrees ?? double.NaN, 2)°</div><div class="label">spread</div></div>
+        </div>
+        <p class="muted">Sixty-one wavelengths traced through an equilateral prism with the packages' own refraction, each drawn in its CIE colour and added like light. Change the glass and the fan changes with its dispersion.</p>
+    </div>
+    <PrismScene @ref="prism" Glass="prismGlass" IncidenceDegrees="incidence" />
+</div>
 
 <div class="figures">
     <div class="figure"><div class="value">@SiteInfo.GlassCount</div><div class="label">glasses with closed-form dispersion</div></div>
@@ -69,10 +94,37 @@ string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</c
 </div>
 
 @code {
+    private static readonly (string Key, string Label)[] PrismChoices =
+    [
+        ("schott/N-BK7", "SCHOTT N-BK7 — borosilicate crown, νd 64"),
+        ("schott/N-FK58", "SCHOTT N-FK58 — fluor crown, νd 91"),
+        ("schott/N-LASF9", "SCHOTT N-LASF9 — dense lanthanum flint, νd 32"),
+        ("schott/SF57", "SCHOTT SF57 — dense flint, νd 24"),
+        ("schott/N-SF66", "SCHOTT N-SF66 — densest flint, νd 21"),
+        ("ohara/S-FPL53", "OHARA S-FPL53 — extra-low dispersion, νd 95"),
+        ("hoya/TAFD55", "HOYA TAFD55 — high-index, νd 27"),
+        ("cdgm/H-ZF88", "CDGM H-ZF88 — dense flint, νd 20"),
+    ];
+
     private int withExtinction;
     private int withThermal;
     private double nd, rs, rp, tau;
     private string tintHex = "";
+    private string prismKeyValue = "schott/N-BK7";
+    private double incidence = 50;
+    private Glass prismGlass = GlassCatalog.Find("schott", "N-BK7")!;
+    private PrismScene? prism;
+
+    private string prismKey
+    {
+        get => prismKeyValue;
+        set
+        {
+            prismKeyValue = value;
+            int slash = value.IndexOf('/');
+            prismGlass = GlassCatalog.Find(value[..slash], value[(slash + 1)..]) ?? prismGlass;
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -85,5 +137,14 @@ string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</c
         Glass glass = GlassCatalog.Find("ohara", "S-BSL7")!;
         glass.Extinction!.InternalTransmittance(400d, 10d, out tau);
         tintHex = GlassColour.Transmitted(glass, 25d)!.Value.Hex;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // The readout quotes the scene's numbers, which exist only after the scene has rendered.
+        if (firstRender)
+        {
+            StateHasChanged();
+        }
     }
 }

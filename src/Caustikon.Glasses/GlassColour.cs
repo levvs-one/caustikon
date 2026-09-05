@@ -116,6 +116,62 @@ public static class GlassColour
             coverageMaximum);
     }
 
+    /// <summary>The sRGB colour of a monochromatic line, for drawing spectra.</summary>
+    /// <param name="wavelengthNanometers">Wavelength in nanometers; outside 360–830 nm the result is black.</param>
+    /// <returns>
+    /// Companded sRGB channels in [0, 1]. The chromaticity is the observer's for that wavelength; since every pure spectral
+    /// colour lies outside the sRGB gamut, the linear channels are desaturated toward the D65 white just enough to bring the
+    /// colour into gamut, then scaled so the brightest channel is 1. The result is a display colour, not a radiometric one.
+    /// </returns>
+    public static (double Red, double Green, double Blue) Monochromatic(double wavelengthNanometers)
+    {
+        double position = (wavelengthNanometers - CieTables.ObserverFirstNanometers) / CieTables.ObserverStepNanometers;
+        if (!double.IsFinite(position) || position < 0d || position > CieTables.ObserverCount - 1)
+        {
+            return (0d, 0d, 0d);
+        }
+
+        int lower = (int)Math.Floor(position);
+        int upper = Math.Min(lower + 1, CieTables.ObserverCount - 1);
+        double t = position - lower;
+        double x = CieTables.XBar[lower] + t * (CieTables.XBar[upper] - CieTables.XBar[lower]);
+        double y = CieTables.YBar[lower] + t * (CieTables.YBar[upper] - CieTables.YBar[lower]);
+        double z = CieTables.ZBar[lower] + t * (CieTables.ZBar[upper] - CieTables.ZBar[lower]);
+        double sum = x + y + z;
+        if (sum <= 0d)
+        {
+            return (0d, 0d, 0d);
+        }
+
+        // Chromaticity only: the observer's own magnitude near the edges of the visible range would be invisible.
+        x /= sum;
+        y /= sum;
+        z /= sum;
+        double red = 3.2404542d * x - 1.5371385d * y - 0.4985314d * z;
+        double green = -0.9692660d * x + 1.8760108d * y + 0.0415560d * z;
+        double blue = 0.0556434d * x - 0.2040259d * y + 1.0572252d * z;
+
+        // Desaturate toward white until no channel is negative.
+        double minimum = Math.Min(red, Math.Min(green, blue));
+        if (minimum < 0d)
+        {
+            double white = -minimum / (1d - minimum);
+            red = red + white * (1d - red);
+            green = green + white * (1d - green);
+            blue = blue + white * (1d - blue);
+        }
+
+        double maximum = Math.Max(red, Math.Max(green, blue));
+        if (maximum > 0d)
+        {
+            red /= maximum;
+            green /= maximum;
+            blue /= maximum;
+        }
+
+        return (TransmittedColour.Compand(Math.Clamp(red, 0d, 1d)), TransmittedColour.Compand(Math.Clamp(green, 0d, 1d)), TransmittedColour.Compand(Math.Clamp(blue, 0d, 1d)));
+    }
+
     /// <summary>Relative spectral power of CIE illuminant D65 at a wavelength (100 at 560 nm), linearly interpolated from the 5 nm table and zero outside 300–780 nm.</summary>
     /// <param name="wavelengthNanometers">Wavelength in nanometers.</param>
     public static double IlluminantAt(double wavelengthNanometers)

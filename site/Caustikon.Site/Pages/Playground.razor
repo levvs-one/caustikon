@@ -83,7 +83,8 @@
         <h2>Through a @thickness mm slab</h2>
         <div class="columns">
             <div>
-                <div class="swatch-block" style="background: @c.Hex"></div>
+                <SpectrumStrip Transmittance="SlabTransmittance" Label="@($"Visible spectrum through the {thickness} mm slab")" />
+                <div class="swatch-block" style="background: @c.Hex; margin-top: 0.8rem"></div>
                 <dl class="kv">
                     <dt>Transmitted colour</dt><dd>@c.Hex · @c.Rgb8.Red, @c.Rgb8.Green, @c.Rgb8.Blue</dd>
                     <dt>Luminous transmittance</dt><dd>@SiteInfo.Number(c.Y, 4)</dd>
@@ -246,6 +247,14 @@
         RecomputeSlab();
     }
 
+    private double[] slabSpectrum = new double[471];
+
+    private double SlabTransmittance(double wavelength)
+    {
+        int i = (int)Math.Round(wavelength) - 360;
+        return i >= 0 && i < slabSpectrum.Length ? slabSpectrum[i] : 0;
+    }
+
     private void RecomputeSlab()
     {
         slabColour = null;
@@ -288,6 +297,7 @@
             }
         }
 
+        slabSpectrum = transmittance;
         TransmittedColour colour = GlassColour.FromTransmittance(transmittance);
         slabColour = colour with { CoverageMinimumNanometers = coverageMin, CoverageMaximumNanometers = coverageMax };
     }

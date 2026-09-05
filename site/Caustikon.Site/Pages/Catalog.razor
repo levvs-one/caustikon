@@ -49,7 +49,9 @@
     </label>
 </div>
 
-<p class="muted">@Filtered.Count shown</p>
+<AbbeDiagram Highlighted="filtered" />
+
+<p class="muted">@filtered.Count shown</p>
 
 <table class="catalog">
         <thead>
@@ -67,7 +69,7 @@
             </tr>
         </thead>
         <tbody>
-            <Virtualize Items="Filtered" Context="glass" ItemSize="31">
+            <Virtualize Items="filtered" Context="glass" ItemSize="31">
                 <tr>
                     <td>@glass.VendorDisplayName</td>
                     <td><a href="@GlassLink(glass)">@glass.Name</a> @if (glass.Category != "optical") { <span class="badge">@glass.Category</span> }</td>
@@ -85,12 +87,24 @@
     </table>
 
 @code {
-    private string search = "";
-    private string vendor = "";
-    private string status = "";
-    private double? ndMin, ndMax, vdMin, vdMax;
+    private string searchValue = "", vendorValue = "", statusValue = "";
+    private double? ndMinValue, ndMaxValue, vdMinValue, vdMaxValue;
     private string sortKey = "vendor";
     private bool descending;
+
+    private string search { get => searchValue; set { searchValue = value; Refilter(); } }
+    private string vendor { get => vendorValue; set { vendorValue = value; Refilter(); } }
+    private string status { get => statusValue; set { statusValue = value; Refilter(); } }
+    private double? ndMin { get => ndMinValue; set { ndMinValue = value; Refilter(); } }
+    private double? ndMax { get => ndMaxValue; set { ndMaxValue = value; Refilter(); } }
+    private double? vdMin { get => vdMinValue; set { vdMinValue = value; Refilter(); } }
+    private double? vdMax { get => vdMaxValue; set { vdMaxValue = value; Refilter(); } }
+
+    private List<Glass> filtered = [];
+
+    protected override void OnParametersSet() => filtered = Filtered;
+
+    private void Refilter() => filtered = Filtered;
 
     private List<Glass> Filtered
     {
@@ -128,6 +142,7 @@
     {
         if (sortKey == key) descending = !descending;
         else { sortKey = key; descending = false; }
+        Refilter();
     }
 
     private string Active(string key) => sortKey == key ? "active" : "";

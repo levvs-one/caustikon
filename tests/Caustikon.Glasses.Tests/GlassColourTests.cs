@@ -111,6 +111,23 @@ public sealed class GlassColourTests
     }
 
     [TestMethod]
+    public void MonochromaticColoursFollowTheSpectrum()
+    {
+        (double r, double g, double b) red = GlassColour.Monochromatic(650d);
+        (double r, double g, double b) green = GlassColour.Monochromatic(530d);
+        (double r, double g, double b) blue = GlassColour.Monochromatic(450d);
+        (double r, double g, double b) yellow = GlassColour.Monochromatic(580d);
+
+        Assert.IsTrue(red.r > red.g && red.r > red.b, $"{red}");
+        Assert.IsTrue(green.g > green.r && green.g > green.b, $"{green}");
+        Assert.IsTrue(blue.b > blue.r && blue.b > blue.g, $"{blue}");
+        Assert.IsTrue(yellow.r > 0.9d && yellow.g > 0.7d && yellow.b < yellow.g, $"{yellow}");
+        Assert.AreEqual(1d, Math.Max(red.r, Math.Max(red.g, red.b)), 1e-12d);
+        Assert.AreEqual((0d, 0d, 0d), GlassColour.Monochromatic(200d));
+        Assert.AreEqual((0d, 0d, 0d), GlassColour.Monochromatic(double.NaN));
+    }
+
+    [TestMethod]
     public void CompandingMatchesTheSRgbCurve()
     {
         Assert.AreEqual(0d, TransmittedColour.Compand(0d));

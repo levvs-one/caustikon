@@ -1,0 +1,191 @@
+@using System.Numerics
+@* White light through an equilateral prism of a real glass. Every ray is traced with Dielectric.RefractUnit at its own
+   wavelength, coloured by the CIE observer, and composited additively so overlapping rays add up to white like light does. *@
+
+<div class="bench">
+    @((MarkupString)svg)
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Glass Glass { get; set; } = default!;
+    [Parameter] public double IncidenceDegrees { get; set; } = 50;
+    [Parameter] public int RayCount { get; set; } = 61;
+
+    private const double W = 1000, H = 520;
+    private string svg = "";
+
+    public double MinimumDeviation { get; private set; } = double.NaN;
+    public double MaximumDeviation { get; private set; } = double.NaN;
+    public double SpreadDegrees => MaximumDeviation - MinimumDeviation;
+
+    protected override void OnParametersSet()
+    {
+        // Prism in scene units: equilateral, side 1, apex up. Scene scale and placement chosen so the fan fits.
+        const double scale = 300;
+        Vector2 origin = new(360, 430);
+        Vector2 a = new(0, 0), b = new(1, 0), c = new(0.5f, MathF.Sqrt(3) / 2);
+        Vector2[] vertices = [a, b, c];
+
+        // Entry point on the left face at 55 % of the way up; the incident direction makes IncidenceDegrees with that face's normal.
+        Vector2 entry = a + (c - a) * 0.55f;
+        Vector2 leftNormal = OutwardNormal(vertices, 2); // edge c→a
+        double theta = IncidenceDegrees * Math.PI / 180;
+        // Rotate the inward normal by theta toward the apex side so the beam comes from lower-left.
+        Vector2 inward = -leftNormal;
+        Vector2 incident = Rotate(inward, theta);
+        Vector2 source = entry - incident * 1.2f;
+
+        System.Text.StringBuilder s = new();
+        s.Append("<svg class=\"prism\" viewBox=\"0 0 ").Append(F(W)).Append(' ').Append(F(H)).Append("\" preserveAspectRatio=\"xMidYMid meet\" role=\"img\" aria-label=\"White light dispersed by a prism of ").Append(Esc(Glass.VendorDisplayName + " " + Glass.Name)).Append("\">");
+        s.Append("<rect width=\"100%\" height=\"100%\" fill=\"#0c1013\"/>");
+
+        // Incoming white beam.
+        s.Append("<line class=\"beam\" x1=\"").Append(F(P(source, origin, scale).X)).Append("\" y1=\"").Append(F(P(source, origin, scale).Y))
+         .Append("\" x2=\"").Append(F(P(entry, origin, scale).X)).Append("\" y2=\"").Append(F(P(entry, origin, scale).Y)).Append("\"/>");
+
+        double minDev = double.PositiveInfinity, maxDev = double.NegativeInfinity;
+        s.Append("<g class=\"fan\">");
+        for (int i = 0; i < RayCount; i++)
+        {
+            double wavelength = 400 + 300.0 * i / (RayCount - 1);
+            if (Glass.IndexAt(wavelength, out double n) != DispersionStatus.Success)
+            {
+                continue;
+            }
+
+            (double r, double g, double bl) = GlassColour.Monochromatic(wavelength);
+            string colour = $"rgb({(int)Math.Round(r * 255)},{(int)Math.Round(g * 255)},{(int)Math.Round(bl * 255)})";
+
+            // Entry refraction.
+            if (Refract(incident, leftNormal, 1f, (float)n, out Vector2 inside) != RefractionKind.Refracted)
+            {
+                continue;
+            }
+
+            List<Vector2> path = [entry];
+            Vector2 position = entry;
+            Vector2 direction = inside;
+            int lastEdge = 2;
+            Vector2? exitDirection = null;
+            for (int bounce = 0; bounce < 4 && exitDirection is null; bounce++)
+            {
+                (Vector2 hit, int edge) = Intersect(position, direction, vertices, lastEdge);
+                path.Add(hit);
+                Vector2 normal = OutwardNormal(vertices, edge);
+                RefractionKind kind = Refract(direction, -normal, (float)n, 1f, out Vector2 outDir);
+                if (kind == RefractionKind.Refracted)
+                {
+                    exitDirection = outDir;
+                }
+                else
+                {
+                    direction = Reflect(direction, normal);
+                    position = hit;
+                    lastEdge = edge;
+                }
+            }
+
+            s.Append("<polyline class=\"ray\" style=\"stroke:").Append(colour).Append("\" points=\"");
+            foreach (Vector2 point in path)
+            {
+                Vector2 p = P(point, origin, scale);
+                s.Append(F(p.X)).Append(',').Append(F(p.Y)).Append(' ');
+            }
+
+            if (exitDirection is { } exit)
+            {
+                Vector2 end = path[^1] + exit * 3f;
+                Vector2 p = P(end, origin, scale);
+                s.Append(F(p.X)).Append(',').Append(F(p.Y));
+                double deviation = Math.Acos(Math.Clamp(Vector2.Dot(incident, exit), -1, 1)) * 180 / Math.PI;
+                minDev = Math.Min(minDev, deviation);
+                maxDev = Math.Max(maxDev, deviation);
+            }
+
+            s.Append("\"/>");
+        }
+
+        s.Append("</g>");
+
+        // Prism outline on top.
+        s.Append("<polygon class=\"glass\" points=\"");
+        foreach (Vector2 v in vertices)
+        {
+            Vector2 p = P(v, origin, scale);
+            s.Append(F(p.X)).Append(',').Append(F(p.Y)).Append(' ');
+        }
+
+        s.Append("\"/>");
+        s.Append("</svg>");
+        svg = s.ToString();
+        MinimumDeviation = double.IsFinite(minDev) ? minDev : double.NaN;
+        MaximumDeviation = double.IsFinite(maxDev) ? maxDev : double.NaN;
+    }
+
+    private static Vector2 P(Vector2 scene, Vector2 origin, double scale) => new((float)(origin.X + scene.X * scale), (float)(origin.Y - scene.Y * scale));
+
+    private static Vector2 Rotate(Vector2 v, double radians)
+    {
+        double c = Math.Cos(radians), s = Math.Sin(radians);
+        return new Vector2((float)(v.X * c - v.Y * s), (float)(v.X * s + v.Y * c));
+    }
+
+    private static Vector2 OutwardNormal(Vector2[] vertices, int edge)
+    {
+        Vector2 p0 = vertices[edge];
+        Vector2 p1 = vertices[(edge + 1) % vertices.Length];
+        Vector2 along = Vector2.Normalize(p1 - p0);
+        Vector2 normal = new(along.Y, -along.X);
+        Vector2 centroid = (vertices[0] + vertices[1] + vertices[2]) / 3f;
+        return Vector2.Dot(normal, p0 - centroid) < 0 ? -normal : normal;
+    }
+
+    private static (Vector2 Point, int Edge) Intersect(Vector2 origin, Vector2 direction, Vector2[] vertices, int skipEdge)
+    {
+        double best = double.PositiveInfinity;
+        int bestEdge = -1;
+        Vector2 bestPoint = origin;
+        for (int edge = 0; edge < vertices.Length; edge++)
+        {
+            if (edge == skipEdge)
+            {
+                continue;
+            }
+
+            Vector2 p0 = vertices[edge];
+            Vector2 p1 = vertices[(edge + 1) % vertices.Length];
+            Vector2 e = p1 - p0;
+            double denominator = direction.X * e.Y - direction.Y * e.X;
+            if (Math.Abs(denominator) < 1e-9)
+            {
+                continue;
+            }
+
+            Vector2 d = p0 - origin;
+            double t = (d.X * e.Y - d.Y * e.X) / denominator;
+            double u = (d.X * direction.Y - d.Y * direction.X) / denominator;
+            if (t > 1e-6 && u >= -1e-6 && u <= 1 + 1e-6 && t < best)
+            {
+                best = t;
+                bestEdge = edge;
+                bestPoint = origin + direction * (float)t;
+            }
+        }
+
+        return (bestPoint, bestEdge);
+    }
+
+    private static RefractionKind Refract(Vector2 incident, Vector2 normalIntoIncidentMedium, float nIn, float nOut, out Vector2 transmitted)
+    {
+        Vector3 i = Vector3.Normalize(new Vector3(incident, 0));
+        Vector3 nrm = Vector3.Normalize(new Vector3(normalIntoIncidentMedium, 0));
+        RefractionKind kind = Dielectric.RefractUnit(i, nrm, nIn, nOut, out Vector3 t);
+        transmitted = kind == RefractionKind.Refracted ? Vector2.Normalize(new Vector2(t.X, t.Y)) : Vector2.Zero;
+        return kind;
+    }
+
+    private static Vector2 Reflect(Vector2 direction, Vector2 normal) => direction - 2 * Vector2.Dot(direction, normal) * normal;
+
+    private static string F(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+    private static string Esc(string v) => System.Net.WebUtility.HtmlEncode(v);
+}

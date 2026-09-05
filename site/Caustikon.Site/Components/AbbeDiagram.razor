@@ -1,0 +1,92 @@
+@inject NavigationManager Navigation
+@* The Abbe diagram: every glass placed by its printed νd and nd. Points are the catalog; nothing is drawn that is not a glass. *@
+
+<div class="abbe">
+    <svg class="chart abbe-chart" viewBox="0 0 @W @H" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Abbe diagram of the catalog">
+        @((MarkupString)axes)
+        <g class="dim">
+            @foreach (Glass g in dimmed)
+            {
+                <circle cx="@F(X(g.CatalogAbbeD!.Value))" cy="@F(Y(g.CatalogIndexD!.Value))" r="2.2" />
+            }
+        </g>
+        @foreach (Glass g in lit)
+        {
+            <circle class="pt" cx="@F(X(g.CatalogAbbeD!.Value))" cy="@F(Y(g.CatalogIndexD!.Value))" r="3.2" fill="@VendorColour(g.Vendor)" @onclick="() => Navigation.NavigateTo(Catalog.GlassLink(g))"><title>@g.VendorDisplayName @g.Name · nd @g.CatalogIndexD?.ToString("0.#####", CultureInfo.InvariantCulture) · νd @g.CatalogAbbeD?.ToString("0.##", CultureInfo.InvariantCulture)</title></circle>
+        }
+    </svg>
+    <div class="legend">
+        @foreach (string vendor in vendorsShown)
+        {
+            <span><span class="swatch dot" style="background: @VendorColour(vendor)"></span>@DisplayName(vendor)</span>
+        }
+        <span class="muted">click a point to open the glass; hover for its name</span>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<Glass> Highlighted { get; set; } = [];
+
+    private const double W = 960, H = 520, Left = 64, Right = W - 20, Top = 16, Bottom = H - 40;
+    private const double XMin = 15, XMax = 100, YMin = 1.40, YMax = 2.15;
+    private static readonly double[] xTicks = [20, 30, 40, 50, 60, 70, 80, 90, 100];
+    private static readonly double[] yTicks = [1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1];
+
+    private static readonly string[] Palette =
+    [
+        "#4fb3d9", "#e0836f", "#7fbf96", "#c9a0e6", "#f0c75e", "#f28cb1", "#9ad0c2", "#d9b48f", "#a3a9b8",
+    ];
+
+    private string axes = "";
+    private List<Glass> lit = [];
+    private List<Glass> dimmed = [];
+    private List<string> vendorsShown = [];
+
+    protected override void OnParametersSet()
+    {
+        System.Text.StringBuilder b = new();
+        foreach (double tick in xTicks)
+        {
+            b.Append("<line class=\"grid\" x1=\"").Append(F(X(tick))).Append("\" x2=\"").Append(F(X(tick))).Append("\" y1=\"").Append(F(Top)).Append("\" y2=\"").Append(F(Bottom)).Append("\"/>");
+            b.Append("<text x=\"").Append(F(X(tick))).Append("\" y=\"").Append(F(Bottom + 16)).Append("\" text-anchor=\"middle\">").Append(tick.ToString("0", CultureInfo.InvariantCulture)).Append("</text>");
+        }
+
+        foreach (double tick in yTicks)
+        {
+            b.Append("<line class=\"grid\" x1=\"").Append(F(Left)).Append("\" x2=\"").Append(F(Right)).Append("\" y1=\"").Append(F(Y(tick))).Append("\" y2=\"").Append(F(Y(tick))).Append("\"/>");
+            b.Append("<text x=\"").Append(F(Left - 8)).Append("\" y=\"").Append(F(Y(tick) + 4)).Append("\" text-anchor=\"end\">").Append(tick.ToString("0.00", CultureInfo.InvariantCulture)).Append("</text>");
+        }
+
+        b.Append("<line class=\"axis\" x1=\"").Append(F(Left)).Append("\" x2=\"").Append(F(Right)).Append("\" y1=\"").Append(F(Bottom)).Append("\" y2=\"").Append(F(Bottom)).Append("\"/>");
+        b.Append("<line class=\"axis\" x1=\"").Append(F(Left)).Append("\" x2=\"").Append(F(Left)).Append("\" y1=\"").Append(F(Top)).Append("\" y2=\"").Append(F(Bottom)).Append("\"/>");
+        b.Append("<text x=\"").Append(F((Left + Right) / 2)).Append("\" y=\"").Append(F(H - 6)).Append("\" text-anchor=\"middle\">Abbe number &#957;<tspan baseline-shift=\"sub\" font-size=\"9\">d</tspan></text>");
+        b.Append("<text transform=\"translate(14 ").Append(F((Top + Bottom) / 2)).Append(") rotate(-90)\" text-anchor=\"middle\">n<tspan baseline-shift=\"sub\" font-size=\"9\">d</tspan></text>");
+        axes = b.ToString();
+
+        HashSet<Glass> set = [.. Highlighted];
+        IEnumerable<Glass> plottable = GlassCatalog.All.Where(g => g.CatalogAbbeD is { } v && g.CatalogIndexD is { } n && v >= XMin && v <= XMax && n >= YMin && n <= YMax);
+        lit = plottable.Where(set.Contains).ToList();
+        dimmed = plottable.Where(g => !set.Contains(g)).ToList();
+        vendorsShown = lit.Select(g => g.Vendor).Distinct().OrderBy(VendorIndex).ToList();
+    }
+
+    // νd runs right-to-left by convention: crowns on the left, flints on the right.
+    private static double X(double abbe) => Right - (abbe - XMin) / (XMax - XMin) * (Right - Left);
+    private static double Y(double index) => Bottom - (index - YMin) / (YMax - YMin) * (Bottom - Top);
+
+    private static int VendorIndex(string vendor)
+    {
+        for (int i = 0; i < GlassCatalog.Vendors.Count; i++)
+        {
+            if (GlassCatalog.Vendors[i] == vendor) return i;
+        }
+
+        return 0;
+    }
+
+    private static string VendorColour(string vendor) => Palette[VendorIndex(vendor) % Palette.Length];
+
+    private static string DisplayName(string vendor) => GlassCatalog.ByVendor(vendor).FirstOrDefault()?.VendorDisplayName ?? vendor;
+
+    private static string F(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+}
