@@ -275,6 +275,118 @@ public sealed class DielectricFresnelTests
     }
 
     [TestMethod]
+    [DataRow(1f, 1.5f)]
+    [DataRow(1.5f, 1f)]
+    [DataRow(1.33f, 1.33f)]
+    [DataRow(float.MaxValue / 2f, float.MaxValue)]
+    public void SchlickSharedIndexBatchMatchesScalarResults(float nIncident, float nTransmitted)
+    {
+        float[] cosines = [0f, 0.2f, 0.5f, 0.8f, 1f];
+        float[] reflectances = new float[cosines.Length];
+
+        Dielectric.Schlick(cosines, nIncident, nTransmitted, reflectances);
+
+        for (int i = 0; i < cosines.Length; i++)
+        {
+            Assert.AreEqual(Dielectric.Schlick(cosines[i], nIncident, nTransmitted), reflectances[i]);
+        }
+    }
+
+    [TestMethod]
+    public void SchlickSharedIndexBatchAllowsExactInPlace()
+    {
+        float[] cosinesAndResults = [0f, 0.5f, 1f];
+        float[] expected =
+        [
+            Dielectric.Schlick(cosinesAndResults[0], 1f, 1.5f),
+            Dielectric.Schlick(cosinesAndResults[1], 1f, 1.5f),
+            Dielectric.Schlick(cosinesAndResults[2], 1f, 1.5f)
+        ];
+
+        Dielectric.Schlick(cosinesAndResults, 1f, 1.5f, cosinesAndResults);
+
+        CollectionAssert.AreEqual(expected, cosinesAndResults);
+    }
+
+    [TestMethod]
+    [DataRow(-0.1f)]
+    [DataRow(1.1f)]
+    [DataRow(float.NaN)]
+    [DataRow(float.PositiveInfinity)]
+    [DataRow(float.NegativeInfinity)]
+    public void SchlickSharedIndexBatchInvalidLateCosineThrowsBeforeWriting(float invalidCosine)
+    {
+        float[] cosines = [0f, 0.5f, invalidCosine];
+        float[] reflectances = [7f, 7f, 7f];
+
+        ArgumentOutOfRangeException exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
+            Dielectric.Schlick(cosines, 1f, 1.5f, reflectances));
+
+        Assert.AreEqual("cosIncidents", exception.ParamName);
+        CollectionAssert.AreEqual(new[] { 7f, 7f, 7f }, reflectances);
+    }
+
+    [TestMethod]
+    public void SchlickSharedIndexBatchInvalidLateCosinePreservesInPlaceInput()
+    {
+        float[] cosinesAndResults = [0f, 0.5f, -0.1f];
+
+        ArgumentOutOfRangeException exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
+            Dielectric.Schlick(cosinesAndResults, 1f, 1.5f, cosinesAndResults));
+
+        Assert.AreEqual("cosIncidents", exception.ParamName);
+        CollectionAssert.AreEqual(new[] { 0f, 0.5f, -0.1f }, cosinesAndResults);
+    }
+
+    [TestMethod]
+    [DataRow(0f, 1.5f, "nIncident")]
+    [DataRow(-1f, 1.5f, "nIncident")]
+    [DataRow(float.NaN, 1.5f, "nIncident")]
+    [DataRow(float.PositiveInfinity, 1.5f, "nIncident")]
+    [DataRow(1f, 0f, "nTransmitted")]
+    [DataRow(1f, -1f, "nTransmitted")]
+    [DataRow(1f, float.NaN, "nTransmitted")]
+    [DataRow(1f, float.PositiveInfinity, "nTransmitted")]
+    public void SchlickSharedIndexBatchInvalidIndexThrowsBeforeWriting(
+        float nIncident, float nTransmitted, string parameterName)
+    {
+        float[] cosines = [0f, 0.5f, 1f];
+        float[] reflectances = [7f, 7f, 7f];
+
+        ArgumentOutOfRangeException exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
+            Dielectric.Schlick(cosines, nIncident, nTransmitted, reflectances));
+
+        Assert.AreEqual(parameterName, exception.ParamName);
+        CollectionAssert.AreEqual(new[] { 7f, 7f, 7f }, reflectances);
+    }
+
+    [TestMethod]
+    [DataRow(0, 1)]
+    [DataRow(1, 0)]
+    public void SchlickSharedIndexBatchRejectsPartialOverlapBeforeWriting(int inputStart, int outputStart)
+    {
+        float[] storage = [0f, 0.2f, 0.6f, 1f];
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() =>
+            Dielectric.Schlick(storage.AsSpan(inputStart, 3), 1f, 1.5f, storage.AsSpan(outputStart, 3)));
+
+        Assert.AreEqual("reflectances", exception.ParamName);
+        CollectionAssert.AreEqual(new[] { 0f, 0.2f, 0.6f, 1f }, storage);
+    }
+
+    [TestMethod]
+    public void SchlickSharedIndexBatchShapeErrorThrowsBeforeWriting()
+    {
+        float[] reflectances = [7f, 7f];
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() =>
+            Dielectric.Schlick(new[] { 0f, 0.5f, 1f }, 1f, 1.5f, reflectances));
+
+        Assert.AreEqual("reflectances", exception.ParamName);
+        CollectionAssert.AreEqual(new[] { 7f, 7f }, reflectances);
+    }
+
+    [TestMethod]
     public void SchlickRejectsInvalidReflectance()
     {
         ArgumentOutOfRangeException below = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => Dielectric.Schlick(0.5f, -0.1f));

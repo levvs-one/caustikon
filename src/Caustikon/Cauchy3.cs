@@ -3,11 +3,26 @@ using System.Runtime.InteropServices;
 namespace Caustikon;
 
 /// <summary>
-/// Immutable three-term Cauchy model n(λ) = A + B/λ² + C/λ⁴. Public wavelengths are
-/// nanometers; B is expressed in µm² and C in µm⁴.
+/// Immutable three-term Cauchy model n = A + B / wavelength^2 + C / wavelength^4.
+/// Public wavelengths are nanometers; the equation uses micrometers.
 /// </summary>
+/// <remarks>
+/// The caller supplies the coefficient source's inclusive validity interval and air or vacuum wavelength
+/// convention. No conversion of the reference medium or measurement conditions is performed.
+/// The default value is uninitialized and evaluations return <see cref="DispersionStatus.InvalidInput"/>.
+/// </remarks>
 public readonly record struct Cauchy3
 {
+    /// <summary>Creates a Cauchy model with an explicit inclusive wavelength interval.</summary>
+    /// <param name="a">Finite, dimensionless constant coefficient.</param>
+    /// <param name="bUm2">Finite quadratic coefficient in square micrometers. Negative values are permitted.</param>
+    /// <param name="cUm4">Finite quartic coefficient in micrometers to the fourth power. Negative values are permitted.</param>
+    /// <param name="minimumWavelengthNanometers">Finite, positive lower endpoint of the model interval, in nanometers.</param>
+    /// <param name="maximumWavelengthNanometers">Finite upper endpoint in nanometers, no less than the minimum.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// A coefficient is nonfinite, the minimum is nonfinite or nonpositive, or the maximum is nonfinite or below the minimum.
+    /// </exception>
+    /// <remarks>Construction validates the coefficients and interval, not whether the index is physical throughout that interval.</remarks>
     public Cauchy3(
         double a,
         double bUm2,
@@ -27,14 +42,34 @@ public readonly record struct Cauchy3
         MaximumWavelengthNanometers = maximumWavelengthNanometers;
     }
 
+    /// <summary>Gets the dimensionless constant coefficient.</summary>
     public double A { get; }
+
+    /// <summary>Gets the quadratic coefficient in square micrometers.</summary>
     public double BUm2 { get; }
+
+    /// <summary>Gets the quartic coefficient in micrometers to the fourth power.</summary>
     public double CUm4 { get; }
+
+    /// <summary>Gets the inclusive lower wavelength endpoint in nanometers, or zero for the default model.</summary>
     public double MinimumWavelengthNanometers { get; }
+
+    /// <summary>Gets the inclusive upper wavelength endpoint in nanometers, or zero for the default model.</summary>
     public double MaximumWavelengthNanometers { get; }
 
     /// <summary>Evaluates the model at a wavelength measured in nanometers.</summary>
-    /// <remarks>On every non-success status, <paramref name="refractiveIndex"/> is <see cref="double.NaN"/>.</remarks>
+    /// <param name="wavelengthNanometers">Wavelength in the coefficient source's air or vacuum convention, in nanometers.</param>
+    /// <param name="refractiveIndex">Receives a positive finite phase index on success, or <see cref="double.NaN"/> otherwise.</param>
+    /// <returns>
+    /// <see cref="DispersionStatus.Success"/> for a positive finite result;
+    /// <see cref="DispersionStatus.InvalidInput"/> for a nonfinite or nonpositive wavelength or an uninitialized model;
+    /// <see cref="DispersionStatus.OutsideModelRange"/> outside the inclusive interval; or
+    /// <see cref="DispersionStatus.NonPhysical"/> for a nonfinite or nonpositive result.
+    /// </returns>
+    /// <remarks>
+    /// Uses double-precision arithmetic without extrapolation. Zero B and C terms are skipped.
+    /// Invalid wavelengths and numerical failures are reported by status, not by exceptions.
+    /// </remarks>
     public DispersionStatus EvaluateNanometers(double wavelengthNanometers, out double refractiveIndex)
     {
         if (MinimumWavelengthNanometers <= 0d ||
@@ -75,6 +110,18 @@ public readonly record struct Cauchy3
     }
 
     /// <summary>Evaluates a batch of wavelengths measured in nanometers.</summary>
+    /// <param name="wavelengthsNanometers">Input wavelengths, using the same convention as the coefficient source.</param>
+    /// <param name="refractiveIndices">Caller-owned results; each unsuccessful lane receives <see cref="double.NaN"/>.</param>
+    /// <param name="statuses">Caller-owned evaluation status for every input wavelength.</param>
+    /// <exception cref="ArgumentException">
+    /// Span lengths differ, input and result spans partially overlap, or status storage overlaps either other span.
+    /// Validation occurs before any output write, including for cross-type overlap.
+    /// </exception>
+    /// <remarks>
+    /// All spans must have the same length. Exact wavelength-to-result in-place operation is allowed.
+    /// Each lane follows <see cref="EvaluateNanometers(double, out double)"/> independently;
+    /// no output arrays are allocated and no work is scheduled on other threads.
+    /// </remarks>
     public void EvaluateNanometers(
         ReadOnlySpan<double> wavelengthsNanometers,
         Span<double> refractiveIndices,

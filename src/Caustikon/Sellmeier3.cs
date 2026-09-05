@@ -3,11 +3,33 @@ using System.Runtime.InteropServices;
 namespace Caustikon;
 
 /// <summary>
-/// Immutable three-resonance Sellmeier model n²(λ) = 1 + Σ Bᵢλ²/(λ²-Cᵢ). Public wavelengths
-/// are nanometers; C coefficients are expressed in µm².
+/// Immutable three-resonance Sellmeier model n^2 = 1 + sum(Bi * wavelength^2 / (wavelength^2 - Ci)).
+/// Public wavelengths are nanometers; the equation uses micrometers.
 /// </summary>
+/// <remarks>
+/// The caller supplies the coefficient source's inclusive validity interval and air or vacuum wavelength
+/// convention. No conversion of the reference medium or measurement conditions is performed.
+/// The default value is uninitialized and evaluations return <see cref="DispersionStatus.InvalidInput"/>.
+/// </remarks>
 public readonly record struct Sellmeier3
 {
+    /// <summary>Creates a Sellmeier model with three coefficient pairs and a pole-free inclusive wavelength interval.</summary>
+    /// <param name="b1">Finite, dimensionless strength of the first resonance. Zero disables the term.</param>
+    /// <param name="c1Um2">Finite, nonnegative squared wavelength of the first resonance, in square micrometers.</param>
+    /// <param name="b2">Finite, dimensionless strength of the second resonance. Zero disables the term.</param>
+    /// <param name="c2Um2">Finite, nonnegative squared wavelength of the second resonance, in square micrometers.</param>
+    /// <param name="b3">Finite, dimensionless strength of the third resonance. Zero disables the term.</param>
+    /// <param name="c3Um2">Finite, nonnegative squared wavelength of the third resonance, in square micrometers.</param>
+    /// <param name="minimumWavelengthNanometers">Finite, positive lower endpoint of the model interval, in nanometers.</param>
+    /// <param name="maximumWavelengthNanometers">Finite upper endpoint in nanometers, no less than the minimum.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// A coefficient is nonfinite, a C coefficient is negative, the wavelength interval is invalid, or
+    /// an active positive resonance pole at 1000 * sqrt(Ci) nanometers lies within the inclusive interval.
+    /// </exception>
+    /// <remarks>
+    /// Negative B coefficients are permitted. A zero C coefficient makes its term a constant B.
+    /// Inactive terms do not restrict the interval. Construction does not establish physical validity throughout the interval.
+    /// </remarks>
     public Sellmeier3(
         double b1,
         double c1Um2,
@@ -39,17 +61,47 @@ public readonly record struct Sellmeier3
         MaximumWavelengthNanometers = maximumWavelengthNanometers;
     }
 
+    /// <summary>Gets the dimensionless strength of the first resonance.</summary>
     public double B1 { get; }
+
+    /// <summary>Gets the first squared resonance wavelength in square micrometers.</summary>
     public double C1Um2 { get; }
+
+    /// <summary>Gets the dimensionless strength of the second resonance.</summary>
     public double B2 { get; }
+
+    /// <summary>Gets the second squared resonance wavelength in square micrometers.</summary>
     public double C2Um2 { get; }
+
+    /// <summary>Gets the dimensionless strength of the third resonance.</summary>
     public double B3 { get; }
+
+    /// <summary>Gets the third squared resonance wavelength in square micrometers.</summary>
     public double C3Um2 { get; }
+
+    /// <summary>Gets the inclusive lower wavelength endpoint in nanometers, or zero for the default model.</summary>
     public double MinimumWavelengthNanometers { get; }
+
+    /// <summary>Gets the inclusive upper wavelength endpoint in nanometers, or zero for the default model.</summary>
     public double MaximumWavelengthNanometers { get; }
 
     /// <summary>Evaluates the model at a wavelength measured in nanometers.</summary>
-    /// <remarks>On every non-success status, <paramref name="refractiveIndex"/> is <see cref="double.NaN"/>.</remarks>
+    /// <param name="wavelengthNanometers">Wavelength in the coefficient source's air or vacuum convention, in nanometers.</param>
+    /// <param name="refractiveIndex">Receives a positive finite phase index on success, or <see cref="double.NaN"/> otherwise.</param>
+    /// <returns>
+    /// <see cref="DispersionStatus.Success"/> for a positive finite index;
+    /// <see cref="DispersionStatus.InvalidInput"/> for a nonfinite or nonpositive wavelength or an uninitialized model;
+    /// <see cref="DispersionStatus.OutsideModelRange"/> outside the inclusive interval;
+    /// <see cref="DispersionStatus.Singular"/> for an active positive-resonance denominator that rounds to zero; or
+    /// <see cref="DispersionStatus.NonPhysical"/> for an unsupported intermediate or a nonfinite or nonpositive squared index.
+    /// </returns>
+    /// <remarks>
+    /// Uses double-precision arithmetic without extrapolation. For an active term with positive C,
+    /// a zero or subnormal squared wavelength in micrometers is unsupported and returns NonPhysical.
+    /// Inactive terms are skipped and zero-C terms are constant; neither imposes this lower numerical limit.
+    /// Very large wavelengths use a scaled expression when squaring would overflow.
+    /// Invalid wavelengths and numerical failures are reported by status, not by exceptions.
+    /// </remarks>
     public DispersionStatus EvaluateNanometers(double wavelengthNanometers, out double refractiveIndex)
     {
         if (MinimumWavelengthNanometers <= 0d ||
@@ -109,6 +161,18 @@ public readonly record struct Sellmeier3
     }
 
     /// <summary>Evaluates a batch of wavelengths measured in nanometers.</summary>
+    /// <param name="wavelengthsNanometers">Input wavelengths, using the same convention as the coefficient source.</param>
+    /// <param name="refractiveIndices">Caller-owned results; each unsuccessful lane receives <see cref="double.NaN"/>.</param>
+    /// <param name="statuses">Caller-owned evaluation status for every input wavelength.</param>
+    /// <exception cref="ArgumentException">
+    /// Span lengths differ, input and result spans partially overlap, or status storage overlaps either other span.
+    /// Validation occurs before any output write, including for cross-type overlap.
+    /// </exception>
+    /// <remarks>
+    /// All spans must have the same length. Exact wavelength-to-result in-place operation is allowed.
+    /// Each lane follows <see cref="EvaluateNanometers(double, out double)"/> independently;
+    /// no output arrays are allocated and no work is scheduled on other threads.
+    /// </remarks>
     public void EvaluateNanometers(
         ReadOnlySpan<double> wavelengthsNanometers,
         Span<double> refractiveIndices,
