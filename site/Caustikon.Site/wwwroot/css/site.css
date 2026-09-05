@@ -71,6 +71,7 @@
 }
 
 html {
+    overflow-x: hidden;
     background: var(--bg);
     color: var(--fg);
     font-family: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
@@ -133,6 +134,7 @@ code, pre {
 }
 
 pre {
+    max-width: 100%;
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -345,6 +347,8 @@ th.sortable.active {
 
 .table-scroll {
     overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
 }
 
 table.compact th,
@@ -842,10 +846,6 @@ button.primary {
         font-size: 0.8rem;
     }
 
-    .table-scroll {
-        margin: 0 -1.25rem;
-        padding: 0 1.25rem;
-    }
 
     pre {
         font-size: 0.8rem;
@@ -859,4 +859,78 @@ button.primary {
     .kv dt {
         margin-top: 0.4rem;
     }
+}
+
+/* Use page */
+
+.use-demo {
+    position: relative;
+    min-height: 260px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin: 1rem 0;
+    background: #f3efe6;
+}
+
+.use-backdrop {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: 1fr auto;
+}
+
+.use-backdrop span {
+    display: block;
+    min-height: 120px;
+}
+
+.use-backdrop p {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 1rem 1.2rem 1.4rem;
+    max-width: none;
+    color: #1d262b;
+    font-size: 1.05rem;
+}
+
+.glass-panel {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    top: 22%;
+    bottom: 22%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 1.2rem 1.4rem;
+    color: #1d262b;
+    background: color-mix(in srgb, var(--glass-tint, #ffffff) 30%, transparent);
+    -webkit-backdrop-filter: blur(var(--glass-blur, 10px));
+    backdrop-filter: blur(var(--glass-blur, 10px));
+    border: 1px solid rgb(255 255 255 / var(--glass-edge, 0.3));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / calc(var(--glass-face, 0.04) * 3)), 0 12px 32px rgb(0 0 0 / 0.18);
+    border-radius: 16px;
+}
+
+.glass-panel strong {
+    font-size: 1.3rem;
+}
+
+.snippet {
+    margin: 0.8rem 0 1.6rem;
+}
+
+.snippet-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+}
+
+.snippet pre {
+    margin: 0;
 }

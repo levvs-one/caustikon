@@ -1,0 +1,311 @@
+@page "/use"
+@inject IJSRuntime Js
+
+<PageTitle>Use a glass · Caustikon</PageTitle>
+
+<h1>Take a glass into your own work</h1>
+<p class="lede">Three paths, one source of numbers. Pick a glass and a thickness; every value below is computed from its catalog entry and can be pasted as is.</p>
+
+<div class="controls">
+    <label class="control">
+        <span>Glass</span>
+        <select @bind="selectedKey">
+            <optgroup label="Commonly used">
+                @foreach ((string key, string label) in Featured)
+                {
+                    <option value="@key">@label</option>
+                }
+            </optgroup>
+            @foreach (string vendor in GlassCatalog.Vendors)
+            {
+                <optgroup label="@(GlassCatalog.ByVendor(vendor).First().VendorDisplayName)">
+                    @foreach (Glass g in GlassCatalog.ByVendor(vendor).Where(g => g.CatalogIndexD is not null))
+                    {
+                        <option value="@(g.Vendor + "/" + g.Name)">@g.Name (@SiteInfo.Number(g.CatalogIndexD!.Value, 4) / @SiteInfo.Number(g.CatalogAbbeD ?? double.NaN, 1))</option>
+                    }
+                </optgroup>
+            }
+        </select>
+    </label>
+    <label class="control">
+        <span class="range-label"><span>Thickness</span><output>@thickness mm</output></span>
+        <input type="range" min="1" max="50" step="1" @bind="thickness" />
+    </label>
+    <label class="control">
+        <span class="range-label"><span>Frost (blur, a design choice)</span><output>@blur px</output></span>
+        <input type="range" min="0" max="30" step="1" @bind="blur" />
+    </label>
+</div>
+
+@if (glass is { } g0 && tint is { } c)
+{
+    <h2>1 · Interface</h2>
+    <p>
+        A panel of @g0.VendorDisplayName @g0.Name, @thickness mm thick, over whatever is behind it. The tint is the colour daylight has after
+        passing through that thickness; the edge is the Fresnel reflectance at 75°; the face sheen is the reflectance at normal incidence.
+        Blur is not physics — clear glass does not scatter — so it stays a slider you own.
+    </p>
+    <div class="use-demo">
+        <div class="use-backdrop">
+            <span style="background:#e4572e"></span><span style="background:#17bebb"></span><span style="background:#ffc914"></span><span style="background:#2e282a"></span><span style="background:#76b041"></span>
+            <p>Text behind the glass keeps its colour where the glass is clear and loses blue where the glass is a dense flint.</p>
+        </div>
+        <div class="glass-panel" style="@PanelStyle">
+            <strong>@g0.Name</strong>
+            <span>@thickness mm · n<sub>d</sub> @SiteInfo.Number(g0.IndexD, 4) · Y @SiteInfo.Number(c.Y, 3)</span>
+        </div>
+    </div>
+    <div class="snippet">
+        <div class="snippet-bar"><span>CSS custom properties and a panel class</span><button @onclick="() => Copy(cssSnippet)">Copy</button></div>
+        <pre><code>@cssSnippet</code></pre>
+    </div>
+    <p class="muted">
+        <code>--glass-shift</code> is the lateral displacement of a ray crossing the panel at 45°, per unit of thickness;
+        <code>--glass-fringe</code> is how much that displacement differs between 400 and 700 nm. Feed them to an SVG
+        <code>feOffset</code> per colour channel, scaled by your panel's thickness in pixels, for a chromatic edge that matches this glass rather than a guess.
+    </p>
+
+    <h2>2 · Shader</h2>
+    <p>
+        GLSL with this glass's own dispersion formula inlined: index at any wavelength in micrometers, an RGB triple at 610, 550 and 465 nm
+        for renderers that trace three channels, absorption per millimetre for the same three, and the exact unpolarized Fresnel reflectance.
+        No dependencies; paste into Unity, Godot, Unreal or a raw WebGL shader.
+    </p>
+    <div class="snippet">
+        <div class="snippet-bar"><span>GLSL</span><button @onclick="() => Copy(glslSnippet)">Copy</button></div>
+        <pre><code>@glslSnippet</code></pre>
+    </div>
+
+    <h2>3 · .NET</h2>
+    <p>The packages themselves: the typed constant is a value type for the ray path, the catalog entry carries everything else.</p>
+    <div class="snippet">
+        <div class="snippet-bar"><span>C#</span><button @onclick="() => Copy(csharpSnippet)">Copy</button></div>
+        <pre><code>@csharpSnippet</code></pre>
+    </div>
+
+    <h2>Which path</h2>
+    <div class="columns">
+        <div><h3>Interface</h3><p>You are laying out panels, cards, overlays. Take the CSS. The numbers make a specific glass; the blur and the mix ratio are yours.</p></div>
+        <div><h3>Shader</h3><p>You are rendering surfaces in a game or a viewer. Take the GLSL: index per wavelength for dispersion, absorption per millimetre for thickness, Fresnel for the rim.</p></div>
+        <div><h3>.NET</h3><p>You are computing, not drawing: ray traces, tolerance studies, spectral transmittance, colorimetry. Take the packages and read the catalog entry's provenance.</p></div>
+    </div>
+}
+
+@code {
+    private static readonly (string Key, string Label)[] Featured =
+    [
+        ("schott/N-BK7", "SCHOTT N-BK7 — the crown everything is measured against"),
+        ("schott/N-SF11", "SCHOTT N-SF11 — dense flint, strong fringes"),
+        ("schott/SF57", "SCHOTT SF57 — very dense flint, warm when thick"),
+        ("schott/N-SF66", "SCHOTT N-SF66 — the highest dispersion in the catalog"),
+        ("schott/N-LASF9", "SCHOTT N-LASF9 — high index, tight refraction"),
+        ("schott/N-FK58", "SCHOTT N-FK58 — fluor crown, almost no fringes"),
+        ("ohara/S-FPL53", "OHARA S-FPL53 — extra-low dispersion"),
+        ("ohara/S-LAH79", "OHARA S-LAH79 — index above two"),
+        ("hoya/TAFD55", "HOYA TAFD55 — high-index lanthanum flint"),
+        ("cdgm/H-ZF88", "CDGM H-ZF88 — dense flint"),
+    ];
+
+    private string selectedKeyValue = "schott/N-BK7";
+    private double thicknessValue = 6;
+    private double blurValue = 10;
+    private Glass? glass;
+    private TransmittedColour? tint;
+    private string cssSnippet = "", glslSnippet = "", csharpSnippet = "";
+    private double faceReflectance, edgeReflectance, shift, fringe;
+
+    private string selectedKey { get => selectedKeyValue; set { selectedKeyValue = value; Recompute(); } }
+    private double thickness { get => thicknessValue; set { thicknessValue = value; Recompute(); } }
+    private double blur { get => blurValue; set { blurValue = value; Recompute(); } }
+
+    protected override void OnInitialized() => Recompute();
+
+    private string PanelStyle => tint is { } c
+        ? $"--glass-tint:{c.Hex};--glass-edge:{F(edgeReflectance, 3)};--glass-face:{F(faceReflectance, 3)};--glass-blur:{blurValue}px"
+        : "";
+
+    private void Recompute()
+    {
+        int slash = selectedKeyValue.IndexOf('/');
+        glass = slash > 0 ? GlassCatalog.Find(selectedKeyValue[..slash], selectedKeyValue[(slash + 1)..]) : null;
+        if (glass is null)
+        {
+            tint = null;
+            return;
+        }
+
+        tint = GlassColour.Transmitted(glass, thicknessValue);
+        double nd = glass.IndexD;
+        faceReflectance = Dielectric.NormalReflectance(1f, (float)nd);
+        edgeReflectance = Dielectric.Fresnel((float)Math.Cos(75d * Math.PI / 180d), 1f, (float)nd).Unpolarized;
+        double shiftRed = Shift(IndexAt(700d));
+        double shiftBlue = Shift(IndexAt(400d));
+        shift = Shift(nd);
+        fringe = shiftBlue - shiftRed;
+
+        TransmittedColour c = tint ?? default;
+        cssSnippet = $$"""
+        /* {{glass.VendorDisplayName}} {{glass.Name}}, {{thicknessValue}} mm. Values from Caustikon.Glasses; provenance: {{glass.Provenance.Citation}} */
+        :root {
+          --glass-index: {{F(nd, 5)}};          /* n_d */
+          --glass-tint: {{c.Hex}};          /* D65 after {{thicknessValue}} mm, sRGB */
+          --glass-luminance: {{F(c.Y, 4)}};     /* luminous transmittance of that path */
+          --glass-face: {{F(faceReflectance, 4)}};        /* reflectance at normal incidence */
+          --glass-edge: {{F(edgeReflectance, 4)}};        /* reflectance at 75° incidence */
+          --glass-shift: {{F(shift, 4)}};       /* ray displacement per unit thickness, 45° */
+          --glass-fringe: {{F(fringe, 5)}};     /* blue–red difference of that displacement */
+        }
+
+        .glass {
+          position: relative;
+          background: color-mix(in srgb, var(--glass-tint) 30%, transparent);
+          -webkit-backdrop-filter: blur({{blurValue}}px);
+          backdrop-filter: blur({{blurValue}}px);                     /* frost: a design choice, not the glass */
+          border: 1px solid rgb(255 255 255 / var(--glass-edge));
+          box-shadow: inset 0 1px 0 rgb(255 255 255 / calc(var(--glass-face) * 3)),
+                      0 12px 32px rgb(0 0 0 / 0.18);
+          border-radius: 16px;
+        }
+        """;
+
+        glslSnippet = $$"""
+        // {{glass.VendorDisplayName}} {{glass.Name}} — Caustikon.Glasses, {{glass.Provenance.Citation}}
+        // Refractive index for a wavelength in micrometers, valid {{F(glass.Model.MinimumWavelengthNanometers / 1000d, 3)}}–{{F(glass.Model.MaximumWavelengthNanometers / 1000d, 3)}} µm.
+        float caustikonIor(float lambda) {
+        {{FormulaBody(glass)}}
+        }
+
+        // Index and absorption per millimetre at 610, 550 and 465 nm, for renderers that trace three channels.
+        const vec3 caustikonIorRgb = vec3({{F(IndexAt(610d), 5)}}, {{F(IndexAt(550d), 5)}}, {{F(IndexAt(465d), 5)}});
+        const vec3 caustikonAbsorbPerMm = vec3({{F(Absorb(610d), 6)}}, {{F(Absorb(550d), 6)}}, {{F(Absorb(465d), 6)}});
+        vec3 caustikonTransmit(float pathMm) { return exp(-caustikonAbsorbPerMm * pathMm); }
+
+        // Exact unpolarized Fresnel power reflectance; returns 1.0 beyond the critical angle.
+        float caustikonFresnel(float cosI, float nI, float nT) {
+          float eta = nI / nT;
+          float sinT2 = eta * eta * (1.0 - cosI * cosI);
+          if (sinT2 >= 1.0) return 1.0;
+          float cosT = sqrt(1.0 - sinT2);
+          float rs = (nI * cosI - nT * cosT) / (nI * cosI + nT * cosT);
+          float rp = (nT * cosI - nI * cosT) / (nT * cosI + nI * cosT);
+          return 0.5 * (rs * rs + rp * rp);
+        }
+        """;
+
+        string identifier = Identifier(glass.Name);
+        string vendorClass = char.ToUpperInvariant(glass.Vendor[0]) + glass.Vendor[1..];
+        csharpSnippet = $$"""
+        // dotnet add package Caustikon.Glasses
+        using Caustikon;
+        using Caustikon.Glasses;
+
+        {{ModelType(glass)}} model = {{vendorClass}}.{{identifier}};               // value type, allocation-free
+        model.EvaluateNanometers(587.5618, out double nd);   // {{F(nd, 5)}}
+
+        Glass glass = GlassCatalog.Find("{{glass.Vendor}}", "{{glass.Name}}")!;
+        glass.Extinction!.InternalTransmittance(450, {{thicknessValue}}, out double t450);   // {{Tau(450d)}}
+        TransmittedColour tint = GlassColour.Transmitted(glass, {{thicknessValue}})!.Value;    // {{c.Hex}}, Y {{F(c.Y, 4)}}
+        FresnelPower rim = Dielectric.Fresnel(cosIncident: 0.2588f, 1f, (float)nd);   // 75°: {{F(edgeReflectance, 4)}}
+        """;
+    }
+
+    private double IndexAt(double wavelength)
+    {
+        IDispersionModel model = glass!.Model;
+        double clamped = Math.Clamp(wavelength, model.MinimumWavelengthNanometers, model.MaximumWavelengthNanometers);
+        return model.EvaluateNanometers(clamped, out double n) == DispersionStatus.Success ? n : double.NaN;
+    }
+
+    private double Absorb(double wavelength)
+    {
+        if (glass!.Extinction is not { } extinction)
+        {
+            return 0d;
+        }
+
+        double clamped = Math.Clamp(wavelength, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers);
+        extinction.AbsorptionCoefficient(clamped, out double perMeter);
+        return perMeter * 1e-3d;
+    }
+
+    private string Tau(double wavelength)
+    {
+        if (glass!.Extinction is not { } extinction)
+        {
+            return "no k data";
+        }
+
+        double clamped = Math.Clamp(wavelength, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers);
+        extinction.InternalTransmittance(clamped, thicknessValue, out double t);
+        return F(t, 4);
+    }
+
+    // Lateral shift of a ray through a plane slab at 45°, per unit thickness: sin θ · (1 − cos θ / sqrt(n² − sin² θ)).
+    private static double Shift(double n)
+    {
+        double s = Math.Sin(Math.PI / 4), c = Math.Cos(Math.PI / 4);
+        return s * (1d - c / Math.Sqrt(n * n - s * s));
+    }
+
+    private static string FormulaBody(Glass glass)
+    {
+        switch (glass.Model)
+        {
+            case Sellmeier m:
+            {
+                System.Text.StringBuilder b = new("  float l2 = lambda * lambda;\n  float n2 = 1.0 + " + G(m.Offset));
+                for (int i = 0; i < m.TermCount; i++)
+                {
+                    b.Append("\n    + ").Append(G(m.StrengthAt(i))).Append(" * l2 / (l2 - ").Append(G(m.ResonanceUm2At(i))).Append(')');
+                }
+
+                return b.Append(";\n  return sqrt(n2);").ToString();
+            }
+            case Polynomial m:
+            {
+                System.Text.StringBuilder b = new("  float n2 = " + G(m.Offset));
+                for (int i = 0; i < m.TermCount; i++)
+                {
+                    b.Append("\n    + ").Append(G(m.CoefficientAt(i))).Append(" * pow(lambda, ").Append(G(m.ExponentAt(i))).Append(')');
+                }
+
+                return b.Append(";\n  return sqrt(n2);").ToString();
+            }
+            case Cauchy m:
+            {
+                System.Text.StringBuilder b = new("  float n = " + G(m.Offset));
+                for (int i = 0; i < m.TermCount; i++)
+                {
+                    b.Append("\n    + ").Append(G(m.CoefficientAt(i))).Append(" * pow(lambda, ").Append(G(m.ExponentAt(i))).Append(')');
+                }
+
+                return b.Append(";\n  return n;").ToString();
+            }
+            default:
+                return "  return 1.5;";
+        }
+    }
+
+    private static string ModelType(Glass glass) => glass.Model switch { Sellmeier => "Sellmeier", Polynomial => "Polynomial", Cauchy => "Cauchy", _ => "IDispersionModel" };
+
+    private static string Identifier(string name)
+    {
+        string id = new(name.Where(char.IsAsciiLetterOrDigit).ToArray());
+        return id.Length > 0 && char.IsAsciiDigit(id[0]) ? "G" + id : id;
+    }
+
+    private static string G(double value)
+    {
+        string text = value.ToString("R", CultureInfo.InvariantCulture);
+        if (!text.Contains('.') && !text.Contains('E') && !text.Contains('e'))
+        {
+            text += ".0";
+        }
+
+        return text;
+    }
+
+    private static string F(double value, int decimals) => double.IsNaN(value) ? "NaN" : value.ToString("F" + decimals, CultureInfo.InvariantCulture);
+
+    private async Task Copy(string text) => await Js.InvokeVoidAsync("caustikonClipboard.copy", text);
+}

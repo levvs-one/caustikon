@@ -1,5 +1,6 @@
 @page "/render"
 @using Caustikon.Site.Services
+@using System.Numerics
 @inject IJSRuntime Js
 @implements IDisposable
 
@@ -36,10 +37,26 @@
     <label class="control">
         <span>Resolution</span>
         <select @bind="size">
-            <option value="160">160 px, fast</option>
-            <option value="240">240 px</option>
-            <option value="360">360 px, fine</option>
+            <option value="320">320 px</option>
+            <option value="480">480 px</option>
+            <option value="720">720 px</option>
         </select>
+    </label>
+    <label class="control">
+        <span class="range-label"><span>Light around</span><output>@lightAzimuth°</output></span>
+        <input type="range" min="-180" max="180" step="5" @bind="lightAzimuth" />
+    </label>
+    <label class="control">
+        <span class="range-label"><span>Light height</span><output>@lightElevation°</output></span>
+        <input type="range" min="5" max="85" step="5" @bind="lightElevation" />
+    </label>
+    <label class="control">
+        <span class="range-label"><span>Lamp</span><output>@lightIntensity.ToString("0.0", CultureInfo.InvariantCulture)×</output></span>
+        <input type="range" min="0" max="3" step="0.1" @bind="lightIntensity" />
+    </label>
+    <label class="control">
+        <span class="range-label"><span>Room</span><output>@ambient.ToString("0.0", CultureInfo.InvariantCulture)×</output></span>
+        <input type="range" min="0" max="2" step="0.1" @bind="ambient" />
     </label>
     <button class="primary" @onclick="Start" disabled="@rendering">@(rendering ? $"Rendering… {progress}%" : "Render")</button>
 </div>
@@ -58,7 +75,7 @@
                 <dt>Sampled wavelengths</dt><dd>@string.Join(", ", GlassRenderer.SampledWavelengths.Select(w => w.ToString("0", CultureInfo.InvariantCulture))) nm</dd>
                 @if (lastMilliseconds > 0)
                 {
-                    <dt>Tracing time</dt><dd>@lastSize × @lastSize in @((lastMilliseconds / 1000.0).ToString("0.0", CultureInfo.InvariantCulture)) s</dd>
+                    <dt>Tracing time</dt><dd>@lastSize × @lastSize in @((lastMilliseconds / 1000.0).ToString("0.0", CultureInfo.InvariantCulture)) s; @refinedPixels edge pixels supersampled</dd>
                 }
             </dl>
             <p class="muted">
@@ -88,11 +105,13 @@
 
     private string selectedKeyValue = "schott/N-SF11";
     private double diameter = 60;
-    private int size = 240;
-    private int lastSize = 240;
+    private int size = 480;
+    private int lastSize = 480;
     private bool rendering;
     private int progress;
     private long lastMilliseconds;
+    private int refinedPixels;
+    private double lightAzimuth = 55, lightElevation = 50, lightIntensity = 1, ambient = 1;
     private Glass? glass;
     private CancellationTokenSource? cancel;
     private bool rendered;
@@ -135,26 +154,56 @@
         StateHasChanged();
         await Task.Yield();
 
-        GlassRenderer renderer = new(glass, diameter / 2d);
-        byte[] rgba = new byte[size * size * 4];
-        // Only the tracing is timed: the yields between bands are at the browser's mercy and would be reported as physics.
+        GlassRenderer renderer = new(glass, diameter / 2d, lightAzimuth, lightElevation, lightIntensity, ambient);
         System.Diagnostics.Stopwatch watch = new();
-        const int band = 12;
+
+        // Pass 1: a quarter-size preview, drawn scaled, so the sphere appears at once.
+        int previewSize = Math.Max(80, size / 4);
+        Vector3[] previewLinear = new Vector3[previewSize * previewSize];
+        byte[] previewRgba = new byte[previewSize * previewSize * 4];
+        watch.Start();
+        renderer.RenderRows(previewLinear, previewRgba, previewSize, 0, previewSize);
+        watch.Stop();
+        await Js.InvokeVoidAsync("caustikonCanvas.put", "render-canvas", previewSize, previewSize, previewRgba, size, size);
+        await Task.Yield();
+
+        // Pass 2: every pixel at full size, in bands.
+        Vector3[] linear = new Vector3[size * size];
+        byte[] rgba = new byte[size * size * 4];
+        const int band = 24;
         for (int row = 0; row < size && !token.IsCancellationRequested; row += band)
         {
             int end = Math.Min(size, row + band);
             watch.Start();
-            renderer.RenderRows(rgba, size, row, end);
+            renderer.RenderRows(linear, rgba, size, row, end);
             watch.Stop();
-            progress = end * 100 / size;
-            await Js.InvokeVoidAsync("caustikonCanvas.put", "render-canvas", size, size, rgba);
+            progress = end * 90 / size;
             StateHasChanged();
             await Task.Yield();
         }
 
         if (!token.IsCancellationRequested)
         {
+            await Js.InvokeVoidAsync("caustikonCanvas.put", "render-canvas", size, size, rgba, size, size);
+        }
+
+        // Pass 3: four samples per pixel where neighbours disagree; the rest already converged with one.
+        int refined = 0;
+        for (int row = 0; row < size && !token.IsCancellationRequested; row += band * 2)
+        {
+            int end = Math.Min(size, row + band * 2);
+            watch.Start();
+            refined += renderer.RefineEdges(linear, rgba, size, row, end);
+            watch.Stop();
+            progress = 90 + end * 10 / size;
+            await Task.Yield();
+        }
+
+        if (!token.IsCancellationRequested)
+        {
+            await Js.InvokeVoidAsync("caustikonCanvas.put", "render-canvas", size, size, rgba, size, size);
             lastMilliseconds = watch.ElapsedMilliseconds;
+            refinedPixels = refined;
         }
 
         rendering = false;
