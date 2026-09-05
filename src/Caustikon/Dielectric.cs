@@ -4,22 +4,42 @@ using System.Runtime.InteropServices;
 namespace Caustikon;
 
 /// <summary>Allocation-free geometric-optics operations for lossless dielectric interfaces.</summary>
+/// <remarks>
+/// Media are homogeneous, isotropic and nonabsorbing. Refractive indices are dimensionless phase indices
+/// measured at comparable conditions and with the same reference medium. The incident medium is the one
+/// the ray leaves; the transmitted medium is the one it enters. Indices and normals are never swapped automatically.
+/// Batch methods execute synchronously in caller-owned storage, without allocating output arrays or scheduling parallel work.
+/// </remarks>
 public static class Dielectric
 {
     private const float FloatMachineEpsilon = 1.1920929e-7f;
 
     /// <summary>
-    /// Maximum accepted absolute error in a vector's squared length. The tolerance is tight enough
-    /// to reject visibly non-unit input while accommodating ordinary single-precision normalization.
+    /// Maximum accepted absolute error in a vector's squared length: eight times 2^-23, approximately 9.54e-7.
     /// </summary>
+    /// <remarks>
+    /// The test is abs(lengthSquared - 1) &lt;= this value, with squared length calculated in single precision.
+    /// Here 2^-23 is the spacing immediately above 1f, not <see cref="float.Epsilon"/>.
+    /// </remarks>
     public const float UnitLengthSquaredTolerance = 8f * FloatMachineEpsilon;
 
     /// <summary>Refracts a unit direction at a dielectric interface.</summary>
+    /// <param name="incidentUnit">Finite ray-travel direction toward the interface, within <see cref="UnitLengthSquaredTolerance"/> of unit squared length.</param>
+    /// <param name="normalUnit">Finite normal pointing into the incident medium, within the same unit squared-length tolerance.</param>
+    /// <param name="nIncident">Finite, positive phase refractive index of the medium the ray leaves.</param>
+    /// <param name="nTransmitted">Finite, positive phase refractive index of the medium the ray enters.</param>
+    /// <param name="refractedUnit">
+    /// Receives the transmitted direction for Refracted, a unit tangent for CriticalAngle, or
+    /// <see cref="Vector3.Zero"/> for InvalidInput and TotalInternalReflection.
+    /// </param>
+    /// <returns>The physical or validation outcome; invalid arguments return <see cref="RefractionKind.InvalidInput"/> rather than throwing.</returns>
     /// <remarks>
-    /// <paramref name="incidentUnit"/> travels toward the interface and <paramref name="normalUnit"/>
-    /// points back into the incident medium, so their dot product must be non-positive. Invalid input
-    /// and total internal reflection produce <see cref="Vector3.Zero"/>. The discriminant is classified
-    /// with a boundary of eight binary32 machine epsilons scaled by transmitted sine squared.
+    /// The incident-normal dot product must be nonpositive. Equal indices return the incident vector exactly,
+    /// including at grazing incidence. Otherwise the calculation compensates for accepted input length error
+    /// with double-precision intermediates; it does not normalize the final refracted vector.
+    /// For a higher-to-lower-index transition, the critical boundary is abs(1 - sin2T) &lt;= 8 * 2^-23 * max(1, sin2T),
+    /// where sin2T is the squared transmitted tangential length. Within that boundary the output is a unit tangent.
+    /// Entering a higher-index medium has no critical-angle snapping.
     /// </remarks>
     public static RefractionKind RefractUnit(
         Vector3 incidentUnit,
@@ -38,6 +58,20 @@ public static class Dielectric
     }
 
     /// <summary>Refracts a batch with one pair of refractive indices shared by every lane.</summary>
+    /// <param name="incidentUnits">Ray-travel directions toward the interface; each must satisfy the scalar unit-vector contract.</param>
+    /// <param name="normalUnits">Normals pointing into the incident medium; each must satisfy the scalar unit-vector and orientation contract.</param>
+    /// <param name="nIncident">Shared finite, positive phase index of the incident medium.</param>
+    /// <param name="nTransmitted">Shared finite, positive phase index of the transmitted medium.</param>
+    /// <param name="refractedUnits">Caller-owned transmitted directions; invalid and totally internally reflected lanes receive <see cref="Vector3.Zero"/>.</param>
+    /// <param name="kinds">Caller-owned physical or validation outcome for every lane.</param>
+    /// <exception cref="ArgumentException">Span lengths differ or buffers have forbidden overlap. No output is written.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A shared refractive index is nonfinite or nonpositive. No output is written.</exception>
+    /// <remarks>
+    /// All spans must have the same length. Exact incident-to-result in-place operation is allowed, but partial
+    /// overlap is not. Results must not overlap normals, even exactly; status storage must not overlap any other span,
+    /// including across element types. Invalid vectors are reported per lane, not as exceptions.
+    /// Direction and boundary rules are those of <see cref="RefractUnit(Vector3, Vector3, float, float, out Vector3)"/>.
+    /// </remarks>
     public static void RefractUnit(
         ReadOnlySpan<Vector3> incidentUnits,
         ReadOnlySpan<Vector3> normalUnits,
@@ -59,6 +93,20 @@ public static class Dielectric
     }
 
     /// <summary>Refracts a batch whose refractive indices vary per lane.</summary>
+    /// <param name="incidentUnits">Ray-travel directions toward the interface; each must satisfy the scalar unit-vector contract.</param>
+    /// <param name="normalUnits">Normals pointing into the incident medium; each must satisfy the scalar unit-vector and orientation contract.</param>
+    /// <param name="nIncidents">Finite, positive phase index of the incident medium for each lane.</param>
+    /// <param name="nTransmitteds">Finite, positive phase index of the transmitted medium for each lane.</param>
+    /// <param name="refractedUnits">Caller-owned transmitted directions; invalid and totally internally reflected lanes receive <see cref="Vector3.Zero"/>.</param>
+    /// <param name="kinds">Caller-owned physical or validation outcome for every lane.</param>
+    /// <exception cref="ArgumentException">Span lengths differ or buffers have forbidden overlap. No output is written.</exception>
+    /// <remarks>
+    /// All spans must have the same length. Exact incident-to-result in-place operation is allowed, but partial
+    /// overlap is not. Results must not overlap normals or index spans, even exactly or across element types.
+    /// Status storage must not overlap any input or other output. Invalid vectors and indices produce
+    /// <see cref="RefractionKind.InvalidInput"/> per lane, allowing other lanes to succeed.
+    /// Direction and boundary rules are those of <see cref="RefractUnit(Vector3, Vector3, float, float, out Vector3)"/>.
+    /// </remarks>
     public static void RefractUnit(
         ReadOnlySpan<Vector3> incidentUnits,
         ReadOnlySpan<Vector3> normalUnits,
@@ -88,7 +136,18 @@ public static class Dielectric
     }
 
     /// <summary>Computes exact S, P, and unpolarized power reflectance.</summary>
-    /// <param name="cosIncident">Cosine of the angle to the interface normal, in the inclusive range [0, 1].</param>
+    /// <param name="cosIncident">Finite, nonnegative cosine of the incidence angle, in [0, 1]; 0 is grazing and 1 is normal incidence.</param>
+    /// <param name="nIncident">Finite, positive phase refractive index of the medium the ray leaves.</param>
+    /// <param name="nTransmitted">Finite, positive phase refractive index of the medium the ray enters.</param>
+    /// <returns>Reflected power fractions in [0, 1] for both polarizations and their unpolarized mean.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">The cosine is nonfinite or outside [0, 1], or an index is nonfinite or nonpositive.</exception>
+    /// <remarks>
+    /// Equal indices give zero reflectance, including at grazing incidence. For a higher-to-lower-index transition,
+    /// reflectance is one when 1 - sin2T &lt;= 8 * 2^-23 * max(1, sin2T), including total internal reflection;
+    /// sin2T = (nIncident / nTransmitted)^2 * (1 - cosIncident^2). No critical snapping applies in the other direction.
+    /// Ratios and amplitudes use double-precision intermediates. Derive the cosine from normalized directions,
+    /// not from vectors with residual unit-length error.
+    /// </remarks>
     public static FresnelPower Fresnel(float cosIncident, float nIncident, float nTransmitted)
     {
         ThrowIfInvalidCosine(cosIncident, nameof(cosIncident));
@@ -121,6 +180,13 @@ public static class Dielectric
     }
 
     /// <summary>Computes exact Fresnel power for a batch with shared refractive indices.</summary>
+    /// <param name="cosIncidents">Finite incidence cosines in [0, 1], where 0 is grazing and 1 is normal incidence.</param>
+    /// <param name="nIncident">Shared finite, positive phase index of the incident medium.</param>
+    /// <param name="nTransmitted">Shared finite, positive phase index of the transmitted medium.</param>
+    /// <param name="powers">Caller-owned power-reflectance results, with the same length as the input.</param>
+    /// <exception cref="ArgumentException">Span lengths differ or output storage overlaps the input, including across element types. No output is written.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Any cosine is nonfinite or outside [0, 1], or a shared index is nonfinite or nonpositive. No output is written.</exception>
+    /// <remarks>Every lane follows <see cref="Fresnel(float, float, float)"/>. All inputs are validated before writing any result.</remarks>
     public static void Fresnel(
         ReadOnlySpan<float> cosIncidents,
         float nIncident,
@@ -144,6 +210,16 @@ public static class Dielectric
     }
 
     /// <summary>Computes exact Fresnel power for a batch whose refractive indices vary per lane.</summary>
+    /// <param name="cosIncidents">Finite incidence cosines in [0, 1], where 0 is grazing and 1 is normal incidence.</param>
+    /// <param name="nIncidents">Finite, positive phase index of the incident medium for each lane.</param>
+    /// <param name="nTransmitteds">Finite, positive phase index of the transmitted medium for each lane.</param>
+    /// <param name="powers">Caller-owned power-reflectance results.</param>
+    /// <exception cref="ArgumentException">Span lengths differ or output storage overlaps any input, including across element types. No output is written.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Any cosine is nonfinite or outside [0, 1], or any index is nonfinite or nonpositive. No output is written.</exception>
+    /// <remarks>
+    /// All spans must have the same length. Every lane follows <see cref="Fresnel(float, float, float)"/>.
+    /// All inputs are validated before writing any result; invalid lanes throw rather than returning a status.
+    /// </remarks>
     public static void Fresnel(
         ReadOnlySpan<float> cosIncidents,
         ReadOnlySpan<float> nIncidents,
@@ -172,6 +248,11 @@ public static class Dielectric
     }
 
     /// <summary>Computes power reflectance at normal incidence.</summary>
+    /// <param name="nIncident">Finite, positive phase refractive index of the medium the ray leaves.</param>
+    /// <param name="nTransmitted">Finite, positive phase refractive index of the medium the ray enters.</param>
+    /// <returns>The power fraction ((nIncident - nTransmitted) / (nIncident + nTransmitted))^2, in [0, 1].</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Either index is nonfinite or nonpositive.</exception>
+    /// <remarks>Uses double-precision intermediates so sums and differences of finite float indices do not overflow.</remarks>
     public static float NormalReflectance(float nIncident, float nTransmitted)
     {
         ThrowIfNotPositiveFinite(nIncident, nameof(nIncident));
@@ -181,6 +262,15 @@ public static class Dielectric
     }
 
     /// <summary>Computes normal-incidence power reflectance for a batch.</summary>
+    /// <param name="nIncidents">Finite, positive phase index of the incident medium for each lane.</param>
+    /// <param name="nTransmitteds">Finite, positive phase index of the transmitted medium for each lane.</param>
+    /// <param name="reflectances">Caller-owned power fractions in [0, 1].</param>
+    /// <exception cref="ArgumentException">Span lengths differ or an input and output partially overlap. No output is written.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Any index is nonfinite or nonpositive. No output is written.</exception>
+    /// <remarks>
+    /// All spans must have the same length. Output may exactly replace either input in place.
+    /// All inputs are validated before writing; each result follows <see cref="NormalReflectance(float, float)"/>.
+    /// </remarks>
     public static void NormalReflectance(
         ReadOnlySpan<float> nIncidents,
         ReadOnlySpan<float> nTransmitteds,
@@ -205,6 +295,14 @@ public static class Dielectric
     }
 
     /// <summary>Applies Schlick's approximation using a supplied normal-incidence reflectance.</summary>
+    /// <param name="cosIncident">Finite incidence cosine in [0, 1], where 0 is grazing and 1 is normal incidence.</param>
+    /// <param name="normalReflectance">Finite normal-incidence power fraction R0 in [0, 1].</param>
+    /// <returns>R0 + (1 - R0) * (1 - cosIncident)^5, a power fraction in [0, 1].</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Either argument is nonfinite or outside [0, 1].</exception>
+    /// <remarks>
+    /// This approximation cannot detect total internal reflection or the critical boundary.
+    /// Use <see cref="Fresnel(float, float, float)"/> for exact dielectric power reflectance and boundary handling.
+    /// </remarks>
     public static float Schlick(float cosIncident, float normalReflectance)
     {
         ThrowIfInvalidCosine(cosIncident, nameof(cosIncident));
@@ -220,10 +318,29 @@ public static class Dielectric
     }
 
     /// <summary>Applies Schlick's approximation using reflectance derived from the two indices.</summary>
+    /// <param name="cosIncident">Finite incidence cosine in [0, 1], where 0 is grazing and 1 is normal incidence.</param>
+    /// <param name="nIncident">Finite, positive phase refractive index of the medium the ray leaves.</param>
+    /// <param name="nTransmitted">Finite, positive phase refractive index of the medium the ray enters.</param>
+    /// <returns>The Schlick power fraction in [0, 1], using <see cref="NormalReflectance(float, float)"/> as R0.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">The cosine is nonfinite or outside [0, 1], or an index is nonfinite or nonpositive.</exception>
+    /// <remarks>
+    /// Supplying both indices only derives R0; it does not add total-internal-reflection or critical-boundary detection.
+    /// Equal indices are not special-cased: the approximation still evaluates (1 - cosIncident)^5.
+    /// Use <see cref="Fresnel(float, float, float)"/> for exact dielectric power reflectance.
+    /// </remarks>
     public static float Schlick(float cosIncident, float nIncident, float nTransmitted) =>
         Schlick(cosIncident, NormalReflectance(nIncident, nTransmitted));
 
     /// <summary>Applies Schlick's approximation to a batch using one shared normal reflectance.</summary>
+    /// <param name="cosIncidents">Finite incidence cosines in [0, 1], where 0 is grazing and 1 is normal incidence.</param>
+    /// <param name="normalReflectance">Shared finite normal-incidence power fraction R0 in [0, 1].</param>
+    /// <param name="reflectances">Caller-owned Schlick power fractions, with the same length as the input.</param>
+    /// <exception cref="ArgumentException">Span lengths differ or input and output partially overlap. No output is written.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Any cosine or the shared reflectance is nonfinite or outside [0, 1]. No output is written.</exception>
+    /// <remarks>
+    /// Exact cosine-to-result in-place operation is allowed. All inputs are validated before writing any result.
+    /// Every lane follows <see cref="Schlick(float, float)"/>; no total-internal-reflection or critical-boundary detection is performed.
+    /// </remarks>
     public static void Schlick(
         ReadOnlySpan<float> cosIncidents,
         float normalReflectance,
@@ -248,6 +365,17 @@ public static class Dielectric
     }
 
     /// <summary>Applies Schlick's approximation to a batch using shared refractive indices.</summary>
+    /// <param name="cosIncidents">Finite incidence cosines in [0, 1], where 0 is grazing and 1 is normal incidence.</param>
+    /// <param name="nIncident">Shared finite, positive phase index of the incident medium.</param>
+    /// <param name="nTransmitted">Shared finite, positive phase index of the transmitted medium.</param>
+    /// <param name="reflectances">Caller-owned Schlick power fractions, with the same length as the input.</param>
+    /// <exception cref="ArgumentException">Span lengths differ or input and output partially overlap. No output is written.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Any cosine is nonfinite or outside [0, 1], or a shared index is nonfinite or nonpositive. No output is written.</exception>
+    /// <remarks>
+    /// Exact cosine-to-result in-place operation is allowed. All inputs are validated before writing any result.
+    /// Every lane follows <see cref="Schlick(float, float, float)"/>; the indices only derive R0 and do not add
+    /// total-internal-reflection or critical-boundary detection, including for equal indices.
+    /// </remarks>
     public static void Schlick(
         ReadOnlySpan<float> cosIncidents,
         float nIncident,

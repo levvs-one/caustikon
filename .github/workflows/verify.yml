@@ -83,12 +83,33 @@ jobs:
       - name: Pack
         run: dotnet pack src/Caustikon/Caustikon.csproj --configuration Release --no-build --output artifacts/package
 
+      - name: Require XML API documentation in both package targets
+        shell: pwsh
+        run: |
+          $package = Get-Item artifacts/package/Caustikon.*.nupkg
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
+          try {
+            foreach ($framework in 'net8.0', 'net10.0') {
+              $entry = $archive.GetEntry("lib/$framework/Caustikon.xml")
+              if (-not $entry) { throw "Missing XML documentation for $framework." }
+              $reader = [System.IO.StreamReader]::new($entry.Open())
+              try { [xml]$documentation = $reader.ReadToEnd() } finally { $reader.Dispose() }
+              if ($documentation.doc.assembly.name -ne 'Caustikon' -or
+                  -not $documentation.doc.members.member) {
+                throw "Invalid or empty XML documentation for $framework."
+              }
+            }
+          } finally { $archive.Dispose() }
+
       - name: Run prism example
         run: dotnet run --project examples/Prism --configuration Release --no-build -- artifacts/package/prism.svg
 
       - name: Check prism geometry and labels
         shell: pwsh
         run: ./examples/Prism/verify.ps1 -Path artifacts/package/prism.svg
+
+      - name: Check spectral batch across the critical boundary
+        run: dotnet run --project examples/CriticalBoundary --configuration Release --no-build
 
       - name: Upload package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
