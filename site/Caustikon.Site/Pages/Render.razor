@@ -196,6 +196,7 @@
             refined += renderer.RefineEdges(linear, rgba, size, row, end);
             watch.Stop();
             progress = 90 + end * 10 / size;
+            StateHasChanged();
             await Task.Yield();
         }
 
