@@ -1,0 +1,327 @@
+[
+  {
+    "identifier": "IG2",
+    "vendor": "vitron",
+    "name": "IG2",
+    "category": "infrared",
+    "form": 0,
+    "sourceFormula": "formula 1",
+    "minimumWavelengthNanometers": 1000,
+    "maximumWavelengthNanometers": 12000,
+    "offset": 2.341388,
+    "firstCoefficients": [
+      2.962098,
+      0.831035
+    ],
+    "secondCoefficients": [
+      0.12961224028899998,
+      1226.634484848964
+    ],
+    "status": "",
+    "extinction": {
+      "wavelengthsNanometers": [
+        1000,
+        1500,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000
+      ],
+      "extinctions": [
+        7.6434E-07,
+        4.4239E-07,
+        4.5765E-07,
+        8.8443E-07,
+        7.8088E-07,
+        9.6615E-07,
+        4.8549E-07,
+        5.9146E-07,
+        1.5079E-06,
+        2.071E-07,
+        3.797E-07,
+        4.3306E-06,
+        5.1546E-05,
+        9.2932E-05,
+        3.6857E-05
+      ]
+    },
+    "provenance": {
+      "source": "RefractiveIndex.INFO database, commit c5c2f18, CC0 1.0",
+      "citation": "1) VITRON datasheet IG-2 June 2014; 2) Dr. Rolf Henkel (VITRON Spezialwerkstoffe GmbH) - private communications",
+      "url": "https://refractiveindex.info/download/data/2014/VITRON IG-2 Datenblatt Juni 2014.pdf",
+      "path": "data/specs/vitron/infrared/IG2.yml",
+      "retrievedOn": "2026-09-05",
+      "notes": "Sellmeier-1 source: each resonance wavelength was squared to the micrometer-squared form."
+    },
+    "check": {}
+  },
+  {
+    "identifier": "IG3",
+    "vendor": "vitron",
+    "name": "IG3",
+    "category": "infrared",
+    "form": 0,
+    "sourceFormula": "formula 1",
+    "minimumWavelengthNanometers": 1000,
+    "maximumWavelengthNanometers": 12000,
+    "offset": 3.885429,
+    "firstCoefficients": [
+      2.934475,
+      0.573772
+    ],
+    "secondCoefficients": [
+      0.258456324996,
+      1050.1595948195559
+    ],
+    "status": "",
+    "extinction": {
+      "wavelengthsNanometers": [
+        1000,
+        1500,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000
+      ],
+      "extinctions": [
+        0.001,
+        1.2419E-06,
+        1.0003E-06,
+        1.2925E-06,
+        1.1877E-06,
+        2.1506E-06,
+        1.0243E-06,
+        1.1946E-06,
+        3.0023E-06,
+        4.5033E-07,
+        5.3779E-07,
+        5.8146E-06,
+        4.8806E-05,
+        0.00017298,
+        5.3684E-05
+      ]
+    },
+    "provenance": {
+      "source": "RefractiveIndex.INFO database, commit c5c2f18, CC0 1.0",
+      "citation": "1) VITRON datasheet IG-3 June 2014; 2) Dr. Rolf Henkel (VITRON Spezialwerkstoffe GmbH) - private communications",
+      "url": "https://refractiveindex.info/download/data/2014/VITRON IG-3 Datenblatt Juni 2014.pdf",
+      "path": "data/specs/vitron/infrared/IG3.yml",
+      "retrievedOn": "2026-09-05",
+      "notes": "Sellmeier-1 source: each resonance wavelength was squared to the micrometer-squared form."
+    },
+    "check": {}
+  },
+  {
+    "identifier": "IG4",
+    "vendor": "vitron",
+    "name": "IG4",
+    "category": "infrared",
+    "form": 0,
+    "sourceFormula": "formula 1",
+    "minimumWavelengthNanometers": 1000,
+    "maximumWavelengthNanometers": 12000,
+    "offset": 2.810961,
+    "firstCoefficients": [
+      3.041642,
+      0.863445
+    ],
+    "secondCoefficients": [
+      0.15850590438399997,
+      1807.6544729104
+    ],
+    "status": "",
+    "extinction": {
+      "wavelengthsNanometers": [
+        1000,
+        1500,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000
+      ],
+      "extinctions": [
+        4.5189E-07,
+        3.4852E-07,
+        4.1109E-07,
+        8.1875E-07,
+        7.838E-07,
+        9.6403E-07,
+        1.1697E-06,
+        1.3401E-06,
+        3.664E-06,
+        5.9186E-07,
+        1.0293E-06,
+        4.9023E-06,
+        5.6255E-05,
+        0.00015434,
+        5.7641E-05
+      ]
+    },
+    "provenance": {
+      "source": "RefractiveIndex.INFO database, commit c5c2f18, CC0 1.0",
+      "citation": "1) VITRON datasheet IG-4 June 2014; 2) Dr. Rolf Henkel (VITRON Spezialwerkstoffe GmbH) - private communications",
+      "url": "https://refractiveindex.info/download/data/2014/VITRON IG-4 Datenblatt Juni 2014.pdf",
+      "path": "data/specs/vitron/infrared/IG4.yml",
+      "retrievedOn": "2026-09-05",
+      "notes": "Sellmeier-1 source: each resonance wavelength was squared to the micrometer-squared form."
+    },
+    "check": {}
+  },
+  {
+    "identifier": "IG5",
+    "vendor": "vitron",
+    "name": "IG5",
+    "category": "infrared",
+    "form": 0,
+    "sourceFormula": "formula 1",
+    "minimumWavelengthNanometers": 1000,
+    "maximumWavelengthNanometers": 12000,
+    "offset": 2.810945,
+    "firstCoefficients": [
+      3.046894,
+      1.793191
+    ],
+    "secondCoefficients": [
+      0.161722209609,
+      2186.217797112064
+    ],
+    "status": "",
+    "extinction": {
+      "wavelengthsNanometers": [
+        1000,
+        1500,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000
+      ],
+      "extinctions": [
+        1.6167E-06,
+        7.1222E-07,
+        9.1812E-07,
+        1.3646E-06,
+        1.4429E-06,
+        1.7754E-06,
+        1.4909E-06,
+        1.4914E-06,
+        2.1907E-06,
+        6.8308E-07,
+        9.4902E-07,
+        4.6058E-06,
+        4.3045E-05,
+        0.00010304,
+        3.8519E-05
+      ]
+    },
+    "provenance": {
+      "source": "RefractiveIndex.INFO database, commit c5c2f18, CC0 1.0",
+      "citation": "1) VITRON datasheet IG-5 June 2014; 2) Dr. Rolf Henkel (VITRON Spezialwerkstoffe GmbH) - private communications",
+      "url": "https://refractiveindex.info/download/data/2014/VITRON IG-5 Datenblatt Juni 2014.pdf",
+      "path": "data/specs/vitron/infrared/IG5.yml",
+      "retrievedOn": "2026-09-05",
+      "notes": "Sellmeier-1 source: each resonance wavelength was squared to the micrometer-squared form."
+    },
+    "check": {}
+  },
+  {
+    "identifier": "IG6",
+    "vendor": "vitron",
+    "name": "IG6",
+    "category": "infrared",
+    "form": 0,
+    "sourceFormula": "formula 1",
+    "minimumWavelengthNanometers": 1000,
+    "maximumWavelengthNanometers": 12000,
+    "offset": 3.110014,
+    "firstCoefficients": [
+      3.669697,
+      2.358954
+    ],
+    "secondCoefficients": [
+      0.18179308238399997,
+      3546.8102933406094
+    ],
+    "status": "",
+    "extinction": {
+      "wavelengthsNanometers": [
+        1000,
+        1500,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000
+      ],
+      "extinctions": [
+        9.9503E-07,
+        5.3877E-07,
+        4.2951E-07,
+        1.0636E-06,
+        9.5938E-07,
+        8.9935E-07,
+        9.2298E-07,
+        5.9146E-07,
+        1.2363E-07,
+        1.0618E-06,
+        3.2719E-07,
+        1.2674E-06,
+        2.6299E-06,
+        2.522E-05,
+        7.4877E-05
+      ]
+    },
+    "provenance": {
+      "source": "RefractiveIndex.INFO database, commit c5c2f18, CC0 1.0",
+      "citation": "1) VITRON datasheet IG-6 June 2014; 2) Dr. Rolf Henkel (VITRON Spezialwerkstoffe GmbH) - private communications",
+      "url": "https://refractiveindex.info/download/data/2014/VITRON IG-6 Datenblatt Juni 2014.pdf",
+      "path": "data/specs/vitron/infrared/IG6.yml",
+      "retrievedOn": "2026-09-05",
+      "notes": "Sellmeier-1 source: each resonance wavelength was squared to the micrometer-squared form."
+    },
+    "check": {}
+  }
+]

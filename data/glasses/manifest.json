@@ -1,0 +1,665 @@
+{
+  "source": "RefractiveIndex.INFO database (https://github.com/polyanskiy/refractiveindex.info-database), CC0 1.0 Universal",
+  "databaseCommit": "c5c2f18",
+  "retrievedOn": "2026-09-05",
+  "glassCount": 1646,
+  "vendors": [
+    {
+      "vendor": "ami",
+      "displayName": "Amorphous Materials",
+      "glassCount": 2,
+      "sellmeier": 2,
+      "polynomial": 0,
+      "cauchy": 0,
+      "withExtinction": 1,
+      "withThermal": 0,
+      "withCatalogIndexAndAbbe": 0
+    },
+    {
+      "vendor": "cargille",
+      "displayName": "Cargille",
+      "glassCount": 5,
+      "sellmeier": 0,
+      "polynomial": 0,
+      "cauchy": 5,
+      "withExtinction": 5,
+      "withThermal": 0,
+      "withCatalogIndexAndAbbe": 0
+    },
+    {
+      "vendor": "cdgm",
+      "displayName": "CDGM",
+      "glassCount": 314,
+      "sellmeier": 259,
+      "polynomial": 55,
+      "cauchy": 0,
+      "withExtinction": 314,
+      "withThermal": 292,
+      "withCatalogIndexAndAbbe": 314
+    },
+    {
+      "vendor": "hikari",
+      "displayName": "HIKARI",
+      "glassCount": 375,
+      "sellmeier": 12,
+      "polynomial": 363,
+      "cauchy": 0,
+      "withExtinction": 375,
+      "withThermal": 169,
+      "withCatalogIndexAndAbbe": 375
+    },
+    {
+      "vendor": "hoya",
+      "displayName": "HOYA",
+      "glassCount": 190,
+      "sellmeier": 0,
+      "polynomial": 190,
+      "cauchy": 0,
+      "withExtinction": 190,
+      "withThermal": 188,
+      "withCatalogIndexAndAbbe": 190
+    },
+    {
+      "vendor": "ohara",
+      "displayName": "OHARA",
+      "glassCount": 410,
+      "sellmeier": 222,
+      "polynomial": 188,
+      "cauchy": 0,
+      "withExtinction": 410,
+      "withThermal": 336,
+      "withCatalogIndexAndAbbe": 410
+    },
+    {
+      "vendor": "schott",
+      "displayName": "SCHOTT",
+      "glassCount": 169,
+      "sellmeier": 169,
+      "polynomial": 0,
+      "cauchy": 0,
+      "withExtinction": 167,
+      "withThermal": 156,
+      "withCatalogIndexAndAbbe": 161
+    },
+    {
+      "vendor": "sumita",
+      "displayName": "SUMITA",
+      "glassCount": 176,
+      "sellmeier": 0,
+      "polynomial": 176,
+      "cauchy": 0,
+      "withExtinction": 176,
+      "withThermal": 176,
+      "withCatalogIndexAndAbbe": 176
+    },
+    {
+      "vendor": "vitron",
+      "displayName": "VITRON",
+      "glassCount": 5,
+      "sellmeier": 5,
+      "polynomial": 0,
+      "cauchy": 0,
+      "withExtinction": 5,
+      "withThermal": 0,
+      "withCatalogIndexAndAbbe": 0
+    }
+  ],
+  "maxAbsoluteIndexDDeviation": 0.0004930968347025555,
+  "maxAbsoluteIndexDDeviationGlass": "schott/BOROFLOAT33",
+  "maxAbsoluteAbbeDDeviation": 0.6258463114588722,
+  "maxAbsoluteAbbeDDeviationGlass": "schott/BOROFLOAT33",
+  "skipped": [
+    {
+      "path": "data/specs/ami/infrared/AMTIR-1.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/ami/infrared/AMTIR-6.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D0082.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D0191.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D0290.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D0391.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D0587.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D0687.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D0785.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D0888.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D0891.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D0991.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D1125.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D1214.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D1219.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D1230.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D1420_1.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D1426-D1526.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D1511.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D1520.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D1616.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D4150.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D5336_1.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D6117.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D6420.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D6526-D6626.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D6625.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D6726-D6826.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/barberini/filter/D9148.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/corning/EagleXG.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/crystran/optical/BaF2.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/CaCO3-e.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/crystran/optical/CaCO3-o.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/CaF2.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/CdTe.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/CsBr.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/CsI.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/GLS.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/GaAs.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/Ge.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/KRS5.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/KRS6.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/LaF3-e.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/crystran/optical/LaF3-o.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/diamond.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/fused_silica-ir.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/fused_silica-uv.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/fused_silica-vis.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/crystran/optical/quartz-e.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/crystran/optical/quartz-o.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IEB400.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IEB470.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IEC501.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IEC508.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IEC518.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IEC578.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IHU250H.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IHU290.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IHU310.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IHU340.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IHU350.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/ILA400.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/ILB90.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/ISK150.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/ISK153.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/ISK157.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/ISK167.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/ISK171.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/ISK370.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/ITY385.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/ITY418.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/ITY425.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/ITY430.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IUV340.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IUV355.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IUV360.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IUV365.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IUV380W.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IVB490.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IVG530.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IVG540.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/isuzu/filter/IVG550.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/lightpath/infrared/BD-2.yml",
+      "reason": "no closed-form dispersion (tabulated nk)"
+    },
+    {
+      "path": "data/specs/lightpath/infrared/BD6.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lightpath/infrared/BDNL4.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    },
+    {
+      "path": "data/specs/lzos/optical/BF1.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/BF11.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/BF16.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/BF21.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/BF24.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/BF25.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/BF28.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/BF8.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/BK10.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/BK4.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/BK6.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/BK8.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/CTK12.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/CTK19.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/CTK3.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/CTK8.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/CTK9.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/F1.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/F13.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/F4.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/F6.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/F8.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/K8.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/KF6.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/KF7.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/LF5.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/LF7.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/LF9.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/LK3.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/LK5.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/LK6.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/LK7.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/OF1.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/OK4.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TF1.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TF10.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TF2.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TF3.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TF4.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TF5.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TF7.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TF8.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TK12.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TK14.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TK16.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TK17.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TK2.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TK20.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TK21.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TK23.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/lzos/optical/TK9.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/schott/misc/B270.yml",
+      "reason": "no closed-form dispersion (tabulated n)"
+    },
+    {
+      "path": "data/specs/schott/misc/DURAN.yml",
+      "reason": "no closed-form dispersion (tabulated n, tabulated k)"
+    }
+  ]
+}

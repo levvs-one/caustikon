@@ -78,8 +78,16 @@ public static class Dispersion
         }
     }
 
-    /// <summary>Classifies the wavelength against a model interval; returns <see cref="DispersionStatus.Success"/> when evaluation may proceed.</summary>
-    internal static DispersionStatus ClassifyWavelength(
+    /// <summary>Applies the shared input rules of every model to a wavelength and an inclusive interval.</summary>
+    /// <param name="wavelengthNanometers">The wavelength to classify, in nanometers.</param>
+    /// <param name="minimumWavelengthNanometers">Inclusive lower bound of the interval, in nanometers.</param>
+    /// <param name="maximumWavelengthNanometers">Inclusive upper bound of the interval, in nanometers.</param>
+    /// <returns>
+    /// <see cref="DispersionStatus.InvalidInput"/> when the interval is not positive and ordered (an uninitialized model) or the
+    /// wavelength is nonfinite or nonpositive; <see cref="DispersionStatus.OutsideModelRange"/> when the wavelength lies outside
+    /// the interval; otherwise <see cref="DispersionStatus.Success"/>, meaning evaluation may proceed.
+    /// </returns>
+    public static DispersionStatus ClassifyWavelength(
         double wavelengthNanometers,
         double minimumWavelengthNanometers,
         double maximumWavelengthNanometers)
