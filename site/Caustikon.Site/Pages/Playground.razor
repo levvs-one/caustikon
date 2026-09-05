@@ -28,11 +28,11 @@
         </select>
     </label>
     <label class="control">
-        <span><span>Angle of incidence</span><output>@angle°</output></span>
+        <span class="range-label"><span>Angle of incidence</span><output>@angle°</output></span>
         <input type="range" min="0" max="89.9" step="0.1" @bind="angle" @bind:event="oninput" />
     </label>
     <label class="control">
-        <span><span>Slab thickness</span><output>@thickness mm</output></span>
+        <span class="range-label"><span>Slab thickness</span><output>@thickness mm</output></span>
         <input type="range" min="1" max="100" step="1" @bind="thickness" @bind:event="oninput" />
     </label>
 </div>

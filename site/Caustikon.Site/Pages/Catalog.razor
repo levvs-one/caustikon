@@ -51,8 +51,7 @@
 
 <p class="muted">@Filtered.Count shown</p>
 
-<div class="table-scroll">
-    <table>
+<table class="catalog">
         <thead>
             <tr>
                 <th class="sortable @(Active("vendor"))" @onclick="@(() => SortBy("vendor"))">Manufacturer</th>
@@ -64,7 +63,7 @@
                 <th>Status</th>
                 <th>Model</th>
                 <th class="num">Range, nm</th>
-                <th>Data</th>
+                <th class="nowrap">Data</th>
             </tr>
         </thead>
         <tbody>
@@ -79,12 +78,11 @@
                     <td>@StatusText(glass.Status)</td>
                     <td>@glass.Formula</td>
                     <td class="num">@SiteInfo.Compact(glass.Model.MinimumWavelengthNanometers)–@SiteInfo.Compact(glass.Model.MaximumWavelengthNanometers)</td>
-                    <td class="muted">@(glass.Extinction is not null ? "k" : "")@(glass.Thermal is not null ? " dn/dT" : "")</td>
+                    <td class="muted nowrap">@(glass.Extinction is not null ? "k" : "")@(glass.Thermal is not null ? " dn/dT" : "")</td>
                 </tr>
             </Virtualize>
         </tbody>
     </table>
-</div>
 
 @code {
     private string search = "";

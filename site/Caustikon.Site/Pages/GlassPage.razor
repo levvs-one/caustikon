@@ -46,7 +46,7 @@ else
         <h2>Absorption and transmitted colour</h2>
         <div class="controls">
             <label class="control">
-                <span><span>Path length in the glass</span><output>@thickness mm</output></span>
+                <span class="range-label"><span>Path length in the glass</span><output>@thickness mm</output></span>
                 <input type="range" min="1" max="100" step="1" @bind="thickness" @bind:event="oninput" />
             </label>
             <label class="check"><input type="checkbox" @bind="withSurfaces" /> include the two air–glass surfaces at normal incidence</label>
@@ -81,7 +81,7 @@ else
         <h2>Temperature</h2>
         <div class="controls">
             <label class="control">
-                <span><span>Temperature</span><output>@temperature °C</output></span>
+                <span class="range-label"><span>Temperature</span><output>@temperature °C</output></span>
                 <input type="range" min="-40" max="80" step="1" @bind="temperature" @bind:event="oninput" />
             </label>
         </div>

@@ -317,6 +317,10 @@ td.num, th.num {
     text-align: right;
 }
 
+td.nowrap, th.nowrap {
+    white-space: nowrap;
+}
+
 tbody tr:hover {
     background: var(--panel);
 }
@@ -359,6 +363,10 @@ table.compact td {
 }
 
 .control > span:first-child {
+    display: block;
+}
+
+.control > .range-label {
     display: flex;
     justify-content: space-between;
     gap: 1rem;
