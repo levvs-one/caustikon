@@ -1,0 +1,552 @@
+@font-face {
+    font-family: "IBM Plex Sans";
+    src: url("../fonts/IBMPlexSans-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    src: url("../fonts/IBMPlexSans-Medium.woff2") format("woff2");
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    src: url("../fonts/IBMPlexSans-SemiBold.woff2") format("woff2");
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+:root {
+    --bg: #f5f3ee;
+    --panel: #fffdf8;
+    --fg: #1d262b;
+    --muted: #5f6b73;
+    --line: #d7d2c6;
+    --line-strong: #b9b2a2;
+    --accent: #1d5f74;
+    --accent-ink: #ffffff;
+    --warm: #b9503f;
+    --ok: #3d7a52;
+    --grid: #e6e1d6;
+    --chart-1: #1d5f74;
+    --chart-2: #b9503f;
+    --chart-3: #3d7a52;
+    --chart-4: #7b5ea7;
+    --shadow: 0 1px 0 rgba(29, 38, 43, 0.06);
+    --radius: 4px;
+    --content: 1120px;
+    color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #15191c;
+        --panel: #1b2024;
+        --fg: #e6e2d8;
+        --muted: #9aa4ab;
+        --line: #2c3439;
+        --line-strong: #414b52;
+        --accent: #6fb8cb;
+        --accent-ink: #0f1a1e;
+        --warm: #e0836f;
+        --ok: #7fbf96;
+        --grid: #242b30;
+        --chart-1: #6fb8cb;
+        --chart-2: #e0836f;
+        --chart-3: #7fbf96;
+        --chart-4: #b49ad8;
+        --shadow: none;
+        color-scheme: dark;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+}
+
+a:hover {
+    border-bottom-color: currentColor;
+}
+
+h1, h2, h3 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin: 0 0 0.5rem;
+}
+
+h1 {
+    font-size: 1.9rem;
+}
+
+h2 {
+    font-size: 1.25rem;
+    margin-top: 2.2rem;
+}
+
+h3 {
+    font-size: 1rem;
+    margin-top: 1.4rem;
+}
+
+p {
+    margin: 0 0 0.9rem;
+    max-width: 68ch;
+}
+
+small, .muted {
+    color: var(--muted);
+}
+
+code, pre {
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    font-variant-numeric: tabular-nums;
+}
+
+pre {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0.8rem 1rem;
+    overflow-x: auto;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    white-space: pre;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+}
+
+code {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0 0.3em;
+    font-size: 0.93em;
+}
+
+.boot {
+    display: grid;
+    place-items: center;
+    min-height: 60vh;
+    color: var(--muted);
+}
+
+#blazor-error-ui {
+    position: fixed;
+    inset: auto 0 0 0;
+    background: var(--warm);
+    color: #fff;
+    padding: 0.7rem 1rem;
+    z-index: 10;
+}
+
+#blazor-error-ui a {
+    color: #fff;
+    border-bottom-color: #fff;
+    margin-left: 0.5rem;
+}
+
+/* Frame */
+
+.frame {
+    max-width: var(--content);
+    margin: 0 auto;
+    padding: 0 1.25rem;
+}
+
+header.site {
+    border-bottom: 1px solid var(--line);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+header.site .frame {
+    display: flex;
+    align-items: center;
+    gap: 1.6rem;
+    height: 52px;
+}
+
+.wordmark {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--fg);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: none;
+}
+
+.wordmark svg {
+    width: 20px;
+    height: 20px;
+}
+
+nav.primary {
+    display: flex;
+    gap: 1.1rem;
+    margin-left: auto;
+}
+
+nav.primary a {
+    color: var(--muted);
+    padding: 0.2rem 0;
+    border-bottom: 2px solid transparent;
+}
+
+nav.primary a:hover {
+    color: var(--fg);
+}
+
+nav.primary a.active {
+    color: var(--fg);
+    border-bottom-color: var(--accent);
+}
+
+main {
+    padding: 2.2rem 0 4rem;
+}
+
+footer.site {
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 1.2rem 0 2rem;
+}
+
+footer.site .frame {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.5rem;
+}
+
+/* Text blocks */
+
+.lede {
+    font-size: 1.15rem;
+    max-width: 60ch;
+    color: var(--fg);
+}
+
+.columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem 2.5rem;
+}
+
+.figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem 1.5rem;
+    margin: 1.4rem 0;
+}
+
+.figure {
+    border-top: 2px solid var(--line-strong);
+    padding-top: 0.5rem;
+}
+
+.figure .value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.figure .label {
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+/* Tables */
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+}
+
+th, td {
+    text-align: left;
+    padding: 0.35rem 0.6rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+}
+
+th {
+    font-weight: 500;
+    color: var(--muted);
+    white-space: nowrap;
+    position: sticky;
+    top: 52px;
+    background: var(--bg);
+}
+
+td.num, th.num {
+    text-align: right;
+}
+
+tbody tr:hover {
+    background: var(--panel);
+}
+
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+th.sortable.active {
+    color: var(--fg);
+}
+
+.table-scroll {
+    overflow-x: auto;
+}
+
+table.compact th,
+table.compact td {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+}
+
+/* Controls */
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem 1.4rem;
+    align-items: end;
+    margin: 1rem 0 1.4rem;
+}
+
+.control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.control > span:first-child {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.control output {
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+}
+
+input[type="text"],
+input[type="search"],
+input[type="number"],
+select {
+    font: inherit;
+    color: var(--fg);
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 0.35rem 0.55rem;
+    min-width: 8rem;
+}
+
+input[type="range"] {
+    width: 220px;
+    accent-color: var(--accent);
+}
+
+label.check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--fg);
+    font-size: 0.9rem;
+}
+
+button {
+    font: inherit;
+    color: var(--fg);
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 0.35rem 0.8rem;
+    cursor: pointer;
+}
+
+button.primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+}
+
+/* Panels and charts */
+
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+    box-shadow: var(--shadow);
+}
+
+.chart {
+    width: 100%;
+    height: auto;
+    display: block;
+    font-size: 11px;
+}
+
+.chart .grid {
+    stroke: var(--grid);
+    stroke-width: 1;
+}
+
+.chart .axis {
+    stroke: var(--line-strong);
+    stroke-width: 1;
+}
+
+.chart text {
+    fill: var(--muted);
+    font-family: inherit;
+}
+
+.chart .series {
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.chart .band {
+    fill: var(--accent);
+    opacity: 0.07;
+}
+
+.chart .marker {
+    stroke: var(--line-strong);
+    stroke-dasharray: 3 3;
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.2rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 0.4rem;
+}
+
+.legend .swatch {
+    display: inline-block;
+    width: 14px;
+    height: 3px;
+    vertical-align: middle;
+    margin-right: 0.4rem;
+}
+
+.swatch-block {
+    width: 100%;
+    height: 72px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+}
+
+.kv {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.25rem 1rem;
+    font-size: 0.9rem;
+    margin: 0.6rem 0;
+}
+
+.kv dt {
+    color: var(--muted);
+    margin: 0;
+}
+
+.kv dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.equation {
+    font-size: 1.05rem;
+    padding: 0.6rem 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.equation sup, .equation sub {
+    font-size: 0.75em;
+}
+
+.badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 0.05rem 0.45rem;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    color: var(--muted);
+    vertical-align: middle;
+}
+
+.notice {
+    border-left: 3px solid var(--warm);
+    padding: 0.4rem 0.9rem;
+    color: var(--fg);
+    background: var(--panel);
+    margin: 1rem 0;
+    max-width: 70ch;
+}
+
+@media (max-width: 720px) {
+    header.site .frame {
+        gap: 0.9rem;
+    }
+
+    nav.primary {
+        gap: 0.7rem;
+        font-size: 0.9rem;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+    }
+
+    input[type="range"] {
+        width: 160px;
+    }
+}

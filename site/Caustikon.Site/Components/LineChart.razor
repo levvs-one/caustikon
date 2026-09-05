@@ -1,0 +1,159 @@
+@* An SVG line chart drawn from the numbers directly: no chart library, so the axes say exactly what the library computed. *@
+@((MarkupString)svg)
+@if (Series.Count > 1)
+{
+    <div class="legend">
+        @foreach (ChartSeries series in Series)
+        {
+            <span><span class="swatch" style="background: @series.Colour"></span>@series.Label</span>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ChartSeries> Series { get; set; } = [];
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string XLabel { get; set; } = "";
+    [Parameter] public string YLabel { get; set; } = "";
+    [Parameter] public int Width { get; set; } = 640;
+    [Parameter] public int Height { get; set; } = 300;
+    [Parameter] public (double From, double To)? Band { get; set; }
+    [Parameter] public IReadOnlyList<double> Markers { get; set; } = [];
+    [Parameter] public double? YMin { get; set; }
+    [Parameter] public double? YMax { get; set; }
+
+    private const double Left = 56;
+    private const double Top = 12;
+    private double Right => Width - 14;
+    private double Bottom => Height - 30;
+
+    private double xMin, xMax, yMin, yMax;
+    private string svg = "";
+
+    protected override void OnParametersSet()
+    {
+        List<(double X, double Y)> points = Series.SelectMany(s => s.Points).Where(p => double.IsFinite(p.X) && double.IsFinite(p.Y)).ToList();
+        if (points.Count == 0)
+        {
+            xMin = 0; xMax = 1; yMin = 0; yMax = 1;
+        }
+        else
+        {
+            xMin = points.Min(p => p.X);
+            xMax = points.Max(p => p.X);
+            yMin = YMin ?? points.Min(p => p.Y);
+            yMax = YMax ?? points.Max(p => p.Y);
+            if (xMax - xMin < 1e-12)
+            {
+                xMin -= 0.5;
+                xMax += 0.5;
+            }
+            if (yMax - yMin < 1e-12)
+            {
+                yMin -= 0.5;
+                yMax += 0.5;
+            }
+            if (YMin is null && YMax is null)
+            {
+                double pad = (yMax - yMin) * 0.06;
+                yMin -= pad;
+                yMax += pad;
+            }
+        }
+
+        (double[] xTicks, int xDecimals) = Ticks(xMin, xMax, 7);
+        (double[] yTicks, int yDecimals) = Ticks(yMin, yMax, 6);
+
+        System.Text.StringBuilder b = new();
+        b.Append("<svg class=\"chart\" viewBox=\"0 0 ").Append(Width).Append(' ').Append(Height).Append("\" role=\"img\" aria-label=\"").Append(Escape(Title)).Append("\" preserveAspectRatio=\"xMidYMid meet\">");
+        if (Band is { } band)
+        {
+            double from = Math.Clamp(ToX(band.From), Left, Right);
+            double to = Math.Clamp(ToX(band.To), Left, Right);
+            b.Append("<rect class=\"band\" x=\"").Append(F(from)).Append("\" y=\"").Append(F(Top)).Append("\" width=\"").Append(F(Math.Max(0, to - from))).Append("\" height=\"").Append(F(Bottom - Top)).Append("\"/>");
+        }
+
+        foreach (double tick in yTicks)
+        {
+            double y = ToY(tick);
+            b.Append("<line class=\"grid\" x1=\"").Append(F(Left)).Append("\" x2=\"").Append(F(Right)).Append("\" y1=\"").Append(F(y)).Append("\" y2=\"").Append(F(y)).Append("\"/>");
+            b.Append("<text x=\"").Append(F(Left - 6)).Append("\" y=\"").Append(F(y + 3.5)).Append("\" text-anchor=\"end\">").Append(FormatTick(tick, yDecimals)).Append("</text>");
+        }
+
+        foreach (double tick in xTicks)
+        {
+            double x = ToX(tick);
+            b.Append("<line class=\"grid\" x1=\"").Append(F(x)).Append("\" x2=\"").Append(F(x)).Append("\" y1=\"").Append(F(Top)).Append("\" y2=\"").Append(F(Bottom)).Append("\"/>");
+            b.Append("<text x=\"").Append(F(x)).Append("\" y=\"").Append(F(Bottom + 14)).Append("\" text-anchor=\"middle\">").Append(FormatTick(tick, xDecimals)).Append("</text>");
+        }
+
+        b.Append("<line class=\"axis\" x1=\"").Append(F(Left)).Append("\" x2=\"").Append(F(Right)).Append("\" y1=\"").Append(F(Bottom)).Append("\" y2=\"").Append(F(Bottom)).Append("\"/>");
+        b.Append("<line class=\"axis\" x1=\"").Append(F(Left)).Append("\" x2=\"").Append(F(Left)).Append("\" y1=\"").Append(F(Top)).Append("\" y2=\"").Append(F(Bottom)).Append("\"/>");
+
+        foreach (double marker in Markers)
+        {
+            if (marker >= xMin && marker <= xMax)
+            {
+                double x = ToX(marker);
+                b.Append("<line class=\"marker\" x1=\"").Append(F(x)).Append("\" x2=\"").Append(F(x)).Append("\" y1=\"").Append(F(Top)).Append("\" y2=\"").Append(F(Bottom)).Append("\"/>");
+            }
+        }
+
+        foreach (ChartSeries series in Series)
+        {
+            b.Append("<path class=\"series\" style=\"stroke:").Append(Escape(series.Colour)).Append("\" d=\"").Append(PathOf(series)).Append("\"/>");
+        }
+
+        b.Append("<text x=\"").Append(F((Left + Right) / 2)).Append("\" y=\"").Append(F(Height - 4)).Append("\" text-anchor=\"middle\">").Append(Escape(XLabel)).Append("</text>");
+        b.Append("<text transform=\"translate(12 ").Append(F((Top + Bottom) / 2)).Append(") rotate(-90)\" text-anchor=\"middle\">").Append(Escape(YLabel)).Append("</text>");
+        b.Append("</svg>");
+        svg = b.ToString();
+    }
+
+    private double ToX(double x) => Left + (x - xMin) / (xMax - xMin) * (Right - Left);
+    private double ToY(double y) => Bottom - (y - yMin) / (yMax - yMin) * (Bottom - Top);
+
+    private string PathOf(ChartSeries series)
+    {
+        System.Text.StringBuilder b = new();
+        bool pen = false;
+        foreach ((double x, double y) in series.Points)
+        {
+            if (!double.IsFinite(x) || !double.IsFinite(y))
+            {
+                pen = false;
+                continue;
+            }
+
+            double cy = Math.Clamp(ToY(y), Top, Bottom);
+            b.Append(pen ? " L" : " M").Append(F(ToX(x))).Append(' ').Append(F(cy));
+            pen = true;
+        }
+
+        return b.ToString();
+    }
+
+    private static (double[] Ticks, int Decimals) Ticks(double min, double max, int target)
+    {
+        double span = max - min;
+        double raw = span / target;
+        double magnitude = Math.Pow(10, Math.Floor(Math.Log10(raw)));
+        double residual = raw / magnitude;
+        double step = residual switch { < 1.5 => 1, < 3 => 2, < 7 => 5, _ => 10 } * magnitude;
+        double first = Math.Ceiling(min / step) * step;
+        List<double> ticks = [];
+        for (double t = first; t <= max + step * 1e-9; t += step)
+        {
+            ticks.Add(Math.Round(t / step) * step);
+        }
+
+        int decimals = Math.Max(0, (int)Math.Ceiling(-Math.Log10(step)));
+        return ([.. ticks], decimals);
+    }
+
+    private static string FormatTick(double value, int decimals) => value.ToString("F" + decimals, CultureInfo.InvariantCulture);
+
+    private static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private static string Escape(string value) => System.Net.WebUtility.HtmlEncode(value);
+}

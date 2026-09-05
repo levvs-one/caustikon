@@ -1,0 +1,146 @@
+@page "/catalog"
+
+<PageTitle>Catalog · Caustikon</PageTitle>
+
+<h1>Glass catalog</h1>
+<p class="lede">@GlassCatalog.All.Count glasses from @GlassCatalog.Vendors.Count manufacturers. n<sub>d</sub> and ν<sub>d</sub> are the printed catalog values; every one is reproduced by its fit within five units in the fifth decimal.</p>
+
+<div class="controls">
+    <label class="control">
+        <span>Search</span>
+        <input type="search" placeholder="N-BK7, S-LAH, 517642…" @bind="search" @bind:event="oninput" />
+    </label>
+    <label class="control">
+        <span>Manufacturer</span>
+        <select @bind="vendor">
+            <option value="">All</option>
+            @foreach (string key in GlassCatalog.Vendors)
+            {
+                <option value="@key">@DisplayName(key) (@GlassCatalog.ByVendor(key).Count())</option>
+            }
+        </select>
+    </label>
+    <label class="control">
+        <span>Status</span>
+        <select @bind="status">
+            <option value="">Any</option>
+            <option value="Preferred">Preferred</option>
+            <option value="Standard">Standard</option>
+            <option value="Special">Special</option>
+            <option value="Obsolete">Obsolete</option>
+            <option value="Unspecified">Not stated</option>
+        </select>
+    </label>
+    <label class="control">
+        <span>n<sub>d</sub> from</span>
+        <input type="number" step="0.01" min="1" max="3" @bind="ndMin" />
+    </label>
+    <label class="control">
+        <span>n<sub>d</sub> to</span>
+        <input type="number" step="0.01" min="1" max="3" @bind="ndMax" />
+    </label>
+    <label class="control">
+        <span>ν<sub>d</sub> from</span>
+        <input type="number" step="1" min="10" max="100" @bind="vdMin" />
+    </label>
+    <label class="control">
+        <span>ν<sub>d</sub> to</span>
+        <input type="number" step="1" min="10" max="100" @bind="vdMax" />
+    </label>
+</div>
+
+<p class="muted">@Filtered.Count shown</p>
+
+<div class="table-scroll">
+    <table>
+        <thead>
+            <tr>
+                <th class="sortable @(Active("vendor"))" @onclick="@(() => SortBy("vendor"))">Manufacturer</th>
+                <th class="sortable @(Active("name"))" @onclick="@(() => SortBy("name"))">Glass</th>
+                <th class="num sortable @(Active("nd"))" @onclick="@(() => SortBy("nd"))">n<sub>d</sub></th>
+                <th class="num sortable @(Active("vd"))" @onclick="@(() => SortBy("vd"))">ν<sub>d</sub></th>
+                <th class="num sortable @(Active("density"))" @onclick="@(() => SortBy("density"))">ρ, kg/m³</th>
+                <th>Code</th>
+                <th>Status</th>
+                <th>Model</th>
+                <th class="num">Range, nm</th>
+                <th>Data</th>
+            </tr>
+        </thead>
+        <tbody>
+            <Virtualize Items="Filtered" Context="glass" ItemSize="31">
+                <tr>
+                    <td>@glass.VendorDisplayName</td>
+                    <td><a href="@GlassLink(glass)">@glass.Name</a> @if (glass.Category != "optical") { <span class="badge">@glass.Category</span> }</td>
+                    <td class="num">@(glass.CatalogIndexD is { } nd ? SiteInfo.Number(nd, 5) : "—")</td>
+                    <td class="num">@(glass.CatalogAbbeD is { } vd ? SiteInfo.Number(vd, 2) : "—")</td>
+                    <td class="num">@(glass.DensityKgPerM3 is { } rho ? SiteInfo.Number(rho, 0) : "—")</td>
+                    <td>@(glass.GlassCode ?? "—")</td>
+                    <td>@StatusText(glass.Status)</td>
+                    <td>@glass.Formula</td>
+                    <td class="num">@SiteInfo.Compact(glass.Model.MinimumWavelengthNanometers)–@SiteInfo.Compact(glass.Model.MaximumWavelengthNanometers)</td>
+                    <td class="muted">@(glass.Extinction is not null ? "k" : "")@(glass.Thermal is not null ? " dn/dT" : "")</td>
+                </tr>
+            </Virtualize>
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private string search = "";
+    private string vendor = "";
+    private string status = "";
+    private double? ndMin, ndMax, vdMin, vdMax;
+    private string sortKey = "vendor";
+    private bool descending;
+
+    private List<Glass> Filtered
+    {
+        get
+        {
+            string needle = GlassCatalog.NormalizeName(search);
+            IEnumerable<Glass> query = GlassCatalog.All;
+            if (vendor.Length > 0) query = query.Where(g => g.Vendor == vendor);
+            if (status.Length > 0 && Enum.TryParse(status, out GlassStatus s)) query = query.Where(g => g.Status == s);
+            if (needle.Length > 0)
+            {
+                query = query.Where(g =>
+                    GlassCatalog.NormalizeName(g.Name).Contains(needle, StringComparison.Ordinal) ||
+                    (g.GlassCode?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    g.VendorDisplayName.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
+            if (ndMin is { } a) query = query.Where(g => g.CatalogIndexD >= a);
+            if (ndMax is { } b) query = query.Where(g => g.CatalogIndexD <= b);
+            if (vdMin is { } c) query = query.Where(g => g.CatalogAbbeD >= c);
+            if (vdMax is { } d) query = query.Where(g => g.CatalogAbbeD <= d);
+
+            IOrderedEnumerable<Glass> ordered = sortKey switch
+            {
+                "name" => query.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase),
+                "nd" => query.OrderBy(g => g.CatalogIndexD ?? double.MaxValue),
+                "vd" => query.OrderBy(g => g.CatalogAbbeD ?? double.MaxValue),
+                "density" => query.OrderBy(g => g.DensityKgPerM3 ?? double.MaxValue),
+                _ => query.OrderBy(g => g.VendorDisplayName).ThenBy(g => g.Name, StringComparer.OrdinalIgnoreCase),
+            };
+            return descending ? ordered.Reverse().ToList() : ordered.ToList();
+        }
+    }
+
+    private void SortBy(string key)
+    {
+        if (sortKey == key) descending = !descending;
+        else { sortKey = key; descending = false; }
+    }
+
+    private string Active(string key) => sortKey == key ? "active" : "";
+
+    private static string DisplayName(string vendorKey) => GlassCatalog.ByVendor(vendorKey).FirstOrDefault()?.VendorDisplayName ?? vendorKey;
+
+    public static string GlassLink(Glass glass) => $"glass/{glass.Vendor}/{Uri.EscapeDataString(glass.Name)}";
+
+    public static string StatusText(GlassStatus status) => status switch
+    {
+        GlassStatus.Unspecified => "—",
+        _ => status.ToString(),
+    };
+}

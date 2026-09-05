@@ -1,0 +1,89 @@
+@page "/"
+
+<PageTitle>Caustikon</PageTitle>
+
+<h1>Geometric optics for .NET, with the glass included</h1>
+<p class="lede">
+    Refraction, exact Fresnel reflectance and dispersion as allocation-free value types, and a catalog of
+    @SiteInfo.GlassCount manufacturer glasses that carries dispersion, absorption and temperature data with a
+    citation for every number.
+</p>
+
+<div class="figures">
+    <div class="figure"><div class="value">@SiteInfo.GlassCount</div><div class="label">glasses with closed-form dispersion</div></div>
+    <div class="figure"><div class="value">@SiteInfo.VendorCount</div><div class="label">manufacturers</div></div>
+    <div class="figure"><div class="value">@withExtinction</div><div class="label">with absorption tables</div></div>
+    <div class="figure"><div class="value">@withThermal</div><div class="label">with dn/dT coefficients</div></div>
+</div>
+
+<h2>Install</h2>
+<pre><code>dotnet add package Caustikon
+dotnet add package Caustikon.Glasses</code></pre>
+<p>Both packages target .NET 8 and .NET 10 and depend on nothing outside the base class library.</p>
+
+<h2>Use</h2>
+<pre><code>using Caustikon;
+using Caustikon.Glasses;
+
+// The concrete model is a value type: no allocation on the ray path.
+Sellmeier bk7 = Schott.NBK7;
+bk7.EvaluateNanometers(587.5618, out double nd);          // @SiteInfo.Number(nd, 5)
+
+// Refraction and exact reflectance at an air–glass interface.
+Vector3 incident = Vector3.Normalize(new Vector3(0.5f, -0.866f, 0f));
+RefractionKind kind = Dielectric.RefractUnit(incident, Vector3.UnitY, 1f, (float)nd, out Vector3 transmitted);
+FresnelPower r = Dielectric.Fresnel(0.866f, 1f, (float)nd);   // s @SiteInfo.Number(rs, 4), p @SiteInfo.Number(rp, 4)
+
+// By name, with everything the catalog knows about it.
+Glass glass = GlassCatalog.Find("ohara", "S-BSL7")!;
+glass.Extinction!.InternalTransmittance(400, 10, out double t);   // @SiteInfo.Number(tau, 4)
+string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</code></pre>
+<p>The numbers in the comments are computed by this page from the packages, not typed in.</p>
+
+<div class="columns">
+    <div>
+        <h3>Catalog</h3>
+        <p>
+            Every glass comes from the RefractiveIndex.INFO database, public domain under CC0, and records the
+            manufacturer catalog it was transcribed from, the file path in the database and the retrieval date.
+            <a href="catalog">Browse the catalog</a> or open a glass such as <a href="glass/schott/N-BK7">SCHOTT N-BK7</a>.
+        </p>
+    </div>
+    <div>
+        <h3>Verified, not assumed</h3>
+        <p>
+            Every catalogued glass is evaluated in CI at the exact d, F and C lines and compared with the
+            <em>printed</em> n<sub>d</sub> and ν<sub>d</sub> of its manufacturer, which are independent of the fit.
+            N-BK7 is additionally pinned to its SCHOTT datasheet for internal transmittance and dn/dT.
+            <a href="about">How the checks work</a>.
+        </p>
+    </div>
+    <div>
+        <h3>Try it</h3>
+        <p>
+            The <a href="playground">playground</a> runs the same code in your browser: pick a glass, an angle
+            and a thickness, and read off refraction, reflectance, dispersion and the transmitted colour.
+            The <a href="formulas">formulas</a> page states each equation and names the type that implements it.
+        </p>
+    </div>
+</div>
+
+@code {
+    private int withExtinction;
+    private int withThermal;
+    private double nd, rs, rp, tau;
+    private string tintHex = "";
+
+    protected override void OnInitialized()
+    {
+        withExtinction = GlassCatalog.All.Count(g => g.Extinction is not null);
+        withThermal = GlassCatalog.All.Count(g => g.Thermal is not null);
+        Schott.NBK7.EvaluateNanometers(587.5618d, out nd);
+        FresnelPower r = Dielectric.Fresnel(0.866f, 1f, (float)nd);
+        rs = r.S;
+        rp = r.P;
+        Glass glass = GlassCatalog.Find("ohara", "S-BSL7")!;
+        glass.Extinction!.InternalTransmittance(400d, 10d, out tau);
+        tintHex = GlassColour.Transmitted(glass, 25d)!.Value.Hex;
+    }
+}

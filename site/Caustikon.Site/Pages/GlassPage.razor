@@ -1,0 +1,288 @@
+@page "/glass/{Vendor}/{Name}"
+
+@if (glass is null)
+{
+    <PageTitle>Glass not found · Caustikon</PageTitle>
+    <h1>No such glass</h1>
+    <p>Nothing in the catalog is called <code>@Name</code> from <code>@Vendor</code>. <a href="catalog">Back to the catalog</a>.</p>
+}
+else
+{
+    <PageTitle>@glass.VendorDisplayName @glass.Name · Caustikon</PageTitle>
+
+    <p class="muted"><a href="catalog">Catalog</a> › @glass.VendorDisplayName</p>
+    <h1>@glass.Name <span class="badge">@Catalog.StatusText(glass.Status)</span> @if (glass.Category != "optical") { <span class="badge">@glass.Category</span> }</h1>
+    <p class="lede">@glass.VendorDisplayName · @(glass.GlassCode is null ? "" : "code " + glass.GlassCode + " · ")@glass.Formula fit over @SiteInfo.Compact(glass.Model.MinimumWavelengthNanometers)–@SiteInfo.Compact(glass.Model.MaximumWavelengthNanometers) nm</p>
+
+    <div class="figures">
+        <div class="figure"><div class="value">@Printed(glass.CatalogIndexD, 5)</div><div class="label">n<sub>d</sub> printed · fit @SiteInfo.Number(glass.IndexD, 5)</div></div>
+        <div class="figure"><div class="value">@Printed(glass.CatalogAbbeD, 2)</div><div class="label">ν<sub>d</sub> printed · fit @SiteInfo.Number(glass.AbbeD, 2)</div></div>
+        <div class="figure"><div class="value">@SiteInfo.Number(glass.IndexF, 5)</div><div class="label">n<sub>F</sub> 486.13 nm</div></div>
+        <div class="figure"><div class="value">@SiteInfo.Number(glass.IndexC, 5)</div><div class="label">n<sub>C</sub> 656.27 nm</div></div>
+        <div class="figure"><div class="value">@Printed(glass.DensityKgPerM3, 0)</div><div class="label">density, kg/m³</div></div>
+        <div class="figure"><div class="value">@Printed(glass.ReferenceTemperatureKelvin, 0)</div><div class="label">reference temperature, K</div></div>
+    </div>
+
+    <h2>Refractive index</h2>
+    <div class="panel">
+        <LineChart Series="indexSeries" Title="Refractive index against wavelength" XLabel="wavelength, nm" YLabel="n" Band="(380, 780)" Markers="lineMarkers" />
+    </div>
+    <p class="muted">Shaded: the visible range. Dashed: the F, d and C lines. Outside the fit interval the model reports <code>OutsideModelRange</code> instead of extrapolating.</p>
+
+    <div class="table-scroll">
+        <table class="compact">
+            <thead><tr><th>Line</th><th class="num">λ, nm</th><th class="num">n</th></tr></thead>
+            <tbody>
+                @foreach ((string label, double wavelength) in Lines)
+                {
+                    <tr><td>@label</td><td class="num">@SiteInfo.Number(wavelength, 4)</td><td class="num">@IndexAt(wavelength)</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (glass.Extinction is { } extinction)
+    {
+        <h2>Absorption and transmitted colour</h2>
+        <div class="controls">
+            <label class="control">
+                <span><span>Path length in the glass</span><output>@thickness mm</output></span>
+                <input type="range" min="1" max="100" step="1" @bind="thickness" @bind:event="oninput" />
+            </label>
+            <label class="check"><input type="checkbox" @bind="withSurfaces" /> include the two air–glass surfaces at normal incidence</label>
+        </div>
+        <div class="columns">
+            <div class="panel">
+                <LineChart Series="transmittanceSeries" Title="Internal transmittance against wavelength" XLabel="wavelength, nm" YLabel="τi" YMin="0" YMax="1" Band="(380, 780)" />
+            </div>
+            <div>
+                @if (colour is { } c)
+                {
+                    <div class="swatch-block" style="background: @c.Hex"></div>
+                    <dl class="kv">
+                        <dt>sRGB</dt><dd>@c.Hex · @c.Rgb8.Red, @c.Rgb8.Green, @c.Rgb8.Blue</dd>
+                        <dt>Luminous transmittance Y</dt><dd>@SiteInfo.Number(c.Y, 4)</dd>
+                        <dt>XYZ</dt><dd>@SiteInfo.Number(c.X, 4), @SiteInfo.Number(c.Y, 4), @SiteInfo.Number(c.Z, 4)</dd>
+                        <dt>Illuminant</dt><dd>D65, CIE 1931 2° observer</dd>
+                        <dt>Data coverage</dt><dd>@SiteInfo.Compact(c.CoverageMinimumNanometers)–@SiteInfo.Compact(c.CoverageMaximumNanometers) nm of 360–830</dd>
+                        @if (c.ClippedToGamut)
+                        {
+                            <dt>Gamut</dt><dd>outside sRGB, channels clamped</dd>
+                        }
+                    </dl>
+                    <p class="muted">What a @thickness mm slab does to daylight, seen against white. Bulk absorption from the manufacturer's k(λ) table@(withSurfaces ? ", plus Fresnel loss at both faces" : ""). Tabulated k covers @SiteInfo.Compact(extinction.MinimumWavelengthNanometers)–@SiteInfo.Compact(extinction.MaximumWavelengthNanometers) nm at @extinction.Count points.</p>
+                }
+            </div>
+        </div>
+    }
+
+    @if (glass.Thermal is { } thermal)
+    {
+        <h2>Temperature</h2>
+        <div class="controls">
+            <label class="control">
+                <span><span>Temperature</span><output>@temperature °C</output></span>
+                <input type="range" min="-40" max="80" step="1" @bind="temperature" @bind:event="oninput" />
+            </label>
+        </div>
+        <div class="table-scroll">
+            <table class="compact">
+                <thead><tr><th>Line</th><th class="num">n at @thermal.ReferenceTemperatureCelsius °C</th><th class="num">Δn<sub>abs</sub> at @temperature °C</th><th class="num">dn<sub>abs</sub>/dT at @thermal.ReferenceTemperatureCelsius °C, 10⁻⁶/K</th></tr></thead>
+                <tbody>
+                    @foreach ((string label, double wavelength) in Lines)
+                    {
+                        if (glass.IndexAt(wavelength, out double n) == DispersionStatus.Success)
+                        {
+                            <tr>
+                                <td>@label</td>
+                                <td class="num">@SiteInfo.Number(n, 5)</td>
+                                <td class="num">@((thermal.AbsoluteIndexShift(n, wavelength, temperature) * 1e6).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture)) × 10⁻⁶</td>
+                                <td class="num">@SiteInfo.Number(thermal.AbsoluteSlopeAtReference(n, wavelength) * 1e6, 2)</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="muted">Absolute index (against vacuum) from the manufacturer's D₀, D₁, D₂, E₀, E₁, λ<sub>TK</sub> in the SCHOTT form. The catalog index is relative to air, whose own index also moves with temperature; that conversion is not applied here.</p>
+    }
+
+    <h2>Model</h2>
+    <div class="equation">@FormulaText</div>
+    <div class="table-scroll">
+        <table class="compact">
+            <thead><tr>@foreach (string h in coefficientHeaders) { <th class="num">@h</th> }</tr></thead>
+            <tbody>
+                @foreach (string[] row in coefficientRows)
+                {
+                    <tr>@foreach (string cell in row) { <td class="num">@cell</td> }</tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="muted">λ in micrometers. Typed constant: <code>@VendorClass.@Identifier</code>.</p>
+
+    <h2>Provenance</h2>
+    <dl class="kv">
+        <dt>Source</dt><dd>@glass.Provenance.Source</dd>
+        <dt>Citation</dt><dd>@glass.Provenance.Citation</dd>
+        @if (glass.Provenance.Url is { } url)
+        {
+            <dt>Reference</dt><dd><a href="@url" rel="noopener">@url</a></dd>
+        }
+        <dt>Database path</dt><dd><a href="https://github.com/polyanskiy/refractiveindex.info-database/blob/master/database/@glass.Provenance.Path" rel="noopener">@glass.Provenance.Path</a></dd>
+        <dt>Retrieved</dt><dd>@glass.Provenance.RetrievedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</dd>
+        @if (glass.Provenance.Notes.Length > 0)
+        {
+            <dt>Import notes</dt><dd>@glass.Provenance.Notes</dd>
+        }
+        @if (glass.PartialDispersionDeviationGF is { } dp)
+        {
+            <dt>ΔP<sub>g,F</sub></dt><dd>@SiteInfo.Number(dp, 4)</dd>
+        }
+    </dl>
+}
+
+@code {
+    [Parameter] public string Vendor { get; set; } = "";
+    [Parameter] public string Name { get; set; } = "";
+
+    private static readonly (string Label, double Wavelength)[] Lines =
+    [
+        ("i (Hg)", FraunhoferLines.INanometers), ("h (Hg)", FraunhoferLines.HNanometers), ("g (Hg)", FraunhoferLines.GNanometers),
+        ("F (H)", FraunhoferLines.FNanometers), ("e (Hg)", FraunhoferLines.ENanometers), ("d (He)", FraunhoferLines.DNanometers),
+        ("C (H)", FraunhoferLines.CNanometers), ("r (He)", FraunhoferLines.RNanometers),
+    ];
+
+    private static readonly double[] lineMarkers = [FraunhoferLines.FNanometers, FraunhoferLines.DNanometers, FraunhoferLines.CNanometers];
+
+    private Glass? glass;
+    private List<ChartSeries> indexSeries = [];
+    private List<ChartSeries> transmittanceSeries = [];
+    private string[] coefficientHeaders = [];
+    private List<string[]> coefficientRows = [];
+    private double thicknessValue = 10;
+    private bool surfacesValue;
+    private double temperature = 20;
+    private TransmittedColour? colour;
+
+    private double thickness
+    {
+        get => thicknessValue;
+        set { thicknessValue = value; UpdateTransmittance(); }
+    }
+
+    private bool withSurfaces
+    {
+        get => surfacesValue;
+        set { surfacesValue = value; UpdateTransmittance(); }
+    }
+
+    protected override void OnParametersSet()
+    {
+        glass = GlassCatalog.Find(Vendor, Name);
+        if (glass is null)
+        {
+            return;
+        }
+
+        IDispersionModel model = glass.Model;
+        List<(double, double)> points = [];
+        double min = model.MinimumWavelengthNanometers;
+        double max = model.MaximumWavelengthNanometers;
+        for (int i = 0; i <= 240; i++)
+        {
+            double wavelength = min + (max - min) * i / 240d;
+            points.Add((wavelength, model.EvaluateNanometers(wavelength, out double n) == DispersionStatus.Success ? n : double.NaN));
+        }
+
+        indexSeries = [new ChartSeries("n", points)];
+        BuildCoefficientTable(glass);
+        UpdateTransmittance();
+    }
+
+    private void UpdateTransmittance()
+    {
+        if (glass?.Extinction is not { } extinction)
+        {
+            transmittanceSeries = [];
+            colour = null;
+            return;
+        }
+
+        List<(double, double)> points = [];
+        double min = extinction.MinimumWavelengthNanometers;
+        double max = Math.Min(extinction.MaximumWavelengthNanometers, 2_500d);
+        for (int i = 0; i <= 300; i++)
+        {
+            double wavelength = min + (max - min) * i / 300d;
+            extinction.InternalTransmittance(wavelength, thicknessValue, out double t);
+            points.Add((wavelength, t));
+        }
+
+        transmittanceSeries = [new ChartSeries($"τi, {thicknessValue} mm", points)];
+        colour = GlassColour.Transmitted(glass, thicknessValue, surfacesValue);
+    }
+
+    private void BuildCoefficientTable(Glass glass)
+    {
+        switch (glass.Model)
+        {
+            case Sellmeier s:
+                coefficientHeaders = ["term", "Bᵢ", "Cᵢ, µm²"];
+                coefficientRows = [["offset", SiteInfo.Compact(s.Offset), ""]];
+                for (int i = 0; i < s.TermCount; i++)
+                {
+                    coefficientRows.Add([(i + 1).ToString(CultureInfo.InvariantCulture), G(s.StrengthAt(i)), G(s.ResonanceUm2At(i))]);
+                }
+                break;
+            case Polynomial p:
+                coefficientHeaders = ["term", "aᵢ", "power of λ"];
+                coefficientRows = [["a₀", G(p.Offset), "0"]];
+                for (int i = 0; i < p.TermCount; i++)
+                {
+                    coefficientRows.Add([(i + 1).ToString(CultureInfo.InvariantCulture), G(p.CoefficientAt(i)), SiteInfo.Compact(p.ExponentAt(i))]);
+                }
+                break;
+            case Cauchy c:
+                coefficientHeaders = ["term", "aᵢ", "power of λ"];
+                coefficientRows = [["a₀", G(c.Offset), "0"]];
+                for (int i = 0; i < c.TermCount; i++)
+                {
+                    coefficientRows.Add([(i + 1).ToString(CultureInfo.InvariantCulture), G(c.CoefficientAt(i)), SiteInfo.Compact(c.ExponentAt(i))]);
+                }
+                break;
+            default:
+                coefficientHeaders = [];
+                coefficientRows = [];
+                break;
+        }
+    }
+
+    private string FormulaText => glass?.Formula switch
+    {
+        DispersionFormula.Sellmeier => "n² − 1 = offset + Σ Bᵢ λ² / (λ² − Cᵢ)",
+        DispersionFormula.Polynomial => "n² = a₀ + Σ aᵢ λ^pᵢ",
+        DispersionFormula.Cauchy => "n = a₀ + Σ aᵢ λ^pᵢ",
+        _ => "",
+    };
+
+    private string VendorClass => glass is null ? "" : char.ToUpperInvariant(glass.Vendor[0]) + glass.Vendor[1..];
+
+    private string Identifier
+    {
+        get
+        {
+            if (glass is null) return "";
+            string id = new(glass.Name.Where(char.IsAsciiLetterOrDigit).ToArray());
+            return id.Length > 0 && char.IsAsciiDigit(id[0]) ? "G" + id : id;
+        }
+    }
+
+    private string IndexAt(double wavelength) =>
+        glass!.IndexAt(wavelength, out double n) == DispersionStatus.Success ? SiteInfo.Number(n, 5) : "outside fit";
+
+    private static string Printed(double? value, int decimals) => value is { } v ? SiteInfo.Number(v, decimals) : "—";
+
+    private static string G(double value) => value.ToString("G10", CultureInfo.InvariantCulture);
+}
