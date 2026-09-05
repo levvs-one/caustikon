@@ -66,12 +66,12 @@ try
         }
 
         Vector2 end = exit + outgoing * ((1.6f - exit.X) / outgoing.X);
-        rays.Add(new(wavelength, color, index, entry, exit, end, deviation));
+        rays.Add(new(wavelength, color, entry, exit, end, deviation));
         Console.WriteLine($"{wavelength,8:F1}   {index:F8}   {exitDegrees,9:F5}   {deviation,13:F5}   {throughput,16:F6}");
     }
 
     string output = Path.GetFullPath(args.Length == 1 ? args[0] : "prism.svg");
-    DrawPlate(vertices, origin, rays).Save(output);
+    DrawDiagram(vertices, origin, rays).Save(output);
     Console.WriteLine($"Wrote {output}");
     return 0;
 }
@@ -139,105 +139,59 @@ static Vector2 OutwardNormal(Vector2[] vertices, int edge)
     return Vector2.Normalize(new Vector2(segment.Y, -segment.X));
 }
 
-static XDocument DrawPlate(Vector2[] vertices, Vector2 origin, List<RaySample> rays)
+static XDocument DrawDiagram(Vector2[] vertices, Vector2 origin, List<RaySample> rays)
 {
     XNamespace ns = "http://www.w3.org/2000/svg";
-    XElement svg = new(ns + "svg", new XAttribute("width", 1280), new XAttribute("height", 840),
-        new XAttribute("viewBox", "0 0 1280 840"), new XAttribute("role", "img"),
+    XElement svg = new(ns + "svg", new XAttribute("width", 1200), new XAttribute("height", 580),
+        new XAttribute("viewBox", "0 0 1200 580"), new XAttribute("role", "img"),
         new XAttribute("aria-labelledby", "title description"),
         new XElement(ns + "title", new XAttribute("id", "title"), "Caustikon - N-BK7 prism dispersion"),
         new XElement(ns + "desc", new XAttribute("id", "description"),
-            "Six coincident incident rays refract through a 60 degree N-BK7 prism. " +
-            "The drawing preserves geometry. A separate chart resolves their calculated angular deviations."),
-        new XElement(ns + "rect", new XAttribute("width", 1280), new XAttribute("height", 840), new XAttribute("fill", "#faf9f5")),
-        new XElement(ns + "style", "text { fill: #252824; font-family: 'Consolas', 'Liberation Mono', monospace; font-size: 13px; } " +
-            ".title { font-family: 'Georgia', 'Liberation Serif', serif; font-size: 42px; } " +
-            ".muted { fill: #666b62; } .small { font-size: 11px; }"));
-
-    AddText(48, 42, "CAUSTIKON  /  GEOMETRIC OPTICS", "small");
-    AddText(48, 98, "One prism. Six wavelengths.", "title");
-    AddText(48, 130, "N-BK7  |  60 deg apex  |  45 deg incidence  |  air / glass / air", "muted");
-    AddText(1116, 42, "PLATE 01", "small");
-    AddLine(48, 152, 1232, 152, "#d5d7ce");
+            "Six coincident rays at " + string.Join(", ", rays.Select(ray => $"{ray.Wavelength:F1}")) +
+            " nanometers enter a 60 degree N-BK7 prism at 45 degrees to the surface normal. " +
+            "Angles are to scale; the spectral spread is not exaggerated. " +
+            $"{rays[0].Wavelength:F1} nm bends by {rays[0].Deviation:F3} degrees; " +
+            $"{rays[^1].Wavelength:F1} nm bends by {rays[^1].Deviation:F3} degrees. " +
+            "Colors identify wavelengths, not perceived color or transmitted power."),
+        new XElement(ns + "rect", new XAttribute("width", 1200), new XAttribute("height", 580), new XAttribute("fill", "#ffffff")),
+        new XElement(ns + "style", "text { fill: #282b30; font-family: Arial, Helvetica, sans-serif; font-size: 22px; }"));
 
     Vector2[] drawing = [.. vertices.Select(Project)];
     svg.Add(new XElement(ns + "polygon", new XAttribute("points", string.Join(" ", drawing.Select(Point))),
-        new XAttribute("fill", "#eceee5"), new XAttribute("stroke", "#464b41"), new XAttribute("stroke-width", 1.5)));
-    AddText(402, 277, "60 deg", "small");
-    AddText(395, 340, "N-BK7");
-    AddText(355, 363, "homogeneous glass", "small muted");
-    AddText(69, 423, "coincident input", "small muted");
-    AddText(69, 443, "+15 deg", "small muted");
+        new XAttribute("fill", "#f2f3f5"), new XAttribute("stroke", "#494e56"), new XAttribute("stroke-width", 1.5)));
+    svg.Add(new XElement(ns + "text", new XAttribute("x", 545), new XAttribute("y", 250),
+        new XAttribute("text-anchor", "middle"), "N-BK7"));
     Vector2 source = Project(origin);
     Vector2 entry = Project(rays[0].Entry);
-    AddLine(source.X, source.Y, entry.X, entry.Y, "#252824", 1.6);
+    svg.Add(new XElement(ns + "line", new XAttribute("x1", source.X), new XAttribute("y1", source.Y),
+        new XAttribute("x2", entry.X), new XAttribute("y2", entry.Y),
+        new XAttribute("stroke", "#282b30"), new XAttribute("stroke-width", 2)));
     foreach (RaySample ray in rays)
     {
         Vector2 inside = Project(ray.Exit);
         Vector2 end = Project(ray.End);
         svg.Add(new XElement(ns + "polyline", new XAttribute("points", $"{Point(entry)} {Point(inside)} {Point(end)}"),
-            new XAttribute("fill", "none"), new XAttribute("stroke", ray.Color), new XAttribute("stroke-width", 1.25)));
+            new XAttribute("fill", "none"), new XAttribute("stroke", ray.Color), new XAttribute("stroke-width", 1.5)));
     }
 
-    AddText(60, 560, "Ray geometry is to scale. The narrow fan is physical; colors identify wavelengths.", "small muted");
-    AddText(934, 192, "CALCULATED OUTPUT", "small");
-    AddText(934, 218, "nm", "small muted");
-    AddText(1020, 218, "n", "small muted");
-    AddText(1130, 218, "delta", "small muted");
-    for (int i = 0; i < rays.Count; i++)
-    {
-        RaySample ray = rays[i];
-        double y = 250 + i * 35;
-        AddLine(912, y - 5, 925, y - 5, ray.Color, 3);
-        AddText(934, y, $"{ray.Wavelength:F1}");
-        AddText(1020, y, $"{ray.Index:F5}");
-        AddText(1130, y, $"{ray.Deviation:F3}");
-    }
-
-    AddText(934, 493, "delta = angular deviation", "small muted");
-    AddText(934, 514, "from the incident ray, deg", "small muted");
-    AddLine(48, 582, 1232, 582, "#d5d7ce");
-    AddText(48, 612, "DISPERSION RESOLVED", "small");
-    double minimum = Math.Floor(rays.Min(ray => ray.Deviation) * 2) / 2;
-    double maximum = Math.Ceiling(rays.Max(ray => ray.Deviation) * 2) / 2;
-    for (int tick = 0; tick <= 4; tick++)
-    {
-        double value = minimum + (maximum - minimum) * tick / 4;
-        double y = 744 - tick * 26;
-        AddLine(105, y, 868, y, "#d5d7ce");
-        AddText(48, y + 4, $"{value:F2}", "small muted");
-    }
-
-    string points = string.Join(" ", rays.Select(ray => $"{ChartX(ray.Wavelength):F3},{ChartY(ray.Deviation):F3}"));
-    svg.Add(new XElement(ns + "polyline", new XAttribute("points", points), new XAttribute("fill", "none"),
-        new XAttribute("stroke", "#777d71"), new XAttribute("stroke-width", 1)));
-    foreach (RaySample ray in rays)
-    {
-        svg.Add(new XElement(ns + "circle", new XAttribute("cx", ChartX(ray.Wavelength)), new XAttribute("cy", ChartY(ray.Deviation)),
-            new XAttribute("r", 4), new XAttribute("fill", ray.Color)));
-        AddText(ChartX(ray.Wavelength) - 18, 768, $"{ray.Wavelength:F1}", "small muted");
-    }
-
-    AddText(934, 639, "degrees / nanometers", "small muted");
-    AddText(934, 682, "Sellmeier dispersion", "small");
-    AddText(934, 703, "Vector Snell refraction", "small");
-    AddText(934, 724, "Exact dielectric Fresnel", "small");
-    AddLine(48, 792, 1232, 792, "#d5d7ce");
-    AddText(48, 818, "Source: SCHOTT N-BK7 datasheet, 01-Dec-2023. No coatings, bulk absorption or secondary reflections.", "small muted");
+    AddWavelengthLabel(rays[^1], -24);
+    AddWavelengthLabel(rays[0], 24);
     return new XDocument(new XDeclaration("1.0", "utf-8", null), svg);
 
-    double ChartX(double wavelength) => 105 + (wavelength - 400) / 260 * 763;
-    double ChartY(double deviation) => 744 - (deviation - minimum) / (maximum - minimum) * 104;
-    void AddText(double x, double y, string content, string? style = null) =>
-        svg.Add(new XElement(ns + "text", new XAttribute("x", x), new XAttribute("y", y),
-            style is null ? null : new XAttribute("class", style), content));
-    void AddLine(double x1, double y1, double x2, double y2, string color, double width = 1) =>
-        svg.Add(new XElement(ns + "line", new XAttribute("x1", x1), new XAttribute("y1", y1),
-            new XAttribute("x2", x2), new XAttribute("y2", y2), new XAttribute("stroke", color), new XAttribute("stroke-width", width)));
+    void AddWavelengthLabel(RaySample ray, float offset)
+    {
+        Vector2 end = Project(ray.End);
+        float labelY = end.Y + offset;
+        svg.Add(new XElement(ns + "path",
+            new XAttribute("d", $"M {end.X + 8:F3},{end.Y:F3} L {end.X + 32:F3},{labelY:F3}"),
+            new XAttribute("fill", "none"), new XAttribute("stroke", ray.Color), new XAttribute("stroke-width", 1)),
+            new XElement(ns + "text", new XAttribute("x", end.X + 42), new XAttribute("y", labelY + 7),
+                $"{ray.Wavelength:F1} nm"));
+    }
 }
 
-static Vector2 Project(Vector2 point) => new(255 + point.X * 330, 526 - point.Y * 330);
+static Vector2 Project(Vector2 point) => new(330 + point.X * 430, 470 - point.Y * 430);
 static string Point(Vector2 point) => $"{point.X:F3},{point.Y:F3}";
 
-internal sealed record RaySample(double Wavelength, string Color, double Index, Vector2 Entry,
+internal sealed record RaySample(double Wavelength, string Color, Vector2 Entry,
     Vector2 Exit, Vector2 End, double Deviation);

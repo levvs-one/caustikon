@@ -8,7 +8,7 @@ Scalar and span APIs use caller-owned storage. The library targets .NET 8 and .N
 
 ![Six wavelengths refracted through an N-BK7 prism](examples/Prism/prism.svg)
 
-[The prism example](examples/Prism) generates this plate from the library's dispersion, refraction, and Fresnel calculations. Its ray geometry is checked against an independent prism identity.
+[The prism example](examples/Prism) calculates the ray paths and prints the numerical results. The spectral spread is to scale; colors identify wavelengths, not transmitted power.
 
 ## Use from source
 

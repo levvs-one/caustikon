@@ -86,6 +86,10 @@ jobs:
       - name: Run prism example
         run: dotnet run --project examples/Prism --configuration Release --no-build -- artifacts/package/prism.svg
 
+      - name: Check prism geometry and labels
+        shell: pwsh
+        run: ./examples/Prism/verify.ps1 -Path artifacts/package/prism.svg
+
       - name: Upload package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

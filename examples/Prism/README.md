@@ -1,6 +1,6 @@
 # Prism dispersion
 
-A reproducible optical plate, calculated with Caustikon. Six coincident, parallel rays pass through an equilateral N-BK7 prism. The drawing preserves their geometry; a separate angular plot makes the small spectral spread legible.
+Six coincident rays pass through an equilateral N-BK7 prism. Their paths are calculated with Caustikon, without exaggerating the small spectral spread. The two labels mark the shortest and longest sampled wavelengths; numerical results are printed to the console.
 
 ![Calculated N-BK7 prism dispersion](prism.svg)
 
@@ -14,11 +14,19 @@ The optional argument is the output file. Its parent directory must already exis
 
 The console reports the wavelength, refractive index, exit direction, deviation from the incoming ray, and first-pass transmitted power. The input direction is +15 degrees from the horizontal, corresponding to 45 degrees from the entrance-face normal. All angles are in degrees. The prism edge length is one arbitrary geometric unit; scaling it does not change the angles.
 
+With PowerShell 7, check the generated geometry independently of the library:
+
+```powershell
+./examples/Prism/verify.ps1 -Path examples/Prism/prism.svg
+```
+
+The check reads the SVG coordinates and compares all six internal and exit angles with scalar Snell calculations, within 0.001 degrees. It also checks the prism shape, common entry point and three visible labels. CI runs it on the freshly generated drawing; it does not replace visual inspection.
+
 ## Calculation
 
 The three vertices are counterclockwise. Each outward normal is the right-hand perpendicular to its edge. The entry calculation uses that outward normal; the exit calculation reverses it so it points back into the glass. Ray/segment intersections select the nearest positive boundary crossing, excluding the face just crossed.
 
-`Sellmeier3` evaluates the refractive index at each labeled wavelength. `Dielectric.RefractUnit` computes both interface directions. The example requires ordinary refraction at both surfaces and stops if it encounters a critical angle, total internal reflection, or invalid input. It also checks the independent prism identity `deviation = incidence + emergence - apex` against the vector result.
+`Sellmeier3` evaluates the refractive index at each sampled wavelength: 404.7, 435.8, 486.1, 546.1, 587.6 and 656.3 nm. `Dielectric.RefractUnit` computes both interface directions. The example requires ordinary refraction at both surfaces and stops if it encounters a critical angle, total internal reflection, or invalid input. It also checks the independent prism identity `deviation = incidence + emergence - apex` against the vector result.
 
 `Dielectric.Fresnel` supplies the two power reflectances at each interface. The transmitted fraction for initially unpolarized light is
 
