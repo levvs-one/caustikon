@@ -18,13 +18,14 @@
             </a>
             <nav class="primary">
                 <NavLink href="catalog">@L["nav.catalog"]</NavLink>
-                <NavLink href="playground">@L["nav.playground"]</NavLink>
+                <NavLink href="design">@L["nav.design"]</NavLink>
                 <NavLink href="render">@L["nav.render"]</NavLink>
-                <NavLink href="use">@L["nav.use"]</NavLink>
-                <NavLink href="formulas">@L["nav.formulas"]</NavLink>
-                <NavLink href="about">@L["nav.about"]</NavLink>
-                <a href="https://github.com/levvs-one/caustikon" rel="noopener">GitHub</a>
+                <NavLink href="" Match="NavLinkMatch.All">@L["nav.bench"]</NavLink>
+                <GiveMenu />
             </nav>
+            <a class="github" href="https://github.com/levvs-one/caustikon" rel="noopener" title="GitHub" aria-label="GitHub">
+                <svg viewBox="0 0 16 16" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+            </a>
             <LanguageMenu />
         </div>
     </header>
@@ -37,9 +38,10 @@
 
     <footer class="site">
         <div class="frame">
-            <span>Caustikon @SiteInfo.Version · MIT</span>
-            <span>@L["footer.data"] · @SiteInfo.GlassCount @L["footer.glasses"], @SiteInfo.VendorCount @L["footer.vendors"]</span>
+            <span>Caustikon @SiteInfo.Version, MIT. @L["footer.by"] <a href="https://github.com/levvs-one" rel="noopener">levvs-one</a></span>
+            <span>@L["footer.data"]: @SiteInfo.GlassCount @L["footer.glasses"], @SiteInfo.VendorCount @L["footer.vendors"]</span>
             <span>@L["footer.colour"]</span>
+            <span class="footer-links"><a href="formulas">@L["nav.formulas"]</a><a href="about">@L["nav.about"]</a><a href="playground">@L["nav.playground"]</a></span>
         </div>
     </footer>
 </CascadingValue>

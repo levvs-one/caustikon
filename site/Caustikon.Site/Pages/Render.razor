@@ -1,4 +1,5 @@
 @page "/render"
+@page "/3d"
 @using Caustikon.Site.Services
 @using System.Numerics
 @inject IJSRuntime Js
@@ -6,6 +7,9 @@
 @inherits LocalizedComponent
 
 <PageTitle>@L["render.title"]</PageTitle>
+<HeadContent>
+    <meta name="description" content="@L["render.meta"]" />
+</HeadContent>
 
 <h1>@L["render.h1"]</h1>
 <p class="lede">@L["render.lede"]</p>
@@ -20,7 +24,7 @@
                 <optgroup label="@L["render.common"]">
                     @foreach ((string key, string label) in Featured)
                     {
-                        <option value="@key">@label</option>
+                        <option value="@key">@(L.IsRussian ? label.Split('|')[1] : label.Split('|')[0])</option>
                     }
                 </optgroup>
                 @foreach (string vendor in GlassCatalog.Vendors)
@@ -47,15 +51,9 @@
         </label>
         @if (shapeKey == "prism")
         {
-            <label class="control">
-                <span class="range-label"><span>@L["render.faces"]</span><output>@sides</output></span>
-                <input type="range" min="3" max="12" step="1" @bind="sides" @bind:event="oninput" />
-            </label>
+            <RangeField Label="@L["render.faces"]" @bind-Value="sidesAsDouble" Min="3" Max="12" Step="1" />
         }
-        <label class="control">
-            <span class="range-label"><span>@L["render.size"]</span><output>@sizeMm mm</output></span>
-            <input type="range" min="2" max="400" step="1" @bind="sizeMm" @bind:event="oninput" />
-        </label>
+        <RangeField Label="@L["render.size"]" @bind-Value="sizeMm" Min="2" Max="400" Step="1" Unit="mm" />
         <label class="control">
             <span>@L["render.backdrop"]</span>
             <select @bind="backdropKey">
@@ -65,22 +63,6 @@
                 <option value="paper">@L["render.backdrop.paper"]</option>
                 <option value="night">@L["render.backdrop.night"]</option>
             </select>
-        </label>
-        <label class="control">
-            <span class="range-label"><span>@L["render.light.az"]</span><output>@lightAzimuth°</output></span>
-            <input type="range" min="-180" max="180" step="1" @bind="lightAzimuth" @bind:event="oninput" />
-        </label>
-        <label class="control">
-            <span class="range-label"><span>@L["render.light.el"]</span><output>@lightElevation°</output></span>
-            <input type="range" min="5" max="85" step="1" @bind="lightElevation" @bind:event="oninput" />
-        </label>
-        <label class="control">
-            <span class="range-label"><span>@L["render.lamp"]</span><output>@lightIntensity.ToString("0.0", CultureInfo.InvariantCulture)×</output></span>
-            <input type="range" min="0" max="4" step="0.1" @bind="lightIntensity" @bind:event="oninput" />
-        </label>
-        <label class="control">
-            <span class="range-label"><span>@L["render.room"]</span><output>@ambient.ToString("0.0", CultureInfo.InvariantCulture)×</output></span>
-            <input type="range" min="0" max="2" step="0.1" @bind="ambient" @bind:event="oninput" />
         </label>
         @if (!gpu)
         {
@@ -97,12 +79,21 @@
             </div>
         }
     </div>
+    <details class="more">
+        <summary>@L["ui.more"]</summary>
+        <div class="bench-controls">
+            <RangeField Label="@L["render.light.az"]" @bind-Value="lightAzimuth" Min="-180" Max="180" Step="1" Unit="°" />
+            <RangeField Label="@L["render.light.el"]" @bind-Value="lightElevation" Min="5" Max="85" Step="1" Unit="°" />
+            <RangeField Label="@L["render.lamp"]" @bind-Value="lightIntensity" Min="0" Max="4" Step="0.1" Unit="×" />
+            <RangeField Label="@L["render.room"]" @bind-Value="ambient" Min="0" Max="2" Step="0.1" Unit="×" />
+        </div>
+    </details>
     @if (glass is { } g0)
     {
         <div class="render-facts">
             <dl class="kv">
-                <dt>@L["render.fact.glass"]</dt><dd>@g0.VendorDisplayName <a href="@Catalog.GlassLink(g0)">@g0.Name</a> · n<sub>d</sub> @SiteInfo.Number(g0.IndexD, 5) · ν<sub>d</sub> @SiteInfo.Number(g0.AbbeD, 2)</dd>
-                <dt>@L["render.fact.n"]</dt><dd>@IndexAt(g0, 400) · @IndexAt(g0, 700)</dd>
+                <dt>@L["render.fact.glass"]</dt><dd>@g0.VendorDisplayName <a href="@Catalog.GlassLink(g0)">@g0.Name</a>, n<sub>d</sub> @SiteInfo.Number(g0.IndexD, 5), ν<sub>d</sub> @SiteInfo.Number(g0.AbbeD, 2)</dd>
+                <dt>@L["render.fact.n"]</dt><dd>@IndexAt(g0, 400), @IndexAt(g0, 700)</dd>
                 <dt>@H("render.fact.tau", sizeMm)</dt><dd>@Tau(g0, 450) / @Tau(g0, 650)</dd>
                 <dt>@L["render.fact.ground"]</dt><dd>@L["render.fact.ground.v"]</dd>
                 <dt>@L["render.fact.samples"]</dt><dd>@string.Join(", ", GlassRenderer.SampledWavelengths.Select(w => w.ToString("0", CultureInfo.InvariantCulture))) nm</dd>
@@ -112,7 +103,7 @@
                 }
                 else if (lastMilliseconds > 0)
                 {
-                    <dt>@L["render.fact.time"]</dt><dd>@T("render.fact.time.v", lastSize, (lastMilliseconds / 1000.0).ToString("0.0", CultureInfo.InvariantCulture), refinedPixels)</dd>
+                    <dt>@L["render.fact.time"]</dt><dd>@T("render.fact.time.v", lastSize, SiteInfo.Number(lastMilliseconds / 1000.0, 1), refinedPixels)</dd>
                 }
             </dl>
             <p class="bench-note">@L["render.note"]</p>
@@ -123,16 +114,16 @@
 @code {
     private static readonly (string Key, string Label)[] Featured =
     [
-        ("schott/N-BK7", "SCHOTT N-BK7 — the crown everything is measured against"),
-        ("schott/N-SF11", "SCHOTT N-SF11 — dense flint, strong fringes"),
-        ("schott/SF57", "SCHOTT SF57 — very dense flint, warm when thick"),
-        ("schott/N-SF66", "SCHOTT N-SF66 — the highest dispersion in the catalog"),
-        ("schott/N-LASF9", "SCHOTT N-LASF9 — high index, tight refraction"),
-        ("schott/N-FK58", "SCHOTT N-FK58 — fluor crown, almost no fringes"),
-        ("ohara/S-FPL53", "OHARA S-FPL53 — extra-low dispersion"),
-        ("ohara/S-LAH79", "OHARA S-LAH79 — index above two"),
-        ("hoya/TAFD55", "HOYA TAFD55 — high-index lanthanum flint"),
-        ("cdgm/H-ZF88", "CDGM H-ZF88 — dense flint"),
+        ("schott/N-BK7", "SCHOTT N-BK7, the crown everything is measured against|SCHOTT N-BK7, крон, с которым сравнивают всё"),
+        ("schott/N-SF11", "SCHOTT N-SF11, dense flint, strong fringes|SCHOTT N-SF11, плотный флинт, сильные каймы"),
+        ("schott/SF57", "SCHOTT SF57, very dense flint, warm when thick|SCHOTT SF57, очень плотный флинт, теплеет в толщине"),
+        ("schott/N-SF66", "SCHOTT N-SF66, the highest dispersion in the catalog|SCHOTT N-SF66, самая сильная дисперсия в каталоге"),
+        ("schott/N-LASF9", "SCHOTT N-LASF9, high index, tight refraction|SCHOTT N-LASF9, высокий показатель, крутой излом"),
+        ("schott/N-FK58", "SCHOTT N-FK58, fluor crown, almost no fringes|SCHOTT N-FK58, фторкрон, кайм почти нет"),
+        ("ohara/S-FPL53", "OHARA S-FPL53, extra-low dispersion|OHARA S-FPL53, сверхнизкая дисперсия"),
+        ("ohara/S-LAH79", "OHARA S-LAH79, index above two|OHARA S-LAH79, показатель выше двух"),
+        ("hoya/TAFD55", "HOYA TAFD55, high-index lanthanum flint|HOYA TAFD55, высокоиндексный лантановый флинт"),
+        ("cdgm/H-ZF88", "CDGM H-ZF88, dense flint|CDGM H-ZF88, плотный флинт"),
     ];
 
     private string selectedKeyValue = "schott/N-SF11";
@@ -147,6 +138,7 @@
     private string shapeKey { get => shapeKeyValue; set { shapeKeyValue = value; Push(); } }
     private string backdropKey { get => backdropKeyValue; set { backdropKeyValue = value; Push(); } }
     private int sides { get => sidesValue; set { sidesValue = value; Push(); } }
+    private double sidesAsDouble { get => sidesValue; set => sides = (int)Math.Round(value); }
     private double sizeMm { get => sizeMmValue; set { sizeMmValue = value; Push(); } }
     private double lightAzimuth { get => lightAzimuthValue; set { lightAzimuthValue = value; Push(); } }
     private double lightElevation { get => lightElevationValue; set { lightElevationValue = value; Push(); } }

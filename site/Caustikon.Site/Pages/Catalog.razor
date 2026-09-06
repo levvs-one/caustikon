@@ -2,6 +2,9 @@
 @inherits LocalizedComponent
 
 <PageTitle>@L["catalog.title"]</PageTitle>
+<HeadContent>
+    <meta name="description" content="@L["catalog.meta"]" />
+</HeadContent>
 
 <h1>@L["catalog.h1"]</h1>
 <p class="lede">@H("catalog.lede", GlassCatalog.All.Count, GlassCatalog.Vendors.Count)</p>

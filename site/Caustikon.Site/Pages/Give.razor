@@ -1,0 +1,366 @@
+@page "/give"
+@page "/give/{Topic}"
+@inject IJSRuntime Js
+@inherits LocalizedComponent
+
+@* One page per craft: what the physics asks for, which glass to take, worked numbers, and code to paste. Every number
+   in the tables is computed from the catalog when the page renders; the prose only says what the numbers mean. *@
+
+<PageTitle>@L["give." + Key + ".name"] — Caustikon</PageTitle>
+<HeadContent>
+    <meta name="description" content="@L["give." + Key + ".tag"]" />
+</HeadContent>
+
+<nav class="give-tabs" aria-label="@L["nav.give"]">
+    @foreach ((string slug, string key) in Topics)
+    {
+        <a href="give/@slug" class="@(key == Key ? "active" : "")">@L["give." + key + ".name"]</a>
+    }
+</nav>
+
+<h1>@L["give." + Key + ".h1"]</h1>
+<p class="lede">@L["give." + Key + ".lede"]</p>
+
+<h2>@L["give.sec.methods"]</h2>
+@foreach (string p in Paragraphs("methods"))
+{
+    <p>@H(p)</p>
+}
+
+<h2>@L["give.sec.numbers"]</h2>
+<p>@L["give.numbers.p"]</p>
+<div class="table-scroll">
+    <table class="compact">
+        <thead>
+            <tr>
+                <th>@L["give.col.glass"]</th>
+                <th class="num">n<sub>d</sub></th>
+                <th class="num">ν<sub>d</sub></th>
+                @if (Key == "web" || Key == "blender")
+                {
+                    <th class="num">@(Key == "web" ? "dispersion" : "Abbe")</th>
+                }
+                <th class="num">n<sub>R</sub>, n<sub>G</sub>, n<sub>B</sub></th>
+                <th class="num">R<sub>0</sub></th>
+                <th class="num">α<sub>R,G,B</sub>, 1/mm</th>
+                <th>@T("give.col.tint", 10)</th>
+                <th>@L["give.col.look"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (Row r in rows)
+            {
+                <tr>
+                    <td><a href="@Catalog.GlassLink(r.Glass)">@r.Glass.VendorDisplayName @r.Glass.Name</a></td>
+                    <td class="num">@SiteInfo.Number(r.Glass.IndexD, 4)</td>
+                    <td class="num">@SiteInfo.Number(r.Glass.AbbeD, 1)</td>
+                    @if (Key == "web")
+                    {
+                        <td class="num">@SiteInfo.Number(20 / r.Glass.AbbeD, 3)</td>
+                    }
+                    else if (Key == "blender")
+                    {
+                        <td class="num">@SiteInfo.Number(r.Glass.AbbeD, 1)</td>
+                    }
+                    <td class="num">@SiteInfo.Number(r.Rgb[0], 4), @SiteInfo.Number(r.Rgb[1], 4), @SiteInfo.Number(r.Rgb[2], 4)</td>
+                    <td class="num">@SiteInfo.Number(r.Face * 100, 1)%</td>
+                    <td class="num">@(r.HasK ? SiteInfo.Number(r.Alpha[0], 5) + ", " + SiteInfo.Number(r.Alpha[1], 5) + ", " + SiteInfo.Number(r.Alpha[2], 5) : L["render.nok"])</td>
+                    <td><span class="swatch" style="background:@r.Tint.Hex"></span> @r.Tint.Hex, Y @SiteInfo.Number(r.Tint.Y, 3)</td>
+                    <td>@L["give.look." + r.Look]</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<h2>@L["give.sec.advice"]</h2>
+<ul class="advice">
+    @foreach (string p in Paragraphs("advice"))
+    {
+        <li>@H(p)</li>
+    }
+</ul>
+
+<h2>@L["give.sec.examples"]</h2>
+@foreach (string p in Paragraphs("examples"))
+{
+    <p>@H(p, Args)</p>
+}
+
+<h2>@L["give.sec.code"]</h2>
+<p>@H("give." + Key + ".code.p")</p>
+@foreach ((string label, string text) in snippets)
+{
+    <div class="snippet">
+        <div class="snippet-bar"><span>@label</span><button @onclick="() => Copy(text)">@L["use.copy"]</button></div>
+        <pre><code>@text</code></pre>
+    </div>
+}
+
+<h2>@L["give.sec.next"]</h2>
+<dl class="kv map">
+    @foreach ((string href, string key) in Links)
+    {
+        <dt><a href="@href">@L[key]</a></dt><dd>@L[key + ".give"]</dd>
+    }
+</dl>
+
+@code {
+    public static readonly (string Slug, string Key)[] Topics =
+    [
+        ("design", "design"),
+        ("games", "games"),
+        ("blender", "blender"),
+        ("web", "web"),
+        ("dotnet", "dotnet"),
+    ];
+
+    private static readonly string[] Picks = ["schott/N-BK7", "schott/N-FK58", "ohara/S-FPL53", "schott/N-LASF9", "schott/N-SF11", "schott/SF57"];
+
+    [Parameter] public string? Topic { get; set; }
+
+    private string Key => Topics.FirstOrDefault(t => t.Slug == (Topic ?? "design")).Key ?? "design";
+
+    private readonly List<Row> rows = [];
+    private (string Label, string Code)[] snippets = [];
+
+    private sealed record Row(Glass Glass, double[] Rgb, double Face, double[] Alpha, bool HasK, TransmittedColour Tint, string Look);
+
+    private object[] Args => rows.Count >= 6
+        ? [SiteInfo.Number(rows[0].Glass.IndexD, 4), SiteInfo.Number(rows[0].Glass.AbbeD, 1), SiteInfo.Number(rows[0].Face * 100, 1),
+           SiteInfo.Number(rows[4].Glass.IndexD, 4), SiteInfo.Number(rows[4].Glass.AbbeD, 1), SiteInfo.Number(rows[4].Face * 100, 1),
+           rows[5].Tint.Hex, SiteInfo.Number(rows[5].Tint.Y * 100, 0), SiteInfo.Number(rows[1].Tint.Y * 100, 0)]
+        : [];
+
+    private (string Href, string Key)[] Links => Key switch
+    {
+        "design" => [("design", "nav.design"), ("catalog", "nav.catalog"), ("give/web", "give.web.name")],
+        "games" => [("render", "nav.render"), ("give/blender", "give.blender.name"), ("catalog", "nav.catalog")],
+        "blender" => [("render", "nav.render"), ("give/games", "give.games.name"), ("catalog", "nav.catalog")],
+        "web" => [("design", "nav.design"), ("give/design", "give.design.name"), ("catalog", "nav.catalog")],
+        _ => [("", "nav.bench"), ("formulas", "nav.formulas"), ("catalog", "nav.catalog")],
+    };
+
+    private IEnumerable<string> Paragraphs(string section)
+    {
+        for (int i = 1; i <= 8; i++)
+        {
+            string key = $"give.{Key}.{section}.{i}";
+            if (L[key] == key)
+            {
+                yield break;
+            }
+
+            yield return key;
+        }
+    }
+
+    protected override void OnInitialized() => Build();
+
+    protected override void OnParametersSet() => Build();
+
+    private void Build()
+    {
+        rows.Clear();
+        foreach (string pick in Picks)
+        {
+            int slash = pick.IndexOf('/');
+            Glass? g = GlassCatalog.Find(pick[..slash], pick[(slash + 1)..]);
+            if (g is null)
+            {
+                continue;
+            }
+
+            double[] rgb = [IndexAt(g, 610), IndexAt(g, 550), IndexAt(g, 465)];
+            double[] alpha = [Absorb(g, 610), Absorb(g, 550), Absorb(g, 465)];
+            TransmittedColour tint = GlassColour.Transmitted(g, 10) ?? default;
+            string look = g.AbbeD >= 60 ? "clean" : g.AbbeD >= 40 ? "neutral" : g.AbbeD >= 28 ? "lively" : "gem";
+            rows.Add(new Row(g, rgb, Dielectric.NormalReflectance(1f, (float)g.IndexD), alpha, g.Extinction is not null, tint, look));
+        }
+
+        snippets = Key switch
+        {
+            "games" => [("HLSL / GLSL", GamesCode())],
+            "blender" => [(L["give.blender.code.label"], BlenderCode())],
+            "web" => [("three.js", ThreeCode()), ("glTF", GltfCode())],
+            "dotnet" => [("C#", DotnetCode())],
+            _ => [("CSS", DesignCode())],
+        };
+    }
+
+    private static double IndexAt(Glass g, double wavelength)
+    {
+        double clamped = Math.Clamp(wavelength, g.Model.MinimumWavelengthNanometers, g.Model.MaximumWavelengthNanometers);
+        return g.Model.EvaluateNanometers(clamped, out double n) == DispersionStatus.Success ? n : double.NaN;
+    }
+
+    private static double Absorb(Glass g, double wavelength)
+    {
+        if (g.Extinction is not { } extinction)
+        {
+            return 0;
+        }
+
+        double clamped = Math.Clamp(wavelength, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers);
+        extinction.AbsorptionCoefficient(clamped, out double perMeter);
+        return perMeter * 1e-3;
+    }
+
+    private static string C(double v, int decimals) => v.ToString("F" + decimals, CultureInfo.InvariantCulture);
+
+    private string GamesCode()
+    {
+        Row a = rows[0], b = rows[4];
+        return $$"""
+        // Caustikon.Glasses, {{a.Glass.Provenance.Citation}}
+        // Three-channel glass: index and absorption at 610, 550 and 465 nm. Same code compiles as HLSL and GLSL.
+        static const float3 IOR_NBK7  = float3({{C(a.Rgb[0], 5)}}, {{C(a.Rgb[1], 5)}}, {{C(a.Rgb[2], 5)}});   // {{a.Glass.VendorDisplayName}} {{a.Glass.Name}}
+        static const float3 IOR_NSF11 = float3({{C(b.Rgb[0], 5)}}, {{C(b.Rgb[1], 5)}}, {{C(b.Rgb[2], 5)}});   // {{b.Glass.VendorDisplayName}} {{b.Glass.Name}}
+        static const float3 ABS_NBK7  = float3({{C(a.Alpha[0], 6)}}, {{C(a.Alpha[1], 6)}}, {{C(a.Alpha[2], 6)}}); // per millimetre
+        static const float3 ABS_NSF11 = float3({{C(b.Alpha[0], 6)}}, {{C(b.Alpha[1], 6)}}, {{C(b.Alpha[2], 6)}});
+
+        // Exact unpolarized Fresnel power reflectance from n1 into n2; 1 past the critical angle.
+        float FresnelExact(float cosI, float n1, float n2)
+        {
+            float eta = n1 / n2;
+            float sinT2 = eta * eta * (1.0 - cosI * cosI);
+            if (sinT2 >= 1.0) return 1.0;
+            float cosT = sqrt(1.0 - sinT2);
+            float rs = (n1 * cosI - n2 * cosT) / (n1 * cosI + n2 * cosT);
+            float rp = (n2 * cosI - n1 * cosT) / (n2 * cosI + n1 * cosT);
+            return 0.5 * (rs * rs + rp * rp);
+        }
+
+        // One channel through a slab of the given thickness: what comes out, and where the ray leaves.
+        // view: unit vector toward the surface; normal: outward unit normal; thicknessMm in millimetres.
+        float SlabChannel(float3 view, float3 normal, float n, float alphaPerMm, float thicknessMm, out float2 offset)
+        {
+            float cosI = saturate(dot(-view, normal));
+            float r = FresnelExact(cosI, 1.0, n);
+            float3 inside = refract(view, normal, 1.0 / n);
+            float cosInside = saturate(dot(-inside, normal));
+            float path = thicknessMm / max(cosInside, 1e-3);
+            offset = inside.xy * path;                 // lateral shift across the slab, for the screen-space sample
+            float t = exp(-alphaPerMm * path);
+            return (1.0 - r) * t * (1.0 - FresnelExact(cosInside, n, 1.0));   // in, absorbed, out
+        }
+
+        // Call per channel with IOR_x[c] and ABS_x[c]; sample the scene colour at uv + offset * pixelsPerMm for each,
+        // multiply by the returned weight, and add FresnelExact(cosI, 1, n) times the reflection probe for the sheen.
+        """;
+    }
+
+    private string BlenderCode()
+    {
+        System.Text.StringBuilder b = new();
+        b.Append(L["give.blender.code.head"]).Append('\n');
+        foreach (Row r in rows)
+        {
+            double density = r.HasK ? r.Alpha[1] * 1000 : 0;
+            b.Append('\n').Append(r.Glass.VendorDisplayName).Append(' ').Append(r.Glass.Name).Append('\n')
+             .Append("  Principled BSDF: IOR = ").Append(C(r.Glass.IndexD, 4))
+             .Append(", Transmission Weight = 1, Dispersion Scale = 1, Dispersion Abbe Number = ").Append(C(r.Glass.AbbeD, 1)).Append('\n')
+             .Append("  Volume Absorption: Density = ").Append(C(density, 3)).Append(" (1/m), Color = ")
+             .Append(r.HasK ? $"({C(Math.Exp(-r.Alpha[0] * 10), 3)}, {C(Math.Exp(-r.Alpha[1] * 10), 3)}, {C(Math.Exp(-r.Alpha[2] * 10), 3)})  // transmittance of 10 mm" : L["render.nok"]).Append('\n');
+        }
+
+        return b.ToString();
+    }
+
+    private string ThreeCode()
+    {
+        Row a = rows[4];
+        return $$"""
+        // {{a.Glass.VendorDisplayName}} {{a.Glass.Name}} in three.js (MeshPhysicalMaterial). Caustikon.Glasses, {{a.Glass.Provenance.Citation}}
+        // dispersion follows KHR_materials_dispersion: 20 / Abbe number. thickness and attenuationDistance are in mesh units;
+        // here the mesh is modelled in millimetres and the slab is 10 mm thick.
+        const glass = new THREE.MeshPhysicalMaterial({
+          transmission: 1,
+          ior: {{C(Math.Min(a.Glass.IndexD, 2.333), 4)}},               // n_d = {{C(a.Glass.IndexD, 4)}}; three.js clamps ior to 2.333
+          dispersion: {{C(20 / a.Glass.AbbeD, 3)}},          // 20 / ν_d, ν_d = {{C(a.Glass.AbbeD, 1)}}
+          thickness: 10,
+          attenuationDistance: 10,
+          attenuationColor: new THREE.Color({{C(Math.Exp(-a.Alpha[0] * 10), 4)}}, {{C(Math.Exp(-a.Alpha[1] * 10), 4)}}, {{C(Math.Exp(-a.Alpha[2] * 10), 4)}}),  // exp(-α · 10 mm) per channel
+          roughness: 0,
+          metalness: 0,
+        });
+        """;
+    }
+
+    private string GltfCode()
+    {
+        Row a = rows[4];
+        return $$"""
+        {
+          "materials": [{
+            "name": "{{a.Glass.VendorDisplayName}} {{a.Glass.Name}}",
+            "pbrMetallicRoughness": { "baseColorFactor": [1, 1, 1, 1], "metallicFactor": 0, "roughnessFactor": 0 },
+            "extensions": {
+              "KHR_materials_transmission": { "transmissionFactor": 1 },
+              "KHR_materials_ior": { "ior": {{C(a.Glass.IndexD, 4)}} },
+              "KHR_materials_dispersion": { "dispersion": {{C(20 / a.Glass.AbbeD, 3)}} },
+              "KHR_materials_volume": {
+                "thicknessFactor": 10,
+                "attenuationDistance": 10,
+                "attenuationColor": [{{C(Math.Exp(-a.Alpha[0] * 10), 4)}}, {{C(Math.Exp(-a.Alpha[1] * 10), 4)}}, {{C(Math.Exp(-a.Alpha[2] * 10), 4)}}]
+              }
+            }
+          }]
+        }
+        """;
+    }
+
+    private string DotnetCode()
+    {
+        Row a = rows[0];
+        return $$"""
+        // dotnet add package Caustikon
+        // dotnet add package Caustikon.Glasses
+        using System.Numerics;
+        using Caustikon;
+        using Caustikon.Glasses;
+
+        // 1. A glass by name, with everything the catalog knows about it.
+        Glass glass = GlassCatalog.Find("{{a.Glass.Vendor}}", "{{a.Glass.Name}}")!;
+        Console.WriteLine($"{glass.Name}: nd {glass.IndexD:F5}, vd {glass.AbbeD:F2}, {glass.Provenance.Citation}");
+
+        // 2. Index at any wavelength: the typed constant is a value type, nothing allocates on the ray path.
+        Sellmeier model = Schott.{{new string(a.Glass.Name.Where(char.IsAsciiLetterOrDigit).ToArray())}};
+        model.EvaluateNanometers(486.1327, out double nF);
+        model.EvaluateNanometers(656.2725, out double nC);
+
+        // 3. A ray into the glass: exact Fresnel split and the refracted direction.
+        Vector3 incident = Vector3.Normalize(new Vector3(0.5f, -1f, 0f));
+        Vector3 normal = Vector3.UnitY;
+        float cosI = -Vector3.Dot(incident, normal);
+        FresnelPower r = Dielectric.Fresnel(cosI, 1f, (float)glass.IndexD);       // r.S, r.P, r.Unpolarized
+        RefractionKind kind = Dielectric.RefractUnit(incident, normal, 1f, (float)glass.IndexD, out Vector3 inside);
+
+        // 4. What 25 mm of it does to daylight, as sRGB, and how the index moves at 60 °C.
+        TransmittedColour tint = GlassColour.Transmitted(glass, 25)!.Value;        // tint.Hex, tint.Y
+        double shift = glass.Thermal?.AbsoluteIndexShift(glass.IndexD, 587.5618, 60) ?? 0;
+        """;
+    }
+
+    private string DesignCode()
+    {
+        Row a = rows[0];
+        double edge = Dielectric.Fresnel(0.5f, 1f, (float)a.Glass.IndexD).Unpolarized;
+        return $$"""
+        /* {{a.Glass.VendorDisplayName}} {{a.Glass.Name}}, 6 mm: the tokens a design system needs for one specific glass. */
+        :root {
+          --glass-tint: {{(GlassColour.Transmitted(a.Glass, 6) ?? default).Hex}};
+          --glass-face: {{C(a.Face, 4)}};   /* reflectance looking straight at it */
+          --glass-edge: {{C(edge, 4)}};   /* reflectance at 60°, on a bevel */
+        }
+        .card.glass {
+          background: color-mix(in srgb, var(--glass-tint) 12%, transparent);
+          backdrop-filter: blur(8px);
+          border: 1px solid rgb(255 255 255 / calc(var(--glass-edge) * 1.5));
+          box-shadow: inset 0 1px 0 rgb(255 255 255 / calc(var(--glass-face) * 4)), 0 18px 40px rgb(0 0 0 / 0.18);
+        }
+        """;
+    }
+
+    private async Task Copy(string text) => await Js.InvokeVoidAsync("caustikonClipboard.copy", text);
+}

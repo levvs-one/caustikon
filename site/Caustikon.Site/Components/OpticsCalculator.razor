@@ -58,7 +58,7 @@
         <div class="calc-results">
             <table class="compact datasheet">
                 <tbody>
-                    <tr class="section"><th colspan="3">@L["calc.sec.index"] · @g0.VendorDisplayName @g0.Name · λ = @SiteInfo.Number(wavelength, 2) nm</th></tr>
+                    <tr class="section"><th colspan="3">@L["calc.sec.index"], @g0.VendorDisplayName @g0.Name, λ = @SiteInfo.Number(wavelength, 2) nm</th></tr>
                     <tr><td>n(λ)</td><td class="num">@Fmt(n, 6)</td><td class="muted">@L["calc.n.note"]</td></tr>
                     <tr><td>dn/dλ</td><td class="num">@Fmt(dndl * 1000, 5) µm⁻¹</td><td class="muted">@L["calc.dndl.note"]</td></tr>
                     <tr><td>n<sub>g</sub> = n − λ·dn/dλ</td><td class="num">@Fmt(groupIndex, 6)</td><td class="muted">@L["calc.ng.note"]</td></tr>
@@ -72,7 +72,7 @@
                     <tr><td>ν<sub>e</sub></td><td class="num">@Fmt((ne - 1) / (nFp - nCp), 2)</td><td class="muted">@L["calc.ve.note"]</td></tr>
                     <tr><td>P<sub>g,F</sub></td><td class="num">@Fmt((ng - g0.IndexF) / (g0.IndexF - g0.IndexC), 4)</td><td class="muted">@L["calc.pgf.note"]</td></tr>
 
-                    <tr class="section"><th colspan="3">@L["calc.sec.interface"] · θ = @SiteInfo.Number(angle, 2)°</th></tr>
+                    <tr class="section"><th colspan="3">@L["calc.sec.interface"], θ = @SiteInfo.Number(angle, 2)°</th></tr>
                     <tr><td>θ<sub>t</sub> @L["calc.airglass"]</td><td class="num">@Angle(refractedIn)</td><td class="muted">n<sub>i</sub> = 1, n<sub>t</sub> = n(λ)</td></tr>
                     <tr><td>R<sub>s</sub>, R<sub>p</sub>, R</td><td class="num">@Fmt(fresnelIn.S, 5), @Fmt(fresnelIn.P, 5), @Fmt(fresnelIn.Unpolarized, 5)</td><td class="muted">@L["calc.r.note"]</td></tr>
                     <tr><td>T = 1 − R</td><td class="num">@Fmt(1 - fresnelIn.Unpolarized, 5)</td><td class="muted">@L["calc.t.note"]</td></tr>
@@ -81,13 +81,13 @@
                     <tr><td>θ<sub>t</sub> @L["calc.glassair"]</td><td class="num">@Angle(refractedOut)</td><td class="muted">@L["calc.out.note"]</td></tr>
                     <tr><td>R @L["calc.glassair"]</td><td class="num">@Fmt(fresnelOut.Unpolarized, 5)</td><td class="muted">@L["calc.rout.note"]</td></tr>
 
-                    <tr class="section"><th colspan="3">@L["calc.sec.slab"] · d = @SiteInfo.Number(thickness, 2) mm</th></tr>
+                    <tr class="section"><th colspan="3">@L["calc.sec.slab"], d = @SiteInfo.Number(thickness, 2) mm</th></tr>
                     <tr><td>@L["calc.path"]</td><td class="num">@Fmt(pathMm, 3) mm</td><td class="muted">d / cos θ<sub>t</sub></td></tr>
                     <tr><td>@L["calc.shift"]</td><td class="num">@Fmt(shiftMm, 4) mm</td><td class="muted">d·sin θ·(1 − cos θ / √(n² − sin² θ))</td></tr>
                     <tr><td>τ<sub>i</sub></td><td class="num">@Tau()</td><td class="muted">@L["calc.tau.note"]</td></tr>
                     <tr><td>T<sub>slab</sub></td><td class="num">@SlabT()</td><td class="muted">@L["calc.tslab.note"]</td></tr>
 
-                    <tr class="section"><th colspan="3">@L["calc.sec.prism"] · A = @SiteInfo.Number(apex, 2)°</th></tr>
+                    <tr class="section"><th colspan="3">@L["calc.sec.prism"], A = @SiteInfo.Number(apex, 2)°</th></tr>
                     <tr><td>δ<sub>min</sub></td><td class="num">@MinDeviation()</td><td class="muted">2·asin(n·sin(A/2)) − A</td></tr>
                     <tr><td>θ<sub>δmin</sub></td><td class="num">@MinDeviationIncidence()</td><td class="muted">@L["calc.dmin.note"]</td></tr>
                     <tr><td>δ(θ)</td><td class="num">@Deviation(n, angle)</td><td class="muted">@L["calc.dev.note"]</td></tr>
@@ -250,5 +250,5 @@
         return Fmt((plus - minus) / 2 * 100, 4) + " °/100 nm";
     }
 
-    private static string Fmt(double value, int decimals) => double.IsNaN(value) ? "—" : value.ToString("F" + decimals, CultureInfo.InvariantCulture);
+    private static string Fmt(double value, int decimals) => SiteInfo.Number(value, decimals);
 }

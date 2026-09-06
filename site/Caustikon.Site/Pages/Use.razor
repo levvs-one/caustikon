@@ -1,68 +1,98 @@
+@page "/design"
 @page "/use"
 @inject IJSRuntime Js
 @inherits LocalizedComponent
 
 <PageTitle>@L["use.title"]</PageTitle>
+<HeadContent>
+    <meta name="description" content="@L["use.meta"]" />
+</HeadContent>
 
 <h1>@L["use.h1"]</h1>
 <p class="lede">@L["use.lede"]</p>
 
-<div class="controls">
-    <label class="control">
-        <span>@L["use.glass"]</span>
-        <select @bind="selectedKey">
-            <optgroup label="@L["render.common"]">
-                @foreach ((string key, string label) in Featured)
-                {
-                    <option value="@key">@label</option>
-                }
-            </optgroup>
-            @foreach (string vendor in GlassCatalog.Vendors)
-            {
-                <optgroup label="@(GlassCatalog.ByVendor(vendor).First().VendorDisplayName)">
-                    @foreach (Glass g in GlassCatalog.ByVendor(vendor).Where(g => g.CatalogIndexD is not null))
+<div class="bench-block">
+    <canvas id="ui-canvas" class="render-canvas ui"></canvas>
+    <p class="bench-hint">@(gpu ? L["use.hint"] : L["use.nogl"])</p>
+    <div class="bench-controls">
+        <label class="control">
+            <span>@L["use.glass"]</span>
+            <select @bind="selectedKey">
+                <optgroup label="@L["render.common"]">
+                    @foreach ((string key, string label) in Featured)
                     {
-                        <option value="@(g.Vendor + "/" + g.Name)">@g.Name (@SiteInfo.Number(g.CatalogIndexD!.Value, 4) / @SiteInfo.Number(g.CatalogAbbeD ?? double.NaN, 1))</option>
+                        <option value="@key">@(L.IsRussian ? label.Split('|')[1] : label.Split('|')[0])</option>
                     }
                 </optgroup>
-            }
-        </select>
-    </label>
-    <label class="control">
-        <span class="range-label"><span>@L["use.thickness"]</span><output>@thickness mm</output></span>
-        <input type="range" min="1" max="50" step="1" @bind="thickness" />
-    </label>
-    <label class="control">
-        <span class="range-label"><span>@L["use.frost"]</span><output>@blur px</output></span>
-        <input type="range" min="0" max="30" step="1" @bind="blur" />
-    </label>
+                @foreach (string vendor in GlassCatalog.Vendors)
+                {
+                    <optgroup label="@(GlassCatalog.ByVendor(vendor).First().VendorDisplayName)">
+                        @foreach (Glass g in GlassCatalog.ByVendor(vendor).Where(g => g.CatalogIndexD is not null))
+                        {
+                            <option value="@(g.Vendor + "/" + g.Name)">@g.Name (@SiteInfo.Number(g.CatalogIndexD!.Value, 4) / @SiteInfo.Number(g.CatalogAbbeD ?? double.NaN, 1))</option>
+                        }
+                    </optgroup>
+                }
+            </select>
+        </label>
+        <RangeField Label="@L["use.thickness"]" @bind-Value="thickness" Min="0.5" Max="40" Step="0.5" Unit="mm" />
+        <RangeField Label="@L["use.bevel"]" @bind-Value="bevel" Min="0" Max="160" Step="1" Unit="px" />
+        <RangeField Label="@L["use.dome"]" @bind-Value="dome" Min="0" Max="1" Step="0.02" />
+        <RangeField Label="@L["use.frost"]" @bind-Value="blur" Min="0" Max="40" Step="1" Unit="px" />
+    </div>
+    <details class="more">
+        <summary>@L["ui.more"]</summary>
+        <div class="bench-controls">
+            <RangeField Label="@L["use.radius"]" @bind-Value="radius" Min="0" Max="120" Step="1" Unit="px" />
+            <RangeField Label="@L["use.light"]" @bind-Value="light" Min="0" Max="360" Step="1" Unit="°" />
+            <RangeField Label="@L["use.scale"]" @bind-Value="pxPerMm" Min="1" Max="12" Step="0.5" Unit="px/mm" />
+            <RangeField Label="@L["use.width"]" @bind-Value="widthFraction" Min="0.2" Max="0.95" Step="0.01" Scale="100" Unit="%" Decimals="0" />
+            <RangeField Label="@L["use.height"]" @bind-Value="heightFraction" Min="0.2" Max="0.95" Step="0.01" Scale="100" Unit="%" Decimals="0" />
+        </div>
+    </details>
+
+    @if (glass is { } g0 && tint is { } c)
+    {
+        <div class="readout compact">
+            <div><div class="value">@Kind(g0)</div><div class="label">@L["use.readout.kind"]</div></div>
+            <div><div class="value">@SiteInfo.Number(faceReflectance * 100, 1)%</div><div class="label">@L["use.readout.face"]</div></div>
+            <div><div class="value">@SiteInfo.Number(edgeReflectance * 100, 1)%</div><div class="label">@L["use.readout.edge"]</div></div>
+            <div><div class="value">@SiteInfo.Number(fringePx, 2) px</div><div class="label">@L["use.readout.fringe"]</div></div>
+            <div><div class="value"><span class="swatch" style="background:@c.Hex"></span> @c.Hex</div><div class="label">@T("use.readout.tint", thickness)</div></div>
+            <div><div class="value">@SiteInfo.Number(c.Y * 100, 1)%</div><div class="label">@L["use.readout.luminance"]</div></div>
+        </div>
+        <p class="bench-note">@Describe(g0, c)</p>
+    }
 </div>
 
-@if (glass is { } g0 && tint is { } c)
+<h2>@L["use.what.h"]</h2>
+<p>@L["use.what.p1"]</p>
+<p>@L["use.what.p2"]</p>
+
+@if (glass is { } g1)
 {
-    <h2>@L["use.ui.h"]</h2>
-    <p>@T("use.ui.p", g0.VendorDisplayName, g0.Name, thickness)</p>
+    <h2>@L["use.glsl.h"]</h2>
+    <p>@L["use.glsl.p"]</p>
+    <div class="snippet">
+        <div class="snippet-bar"><span>GLSL ES 3.00, @g1.VendorDisplayName @g1.Name</span><button @onclick="() => Copy(glslSnippet)">@L["use.copy"]</button></div>
+        <pre><code>@glslSnippet</code></pre>
+    </div>
+
+    <h2>@L["use.css.h"]</h2>
+    <p>@H("use.css.p")</p>
     <div class="use-demo">
         <div class="use-backdrop">
             <span style="background:#e4572e"></span><span style="background:#17bebb"></span><span style="background:#ffc914"></span><span style="background:#2e282a"></span><span style="background:#76b041"></span>
             <p>@L["use.demo.text"]</p>
         </div>
         <div class="glass-panel" style="@PanelStyle">
-            <strong>@g0.Name</strong>
-            <span>@thickness mm · n<sub>d</sub> @SiteInfo.Number(g0.IndexD, 4) · Y @SiteInfo.Number(c.Y, 3)</span>
+            <strong>@g1.Name</strong>
+            <span>@SiteInfo.Number(thickness, 1) mm, n<sub>d</sub> @SiteInfo.Number(g1.IndexD, 4)</span>
         </div>
     </div>
     <div class="snippet">
-        <div class="snippet-bar"><span>@L["use.css.label"]</span><button @onclick="() => Copy(cssSnippet)">@L["use.copy"]</button></div>
+        <div class="snippet-bar"><span>CSS</span><button @onclick="() => Copy(cssSnippet)">@L["use.copy"]</button></div>
         <pre><code>@cssSnippet</code></pre>
-    </div>
-    <p class="muted">@H("use.css.note")</p>
-
-    <h2>@L["use.glsl.h"]</h2>
-    <p>@L["use.glsl.p"]</p>
-    <div class="snippet">
-        <div class="snippet-bar"><span>GLSL</span><button @onclick="() => Copy(glslSnippet)">@L["use.copy"]</button></div>
-        <pre><code>@glslSnippet</code></pre>
     </div>
 
     <h2>@L["use.cs.h"]</h2>
@@ -71,47 +101,133 @@
         <div class="snippet-bar"><span>C#</span><button @onclick="() => Copy(csharpSnippet)">@L["use.copy"]</button></div>
         <pre><code>@csharpSnippet</code></pre>
     </div>
-
-    <h2>@L["use.which.h"]</h2>
-    <div class="columns">
-        <div><h3>@L["use.which.ui.h"]</h3><p>@L["use.which.ui.p"]</p></div>
-        <div><h3>@L["use.which.glsl.h"]</h3><p>@L["use.which.glsl.p"]</p></div>
-        <div><h3>@L["use.which.cs.h"]</h3><p>@L["use.which.cs.p"]</p></div>
-    </div>
 }
+
+<h2>@L["use.pick.h"]</h2>
+<p>@L["use.pick.p"]</p>
+<dl class="kv map">
+    @foreach ((string key, string why) in Picks)
+    {
+        int slash = key.IndexOf('/');
+        Glass? pg = GlassCatalog.Find(key[..slash], key[(slash + 1)..]);
+        if (pg is not null)
+        {
+            <dt><a href="@Catalog.GlassLink(pg)">@pg.VendorDisplayName @pg.Name</a></dt>
+            <dd>@(L.IsRussian ? why.Split('|')[1] : why.Split('|')[0]) @T("use.pick.numbers", SiteInfo.Number(pg.IndexD, 4), SiteInfo.Number(pg.AbbeD, 1), SiteInfo.Number(Dielectric.NormalReflectance(1f, (float)pg.IndexD) * 100, 1))</dd>
+        }
+    }
+</dl>
 
 @code {
     private static readonly (string Key, string Label)[] Featured =
     [
-        ("schott/N-BK7", "SCHOTT N-BK7 — the crown everything is measured against"),
-        ("schott/N-SF11", "SCHOTT N-SF11 — dense flint, strong fringes"),
-        ("schott/SF57", "SCHOTT SF57 — very dense flint, warm when thick"),
-        ("schott/N-SF66", "SCHOTT N-SF66 — the highest dispersion in the catalog"),
-        ("schott/N-LASF9", "SCHOTT N-LASF9 — high index, tight refraction"),
-        ("schott/N-FK58", "SCHOTT N-FK58 — fluor crown, almost no fringes"),
-        ("ohara/S-FPL53", "OHARA S-FPL53 — extra-low dispersion"),
-        ("ohara/S-LAH79", "OHARA S-LAH79 — index above two"),
-        ("hoya/TAFD55", "HOYA TAFD55 — high-index lanthanum flint"),
-        ("cdgm/H-ZF88", "CDGM H-ZF88 — dense flint"),
+        ("schott/N-BK7", "SCHOTT N-BK7, the neutral window glass|SCHOTT N-BK7, нейтральное оконное"),
+        ("schott/N-FK58", "SCHOTT N-FK58, the cleanest edges|SCHOTT N-FK58, самые чистые края"),
+        ("schott/N-SF11", "SCHOTT N-SF11, rainbow edges|SCHOTT N-SF11, радужные края"),
+        ("schott/SF57", "SCHOTT SF57, warm when thick|SCHOTT SF57, теплеет в толщине"),
+        ("schott/N-SF66", "SCHOTT N-SF66, the strongest fringes|SCHOTT N-SF66, самые сильные каймы"),
+        ("schott/N-LASF9", "SCHOTT N-LASF9, glossy face, tight bend|SCHOTT N-LASF9, глянцевое лицо, крутой излом"),
+        ("ohara/S-FPL53", "OHARA S-FPL53, almost no colour at all|OHARA S-FPL53, почти без цвета"),
+        ("ohara/S-LAH79", "OHARA S-LAH79, index above two|OHARA S-LAH79, показатель выше двух"),
+    ];
+
+    private static readonly (string Key, string Why)[] Picks =
+    [
+        ("schott/N-BK7", "For a card or a sheet over content: the look people mean by \"glass\", nothing tinted, faint fringes.|Для карточки или листа над контентом: то самое «стекло», без оттенка, каймы едва заметны."),
+        ("schott/N-FK58", "When the interface behind must stay exactly its colour: the lowest dispersion in the catalog.|Когда интерфейс за стеклом должен остаться ровно своего цвета: самая низкая дисперсия в каталоге."),
+        ("schott/N-SF11", "For a jewel, a button, a highlight: bevels split colours and the face shines twice as hard.|Для «драгоценной» кнопки или акцента: фаски раскладывают цвет, лицо блестит вдвое сильнее."),
+        ("schott/SF57", "For thick, heavy pieces: it warms with thickness, so a slab reads as real material.|Для толстых тяжёлых элементов: с толщиной теплеет, и плита читается как настоящий материал."),
     ];
 
     private string selectedKeyValue = "schott/N-BK7";
-    private double thicknessValue = 6;
-    private double blurValue = 10;
+    private double thicknessValue = 6, bevelValue = 36, domeValue = 0.25, blurValue = 2, radiusValue = 28, lightValue = 120, pxPerMmValue = 4, widthValue = 0.62, heightValue = 0.6;
     private Glass? glass;
     private TransmittedColour? tint;
     private string cssSnippet = "", glslSnippet = "", csharpSnippet = "";
-    private double faceReflectance, edgeReflectance, shift, fringe;
+    private double faceReflectance, edgeReflectance, fringePx;
+    private bool gpu = true;
+    private bool rendered, pushQueued;
+    private string shaderTemplate = "";
 
     private string selectedKey { get => selectedKeyValue; set { selectedKeyValue = value; Recompute(); } }
     private double thickness { get => thicknessValue; set { thicknessValue = value; Recompute(); } }
+    private double bevel { get => bevelValue; set { bevelValue = value; Recompute(); } }
+    private double dome { get => domeValue; set { domeValue = value; Recompute(); } }
     private double blur { get => blurValue; set { blurValue = value; Recompute(); } }
+    private double radius { get => radiusValue; set { radiusValue = value; Recompute(); } }
+    private double light { get => lightValue; set { lightValue = value; Recompute(); } }
+    private double pxPerMm { get => pxPerMmValue; set { pxPerMmValue = value; Recompute(); } }
+    private double widthFraction { get => widthValue; set { widthValue = value; Recompute(); } }
+    private double heightFraction { get => heightValue; set { heightValue = value; Recompute(); } }
 
     protected override void OnInitialized() => Recompute();
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            rendered = true;
+            try
+            {
+                shaderTemplate = await Js.InvokeAsync<string>("caustikonUi.shaderSource");
+            }
+            catch (JSException)
+            {
+                shaderTemplate = "";
+            }
+
+            Recompute();
+            StateHasChanged();
+            await PushAsync();
+            return;
+        }
+
+        if (pushQueued)
+        {
+            pushQueued = false;
+            await PushAsync();
+        }
+    }
+
     private string PanelStyle => tint is { } c
-        ? $"--glass-tint:{c.Hex};--glass-edge:{F(edgeReflectance, 3)};--glass-face:{F(faceReflectance, 3)};--glass-blur:{blurValue}px"
+        ? $"--glass-tint:{c.Hex};--glass-edge:{F(edgeReflectance, 3)};--glass-face:{F(faceReflectance, 3)};--glass-blur:{F(blurValue, 0)}px;--glass-radius:{F(radiusValue, 0)}px"
         : "";
+
+    private async Task PushAsync()
+    {
+        if (glass is null || !gpu)
+        {
+            return;
+        }
+
+        var spec = new
+        {
+            ior = new[] { IndexAt(610d), IndexAt(550d), IndexAt(465d) },
+            alpha = new[] { Absorb(610d), Absorb(550d), Absorb(465d) },
+            thicknessMm = thicknessValue,
+            bevelPx = bevelValue,
+            dome = domeValue,
+            frostPx = blurValue,
+            radiusPx = radiusValue,
+            pxPerMm = pxPerMmValue,
+            widthFraction = widthValue,
+            heightFraction = heightValue,
+            lightDegrees = lightValue,
+            title = L["use.backdrop.title"],
+            lines = Featured.Take(5).Select(f =>
+            {
+                int slash = f.Key.IndexOf('/');
+                Glass? g = GlassCatalog.Find(f.Key[..slash], f.Key[(slash + 1)..]);
+                return g is null ? "" : $"{g.VendorDisplayName} {g.Name}    n_d {SiteInfo.Number(g.IndexD, 4)}    ν_d {SiteInfo.Number(g.AbbeD, 1)}";
+            }).ToArray(),
+        };
+        bool ok = await Js.InvokeAsync<bool>("caustikonUi.render", "ui-canvas", spec);
+        if (!ok && gpu)
+        {
+            gpu = false;
+            StateHasChanged();
+        }
+    }
 
     private void Recompute()
     {
@@ -126,60 +242,38 @@
         tint = GlassColour.Transmitted(glass, thicknessValue);
         double nd = glass.IndexD;
         faceReflectance = Dielectric.NormalReflectance(1f, (float)nd);
-        edgeReflectance = Dielectric.Fresnel((float)Math.Cos(75d * Math.PI / 180d), 1f, (float)nd).Unpolarized;
-        double shiftRed = Shift(IndexAt(700d));
-        double shiftBlue = Shift(IndexAt(400d));
-        shift = Shift(nd);
-        fringe = shiftBlue - shiftRed;
+        edgeReflectance = Dielectric.Fresnel((float)Math.Cos(60d * Math.PI / 180d), 1f, (float)nd).Unpolarized;
+        // Fringe on the bevel: the blue and red rays leave the bevel's slope at different angles and land that far apart.
+        double thicknessPx = thicknessValue * pxPerMmValue;
+        double slope = bevelValue > 0.5 ? Math.Atan(0.5 * thicknessPx / bevelValue) : 0;
+        fringePx = Math.Abs(Shift(IndexAt(465d), slope) - Shift(IndexAt(610d), slope)) * thicknessPx * 0.75;
 
         TransmittedColour c = tint ?? default;
         cssSnippet = $$"""
-        /* {{glass.VendorDisplayName}} {{glass.Name}}, {{thicknessValue}} mm. Values from Caustikon.Glasses; provenance: {{glass.Provenance.Citation}} */
-        :root {
-          --glass-index: {{F(nd, 5)}};          /* n_d */
-          --glass-tint: {{c.Hex}};          /* D65 after {{thicknessValue}} mm, sRGB */
-          --glass-luminance: {{F(c.Y, 4)}};     /* luminous transmittance of that path */
-          --glass-face: {{F(faceReflectance, 4)}};        /* reflectance at normal incidence */
-          --glass-edge: {{F(edgeReflectance, 4)}};        /* reflectance at 75° incidence */
-          --glass-shift: {{F(shift, 4)}};       /* ray displacement per unit thickness, 45° */
-          --glass-fringe: {{F(fringe, 5)}};     /* blue–red difference of that displacement */
-        }
-
+        /* {{glass.VendorDisplayName}} {{glass.Name}}, {{F(thicknessValue, 1)}} mm. Numbers from Caustikon.Glasses; provenance: {{glass.Provenance.Citation}} */
         .glass {
+          --glass-tint: {{c.Hex}};              /* D65 after {{F(thicknessValue, 1)}} mm, sRGB */
+          --glass-luminance: {{F(c.Y, 4)}};        /* share of light that gets through */
+          --glass-face: {{F(faceReflectance, 4)}};           /* reflectance looking straight at it */
+          --glass-edge: {{F(edgeReflectance, 4)}};           /* reflectance at 60°, the bevel */
           position: relative;
-          background: color-mix(in srgb, var(--glass-tint) 30%, transparent);
-          -webkit-backdrop-filter: blur({{blurValue}}px);
-          backdrop-filter: blur({{blurValue}}px);                     /* frost: a design choice, not the glass */
-          border: 1px solid rgb(255 255 255 / var(--glass-edge));
-          box-shadow: inset 0 1px 0 rgb(255 255 255 / calc(var(--glass-face) * 3)),
-                      0 12px 32px rgb(0 0 0 / 0.18);
-          border-radius: 16px;
+          border-radius: {{F(radiusValue, 0)}}px;
+          background: color-mix(in srgb, var(--glass-tint) {{F((1 - c.Y) * 100 + 8, 0)}}%, transparent);
+          -webkit-backdrop-filter: blur({{F(blurValue, 0)}}px);
+          backdrop-filter: blur({{F(blurValue, 0)}}px);                 /* frost is a design choice, not the glass */
+          border: 1px solid rgb(255 255 255 / {{F(edgeReflectance * 1.5, 3)}});
+          box-shadow: inset 0 1px 0 rgb(255 255 255 / {{F(faceReflectance * 4, 3)}}),
+                      inset 0 -1px 0 rgb(0 0 0 / {{F(faceReflectance * 2, 3)}}),
+                      0 18px 40px rgb(0 0 0 / 0.18);
         }
+        /* CSS cannot refract: the bevel's bend and the colour fringes exist only in the shader above. */
         """;
 
-        glslSnippet = $$"""
-        // {{glass.VendorDisplayName}} {{glass.Name}} — Caustikon.Glasses, {{glass.Provenance.Citation}}
-        // Refractive index for a wavelength in micrometers, valid {{F(glass.Model.MinimumWavelengthNanometers / 1000d, 3)}}–{{F(glass.Model.MaximumWavelengthNanometers / 1000d, 3)}} µm.
-        float caustikonIor(float lambda) {
-        {{FormulaBody(glass)}}
-        }
-
-        // Index and absorption per millimetre at 610, 550 and 465 nm, for renderers that trace three channels.
-        const vec3 caustikonIorRgb = vec3({{F(IndexAt(610d), 5)}}, {{F(IndexAt(550d), 5)}}, {{F(IndexAt(465d), 5)}});
-        const vec3 caustikonAbsorbPerMm = vec3({{F(Absorb(610d), 6)}}, {{F(Absorb(550d), 6)}}, {{F(Absorb(465d), 6)}});
-        vec3 caustikonTransmit(float pathMm) { return exp(-caustikonAbsorbPerMm * pathMm); }
-
-        // Exact unpolarized Fresnel power reflectance; returns 1.0 beyond the critical angle.
-        float caustikonFresnel(float cosI, float nI, float nT) {
-          float eta = nI / nT;
-          float sinT2 = eta * eta * (1.0 - cosI * cosI);
-          if (sinT2 >= 1.0) return 1.0;
-          float cosT = sqrt(1.0 - sinT2);
-          float rs = (nI * cosI - nT * cosT) / (nI * cosI + nT * cosT);
-          float rp = (nT * cosI - nI * cosT) / (nT * cosI + nI * cosT);
-          return 0.5 * (rs * rs + rp * rp);
-        }
-        """;
+        glslSnippet = shaderTemplate.Length == 0 ? "" : shaderTemplate
+            .Replace("uniform vec3 uIor;             // refractive index at 610, 550 and 465 nm",
+                     $"// {glass.VendorDisplayName} {glass.Name}: Caustikon.Glasses, {glass.Provenance.Citation}\nconst vec3 uIor = vec3({G(IndexAt(610d))}, {G(IndexAt(550d))}, {G(IndexAt(465d))});   // n at 610, 550, 465 nm")
+            .Replace("uniform vec3 uAlpha;           // absorption per millimetre at the same wavelengths",
+                     $"const vec3 uAlpha = vec3({G(Absorb(610d))}, {G(Absorb(550d))}, {G(Absorb(465d))}); // absorption per mm, same wavelengths");
 
         string identifier = Identifier(glass.Name);
         string vendorClass = char.ToUpperInvariant(glass.Vendor[0]) + glass.Vendor[1..];
@@ -188,14 +282,33 @@
         using Caustikon;
         using Caustikon.Glasses;
 
-        {{ModelType(glass)}} model = {{vendorClass}}.{{identifier}};               // value type, allocation-free
-        model.EvaluateNanometers(587.5618, out double nd);   // {{F(nd, 5)}}
-
         Glass glass = GlassCatalog.Find("{{glass.Vendor}}", "{{glass.Name}}")!;
-        glass.Extinction!.InternalTransmittance(450, {{thicknessValue}}, out double t450);   // {{Tau(450d)}}
-        TransmittedColour tint = GlassColour.Transmitted(glass, {{thicknessValue}})!.Value;    // {{c.Hex}}, Y {{F(c.Y, 4)}}
-        FresnelPower rim = Dielectric.Fresnel(cosIncident: 0.2588f, 1f, (float)nd);   // 75°: {{F(edgeReflectance, 4)}}
+        {{ModelType(glass)}} model = {{vendorClass}}.{{identifier}};                 // value type, allocation-free
+        model.EvaluateNanometers(610, out double nRed);       // {{F(IndexAt(610d), 5)}}
+        model.EvaluateNanometers(465, out double nBlue);      // {{F(IndexAt(465d), 5)}}
+
+        double face = Dielectric.NormalReflectance(1f, (float)glass.IndexD);        // {{F(faceReflectance, 4)}}
+        FresnelPower bevel = Dielectric.Fresnel(cosIncident: 0.5f, 1f, (float)glass.IndexD); // 60°: {{F(edgeReflectance, 4)}}
+        TransmittedColour tint = GlassColour.Transmitted(glass, {{F(thicknessValue, 1)}})!.Value;    // {{c.Hex}}, Y {{F(c.Y, 4)}}
         """;
+
+        if (rendered)
+        {
+            pushQueued = true;
+        }
+    }
+
+    private string Kind(Glass g) => g.AbbeD >= 50 ? L["use.kind.crown"] : g.AbbeD >= 35 ? L["use.kind.middle"] : L["use.kind.flint"];
+
+    // One sentence a designer can act on, built from the numbers above rather than typed per glass.
+    private string Describe(Glass g, TransmittedColour c)
+    {
+        string fringe = fringePx < 0.4 ? L["use.say.fringe.none"] : fringePx < 1.2 ? L["use.say.fringe.some"] : L["use.say.fringe.strong"];
+        double r = c.LinearRed, gg = c.LinearGreen, b = c.LinearBlue;
+        double spread = Math.Max(r, Math.Max(gg, b)) / Math.Max(1e-6, Math.Min(r, Math.Min(gg, b)));
+        string tintWords = spread < 1.02 ? L["use.say.tint.none"] : spread < 1.08 ? (r > b ? L["use.say.tint.warm.slight"] : L["use.say.tint.cool.slight"]) : (r > b ? L["use.say.tint.warm"] : L["use.say.tint.cool"]);
+        string sheen = faceReflectance < 0.045 ? L["use.say.sheen.low"] : faceReflectance < 0.07 ? L["use.say.sheen.mid"] : L["use.say.sheen.high"];
+        return T("use.say", g.VendorDisplayName + " " + g.Name, Kind(g).ToLowerInvariant(), SiteInfo.Number(g.IndexD, 3), SiteInfo.Number(g.AbbeD, 1), fringe, sheen, SiteInfo.Number(faceReflectance * 100, 1), tintWords, SiteInfo.Number(thickness, 1));
     }
 
     private double IndexAt(double wavelength)
@@ -217,62 +330,12 @@
         return perMeter * 1e-3d;
     }
 
-    private string Tau(double wavelength)
+    // Lateral shift per unit depth for a ray entering a surface tilted by <paramref name="slope"/> from the screen plane.
+    private static double Shift(double n, double slope)
     {
-        if (glass!.Extinction is not { } extinction)
-        {
-            return "no k data";
-        }
-
-        double clamped = Math.Clamp(wavelength, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers);
-        extinction.InternalTransmittance(clamped, thicknessValue, out double t);
-        return F(t, 4);
-    }
-
-    // Lateral shift of a ray through a plane slab at 45°, per unit thickness: sin θ · (1 − cos θ / sqrt(n² − sin² θ)).
-    private static double Shift(double n)
-    {
-        double s = Math.Sin(Math.PI / 4), c = Math.Cos(Math.PI / 4);
-        return s * (1d - c / Math.Sqrt(n * n - s * s));
-    }
-
-    private static string FormulaBody(Glass glass)
-    {
-        switch (glass.Model)
-        {
-            case Sellmeier m:
-            {
-                System.Text.StringBuilder b = new("  float l2 = lambda * lambda;\n  float n2 = 1.0 + " + G(m.Offset));
-                for (int i = 0; i < m.TermCount; i++)
-                {
-                    b.Append("\n    + ").Append(G(m.StrengthAt(i))).Append(" * l2 / (l2 - ").Append(G(m.ResonanceUm2At(i))).Append(')');
-                }
-
-                return b.Append(";\n  return sqrt(n2);").ToString();
-            }
-            case Polynomial m:
-            {
-                System.Text.StringBuilder b = new("  float n2 = " + G(m.Offset));
-                for (int i = 0; i < m.TermCount; i++)
-                {
-                    b.Append("\n    + ").Append(G(m.CoefficientAt(i))).Append(" * pow(lambda, ").Append(G(m.ExponentAt(i))).Append(')');
-                }
-
-                return b.Append(";\n  return sqrt(n2);").ToString();
-            }
-            case Cauchy m:
-            {
-                System.Text.StringBuilder b = new("  float n = " + G(m.Offset));
-                for (int i = 0; i < m.TermCount; i++)
-                {
-                    b.Append("\n    + ").Append(G(m.CoefficientAt(i))).Append(" * pow(lambda, ").Append(G(m.ExponentAt(i))).Append(')');
-                }
-
-                return b.Append(";\n  return n;").ToString();
-            }
-            default:
-                return "  return 1.5;";
-        }
+        double s = Math.Sin(slope);
+        double sinT = s / n;
+        return Math.Tan(slope - Math.Asin(sinT));
     }
 
     private static string ModelType(Glass glass) => glass.Model switch { Sellmeier => "Sellmeier", Polynomial => "Polynomial", Cauchy => "Cauchy", _ => "IDispersionModel" };
@@ -294,6 +357,7 @@
         return text;
     }
 
+    // Code samples keep the point whatever the page language: they are meant to be pasted.
     private static string F(double value, int decimals) => double.IsNaN(value) ? "NaN" : value.ToString("F" + decimals, CultureInfo.InvariantCulture);
 
     private async Task Copy(string text) => await Js.InvokeVoidAsync("caustikonClipboard.copy", text);

@@ -3,13 +3,24 @@ namespace Caustikon.Site.Localization;
 /// <summary>Every piece of site text in English and Russian, keyed by page and role. Numbers, code and formulas stay as they are.</summary>
 public static class Strings
 {
+    static Strings()
+    {
+        foreach ((string key, (string, string) pair) in GiveStrings.Table)
+        {
+            Table[key] = pair;
+        }
+    }
+
     public static readonly Dictionary<string, (string En, string Ru)> Table = new(StringComparer.Ordinal)
     {
         // Layout
-        ["nav.catalog"] = ("Catalog", "Каталог"),
-        ["nav.playground"] = ("Playground", "Стенд"),
-        ["nav.render"] = ("Render", "Рендер"),
-        ["nav.use"] = ("Use it", "Взять к себе"),
+        ["nav.catalog"] = ("Catalog", "Catalog"),
+        ["nav.playground"] = ("Slab and interface calculator", "Калькулятор пластины и границы"),
+        ["nav.render"] = ("3D", "3D"),
+        ["nav.use"] = ("Design", "Design"),
+        ["nav.bench"] = ("Optic", "Optic"),
+        ["nav.guides"] = ("Guides", "Гайды"),
+        ["footer.by"] = ("Made by", "Автор:"),
         ["nav.formulas"] = ("Formulas", "Формулы"),
         ["nav.about"] = ("About", "О проекте"),
         ["footer.data"] = ("Glass data: RefractiveIndex.INFO, CC0 1.0", "Данные стёкол: RefractiveIndex.INFO, CC0 1.0"),
@@ -89,11 +100,15 @@ public static class Strings
         ["home.bench.drawing"] = ("Click on the field to put corners down, in order around the outline. A double click or Done closes the shape; then the corners can be dragged.", "Кликай по полю, ставя углы по порядку вдоль контура. Двойной клик или «Готово» замыкает фигуру; потом углы можно таскать."),
         ["home.readout.index"] = ("n_d at this temperature", "n_d при этой температуре"),
         ["home.readout.shift"] = ("shift from the 20 °C value", "сдвиг от значения при 20 °C"),
+        ["ui.more"] = ("More settings", "Ещё настройки"),
+        ["home.meta"] = ("An optical bench in the browser: white light through any lens, prism or drawn shape with the refraction, Fresnel split and absorption of 1646 real glasses.", "Оптический стенд в браузере: белый свет через любую линзу, призму или нарисованную фигуру с преломлением, делением Френеля и поглощением 1646 настоящих стёкол."),
+        ["render.meta"] = ("A solid of any catalog glass on a patterned table, traced on the GPU at nine wavelengths with exact Fresnel reflection, internal bounces and absorption.", "Тело из любого стекла каталога на узорчатом столе, трассировка на GPU на девяти длинах волн с точным отражением Френеля, внутренними отскоками и поглощением."),
+        ["catalog.meta"] = ("1646 optical glasses from nine manufacturers with dispersion curves, absorption, thermal data, colour and provenance for every number.", "1646 оптических стёкол девяти производителей с кривыми дисперсии, поглощением, температурными данными, цветом и источником каждого числа."),
         ["home.readout.energy"] = ("energy that leaves", "энергии вышло"),
         ["home.readout.reflected"] = ("reflected at entry", "отражено на входе"),
         ["home.readout.absorbed"] = ("absorbed inside", "поглощено внутри"),
         // Catalog
-        ["catalog.title"] = ("Catalog · Caustikon", "Каталог · Caustikon"),
+        ["catalog.title"] = ("Catalog — Caustikon", "Каталог — Caustikon"),
         ["catalog.h1"] = ("Glass catalog", "Каталог стёкол"),
         ["catalog.lede"] = ("{0} glasses from {1} manufacturers. n<sub>d</sub> and ν<sub>d</sub> are the printed catalog values; every one is reproduced by its fit within five units in the fifth decimal.",
             "{0} стёкол от {1} производителей. n<sub>d</sub> и ν<sub>d</sub> — печатные каталожные значения; каждое воспроизводится аппроксимацией с точностью до пяти единиц в пятом знаке."),
@@ -125,8 +140,8 @@ public static class Strings
         ["glass.notfound.p"] = ("Nothing in the catalog is called {0} from {1}. <a href=\"catalog\">Back to the catalog</a>.", "В каталоге нет стекла {0} от {1}. <a href=\"catalog\">Назад в каталог</a>."),
         ["glass.fit"] = ("{0} fit over {1}–{2} nm", "аппроксимация {0} на {1}–{2} нм"),
         ["glass.code"] = ("code", "код"),
-        ["glass.nd"] = ("n<sub>d</sub> printed · fit {0}", "n<sub>d</sub> печатный · расчёт {0}"),
-        ["glass.vd"] = ("ν<sub>d</sub> printed · fit {0}", "ν<sub>d</sub> печатный · расчёт {0}"),
+        ["glass.nd"] = ("n<sub>d</sub> printed, fit {0}", "n<sub>d</sub> печатный, расчёт {0}"),
+        ["glass.vd"] = ("ν<sub>d</sub> printed, fit {0}", "ν<sub>d</sub> печатный, расчёт {0}"),
         ["glass.nf"] = ("n<sub>F</sub> 486.13 nm", "n<sub>F</sub> 486,13 нм"),
         ["glass.nc"] = ("n<sub>C</sub> 656.27 nm", "n<sub>C</sub> 656,27 нм"),
         ["glass.density"] = ("density, kg/m³", "плотность, кг/м³"),
@@ -172,8 +187,8 @@ public static class Strings
         ["chart.wavelength"] = ("wavelength, nm", "длина волны, нм"),
 
         // Playground
-        ["play.title"] = ("Playground · Caustikon", "Стенд · Caustikon"),
-        ["play.h1"] = ("Playground", "Стенд"),
+        ["play.title"] = ("Slab and interface calculator — Caustikon", "Калькулятор пластины и границы — Caustikon"),
+        ["play.h1"] = ("Slab and interface calculator", "Калькулятор пластины и границы"),
         ["play.lede"] = ("A plane interface and a slab. Everything below is computed in your browser by the same code the packages ship.", "Плоская граница и пластина. Всё ниже считается в браузере тем же кодом, который лежит в пакетах."),
         ["play.find"] = ("Find a glass", "Найти стекло"),
         ["play.find.hint"] = ("type to narrow the list", "начни печатать, чтобы сузить список"),
@@ -212,7 +227,7 @@ public static class Strings
         ["spectrum.glass"] = ("Visible spectrum through {0} mm of {1}", "Видимый спектр через {0} мм {1}"),
 
         // Render
-        ["render.title"] = ("Render · Caustikon", "Рендер · Caustikon"),
+        ["render.title"] = ("Render — Caustikon", "Рендер — Caustikon"),
         ["render.h1"] = ("Render", "Рендер"),
         ["render.lede"] = ("A solid of the chosen glass on a patterned ground, ray-traced in your browser with the packages' own refraction, reflectance and absorption at nine wavelengths. The fringes and the tint are computed, not drawn.",
             "Тело из выбранного стекла на узорчатом столе, трассированное в браузере преломлением, отражением и поглощением из самих пакетов на девяти длинах волн. Каймы и оттенок вычислены, а не нарисованы."),
@@ -256,34 +271,6 @@ public static class Strings
             "Каждый пиксель — девять лучей, по одному на длину волны: отражение от поверхности с весом Френеля, преломление внутрь, до шести внутренних отражений с поглощением Бугера–Ламберта на каждой хорде по таблице k(λ) стекла, преломление наружу. Флинт разводит края узора в цвет; толстый плотный флинт теплеет, потому что так говорит его собственная k(λ). Не моделируются: тени, каустики на столе, просветление, поляризация сверх неполяризованного разбиения."),
         ["render.nok"] = ("no k data", "нет данных k"),
 
-        // Use
-        ["use.title"] = ("Use a glass · Caustikon", "Взять стекло · Caustikon"),
-        ["use.h1"] = ("Take a glass into your own work", "Забери стекло в свой проект"),
-        ["use.lede"] = ("Three paths, one source of numbers. Pick a glass and a thickness; every value below is computed from its catalog entry and can be pasted as is.",
-            "Три пути, один источник чисел. Выбери стекло и толщину: всё ниже вычислено из его каталожной записи и вставляется как есть."),
-        ["use.glass"] = ("Glass", "Стекло"),
-        ["use.thickness"] = ("Thickness", "Толщина"),
-        ["use.frost"] = ("Frost (blur, a design choice)", "Матовость (размытие — выбор дизайнера)"),
-        ["use.ui.h"] = ("1 · Interface", "1 · Интерфейс"),
-        ["use.ui.p"] = ("A panel of {0} {1}, {2} mm thick, over whatever is behind it. The tint is the colour daylight has after passing through that thickness; the edge is the Fresnel reflectance at 75°; the face sheen is the reflectance at normal incidence. Blur is not physics — clear glass does not scatter — so it stays a slider you own.",
-            "Панель из {0} {1} толщиной {2} мм поверх того, что за ней. Тон — цвет дневного света после этой толщины; кромка — отражение Френеля под 75°; блик грани — отражение при нормальном падении. Размытие — не физика, прозрачное стекло не рассеивает, — поэтому оно остаётся твоим ползунком."),
-        ["use.demo.text"] = ("Text behind the glass keeps its colour where the glass is clear and loses blue where the glass is a dense flint.", "Текст за стеклом сохраняет цвет там, где стекло прозрачно, и теряет синий там, где это плотный флинт."),
-        ["use.css.label"] = ("CSS custom properties and a panel class", "CSS-переменные и класс панели"),
-        ["use.copy"] = ("Copy", "Копировать"),
-        ["use.css.note"] = ("<code>--glass-shift</code> is the lateral displacement of a ray crossing the panel at 45°, per unit of thickness; <code>--glass-fringe</code> is how much that displacement differs between 400 and 700 nm. Feed them to an SVG <code>feOffset</code> per colour channel, scaled by your panel's thickness in pixels, for a chromatic edge that matches this glass rather than a guess.",
-            "<code>--glass-shift</code> — боковое смещение луча, проходящего панель под 45°, на единицу толщины; <code>--glass-fringe</code> — насколько это смещение различается между 400 и 700 нм. Подай их в SVG-<code>feOffset</code> по каналам, умножив на толщину панели в пикселях, — получится цветная кромка именно этого стекла, а не на глаз."),
-        ["use.glsl.h"] = ("2 · Shader", "2 · Шейдер"),
-        ["use.glsl.p"] = ("GLSL with this glass's own dispersion formula inlined: index at any wavelength in micrometers, an RGB triple at 610, 550 and 465 nm for renderers that trace three channels, absorption per millimetre for the same three, and the exact unpolarized Fresnel reflectance. No dependencies; paste into Unity, Godot, Unreal or a raw WebGL shader.",
-            "GLSL с формулой дисперсии именно этого стекла: показатель на любой длине волны в микрометрах, тройка RGB на 610, 550 и 465 нм для рендеров с тремя каналами, поглощение на миллиметр для тех же трёх и точное неполяризованное отражение Френеля. Без зависимостей; вставляется в Unity, Godot, Unreal или голый WebGL."),
-        ["use.cs.h"] = ("3 · .NET", "3 · .NET"),
-        ["use.cs.p"] = ("The packages themselves: the typed constant is a value type for the ray path, the catalog entry carries everything else.", "Сами пакеты: типизированная константа — значимый тип для горячего пути, запись каталога несёт всё остальное."),
-        ["use.which.h"] = ("Which path", "Какой путь"),
-        ["use.which.ui.h"] = ("Interface", "Интерфейс"),
-        ["use.which.ui.p"] = ("You are laying out panels, cards, overlays. Take the CSS. The numbers make a specific glass; the blur and the mix ratio are yours.", "Ты верстаешь панели, карточки, оверлеи. Бери CSS. Числа задают конкретное стекло; размытие и доля подмешивания — твои."),
-        ["use.which.glsl.h"] = ("Shader", "Шейдер"),
-        ["use.which.glsl.p"] = ("You are rendering surfaces in a game or a viewer. Take the GLSL: index per wavelength for dispersion, absorption per millimetre for thickness, Fresnel for the rim.", "Ты рисуешь поверхности в игре или вьюере. Бери GLSL: показатель по длине волны для дисперсии, поглощение на миллиметр для толщины, Френель для ободка."),
-        ["use.which.cs.h"] = (".NET", ".NET"),
-        ["use.which.cs.p"] = ("You are computing, not drawing: ray traces, tolerance studies, spectral transmittance, colorimetry. Take the packages and read the catalog entry's provenance.", "Ты считаешь, а не рисуешь: трассировки, допуски, спектральное пропускание, колориметрия. Бери пакеты и читай происхождение записи каталога."),
 
 
         // Calculator
@@ -325,8 +312,62 @@ public static class Strings
         ["calc.disp.note"] = ("angular dispersion at θ", "угловая дисперсия при θ"),
         ["calc.spreadFC.note"] = ("F to C spread at θ", "разброс F–C при θ"),
         ["calc.noPass"] = ("no transmission: n·sin(A/2) > 1", "не проходит: n·sin(A/2) > 1"),
+        // Glass for UI
+        ["use.title"] = ("Glass for UI — Caustikon", "Стекло для интерфейса — Caustikon"),
+        ["use.meta"] = ("A real optical glass over an interface: bevel refraction, colour fringes, Fresnel sheen and tint from the catalog, with the shader and CSS to copy.", "Настоящее оптическое стекло над интерфейсом: преломление на фаске, цветные каймы, френелевский блеск и оттенок из каталога, плюс шейдер и CSS для копирования."),
+        ["use.h1"] = ("Glass for an interface", "Стекло для интерфейса"),
+        ["use.lede"] = ("A panel of a real glass over a page. Pick the glass and the thickness, shape the bevel, and watch the edges bend and split colour the way that glass does. The shader that draws it is yours to copy; the CSS below approximates what CSS can.", "Панель из настоящего стекла над страницей. Выбери стекло и толщину, задай фаску и смотри, как края гнут и раскладывают цвет ровно так, как это стекло. Шейдер, который это рисует, можно забрать целиком; CSS ниже приближает то, что CSS вообще умеет."),
+        ["use.hint"] = ("Every pixel is traced: the view refracts into the glass at the bevel and the dome, crosses the thickness, and reads the page where it lands. Red, green and blue each use their own index, so fringes appear where that glass puts them.", "Каждый пиксель трассируется: взгляд преломляется в стекло на фаске и куполе, проходит толщину и читает страницу там, куда попал. У красного, зелёного и синего свой показатель, поэтому каймы появляются там, где их даёт это стекло."),
+        ["use.nogl"] = ("This browser has no WebGL2, so only the CSS approximation below can be shown.", "В этом браузере нет WebGL2, поэтому показать можно только CSS-приближение ниже."),
+        ["use.glass"] = ("Glass", "Стекло"),
+        ["use.thickness"] = ("Thickness", "Толщина"),
+        ["use.bevel"] = ("Bevel width", "Ширина фаски"),
+        ["use.dome"] = ("Dome", "Купол"),
+        ["use.frost"] = ("Frost", "Матовость"),
+        ["use.radius"] = ("Corner radius", "Скругление углов"),
+        ["use.light"] = ("Light direction", "Направление света"),
+        ["use.scale"] = ("Pixels per millimetre", "Пикселей на миллиметр"),
+        ["use.width"] = ("Panel width", "Ширина панели"),
+        ["use.height"] = ("Panel height", "Высота панели"),
+        ["use.readout.kind"] = ("glass family", "семейство"),
+        ["use.readout.face"] = ("reflected looking straight at it", "отражается при прямом взгляде"),
+        ["use.readout.edge"] = ("reflected at 60°, on the bevel", "отражается под 60°, на фаске"),
+        ["use.readout.fringe"] = ("colour fringe on the bevel", "цветная кайма на фаске"),
+        ["use.readout.tint"] = ("daylight after {0} mm", "дневной свет после {0} мм"),
+        ["use.readout.luminance"] = ("of the light gets through", "света проходит"),
+        ["use.kind.crown"] = ("Crown", "Крон"),
+        ["use.kind.middle"] = ("In between", "Промежуточное"),
+        ["use.kind.flint"] = ("Flint", "Флинт"),
+        ["use.say"] = ("{0} is a {1}: index {2}, Abbe number {3}. {4} {5}: it returns {6}% of the light head-on. {7} at {8} mm.", "{0} — {1}: показатель {2}, число Аббе {3}. {4} {5}: при прямом взгляде возвращает {6}% света. {7} на {8} мм."),
+        ["use.say.fringe.none"] = ("The bevel stays almost colourless;", "Фаска почти не окрашивается;"),
+        ["use.say.fringe.some"] = ("The bevel shows thin colour fringes up close;", "На фаске вблизи видны тонкие цветные каймы;"),
+        ["use.say.fringe.strong"] = ("The bevel splits colour visibly, like a cut stone;", "Фаска заметно раскладывает цвет, как огранённый камень;"),
+        ["use.say.sheen.low"] = ("the face has a quiet sheen", "лицо блестит сдержанно"),
+        ["use.say.sheen.mid"] = ("the face has a noticeable gloss", "лицо заметно глянцевое"),
+        ["use.say.sheen.high"] = ("the face is glossy like a gem", "лицо блестит как у камня"),
+        ["use.say.tint.none"] = ("No tint to speak of", "Оттенка практически нет"),
+        ["use.say.tint.warm.slight"] = ("A faint warm tint", "Едва тёплый оттенок"),
+        ["use.say.tint.cool.slight"] = ("A faint cool tint", "Едва холодный оттенок"),
+        ["use.say.tint.warm"] = ("A clear warm, yellowish tint", "Явный тёплый, желтоватый оттенок"),
+        ["use.say.tint.cool"] = ("A clear cool tint", "Явный холодный оттенок"),
+        ["use.backdrop.title"] = ("An interface behind the glass", "Интерфейс за стеклом"),
+        ["use.what.h"] = ("What changes between glasses", "Что меняется от стекла к стеклу"),
+        ["use.what.p1"] = ("Three things, and each is a number from the catalog. The index sets how hard the bevel bends the page and how much the face reflects: at 1.52 a window returns four per cent of the light, at 1.78 it returns almost eight and looks glossy. The Abbe number sets how far red and blue part on the bevel: above sixty they stay together, below thirty they split into a visible rainbow. The absorption table sets the tint that grows with thickness; a dense flint goes warm at twenty millimetres, a fluor crown stays clear at forty.", "Три вещи, и каждая — число из каталога. Показатель задаёт, как сильно фаска гнёт страницу и сколько отражает лицо: при 1,52 окно возвращает четыре процента света, при 1,78 почти восемь и выглядит глянцевым. Число Аббе задаёт, насколько на фаске расходятся красный и синий: выше шестидесяти они держатся вместе, ниже тридцати расходятся в заметную радугу. Таблица поглощения задаёт оттенок, который растёт с толщиной: плотный флинт теплеет на двадцати миллиметрах, фторкрон остаётся прозрачным на сорока."),
+        ["use.what.p2"] = ("Frost is not a glass property. Real frosted glass is a rough surface that scatters light; here it is a blur radius, kept separate so the physics stays honest and the design stays yours.", "Матовость — не свойство стекла. Настоящее матовое стекло — шероховатая поверхность, которая рассеивает свет; здесь это радиус размытия, вынесенный отдельно, чтобы физика оставалась честной, а дизайн — твоим."),
+        ["use.glsl.h"] = ("The shader, as drawn above", "Шейдер, как на картинке"),
+        ["use.glsl.p"] = ("GLSL ES 3.00 with this glass's indices and absorption baked in. Feed it a texture of what sits behind the panel and the panel size; it draws the bevel, the dome, the fringes, the sheen and the tint. Nothing in it is tuned by eye.", "GLSL ES 3.00 с зашитыми показателями и поглощением этого стекла. Дай ему текстуру того, что лежит за панелью, и размер панели; он нарисует фаску, купол, каймы, блеск и оттенок. Ничего в нём не подобрано на глаз."),
+        ["use.css.h"] = ("The CSS approximation", "CSS-приближение"),
+        ["use.css.p"] = ("CSS cannot refract, so the bend and the fringes are missing here. What it can carry is the tint, how much light gets through, and the Fresnel numbers as highlight strengths, so a card still reads as this particular glass rather than a generic blur.", "CSS не умеет преломлять, поэтому излома и кайм здесь нет. Что он может нести — оттенок, долю прошедшего света и числа Френеля как силу бликов, чтобы карточка читалась именно как это стекло, а не как размытие вообще."),
+        ["use.demo.text"] = ("Text behind the glass keeps its colour where the glass is clear and loses blue where the glass is a dense flint.", "Текст за стеклом сохраняет цвет там, где стекло прозрачно, и теряет синий там, где стекло — плотный флинт."),
+        ["use.copy"] = ("Copy", "Копировать"),
+        ["use.cs.h"] = ("The same numbers in .NET", "Те же числа в .NET"),
+        ["use.cs.p"] = ("For a renderer or a tool that computes rather than draws: the typed constant is a value type for the ray path, the catalog entry carries the absorption and the provenance.", "Для рендерера или инструмента, который считает, а не рисует: типизированная константа — значимый тип для трассировки, запись каталога несёт поглощение и источник."),
+        ["use.pick.h"] = ("Which glass to take", "Какое стекло взять"),
+        ["use.pick.p"] = ("Four that cover most interface work. Each line ends with its index, Abbe number and how much light the face returns.", "Четыре, которых хватает на большинство интерфейсных задач. В конце каждой строки — показатель, число Аббе и сколько света возвращает лицо."),
+        ["use.pick.numbers"] = ("n_d {0}, ν_d {1}, face {2}%.", "n_d {0}, ν_d {1}, лицо {2}%."),
+
         // Formulas
-        ["formulas.title"] = ("Formulas · Caustikon", "Формулы · Caustikon"),
+        ["formulas.title"] = ("Formulas — Caustikon", "Формулы — Caustikon"),
         ["formulas.h1"] = ("Formulas", "Формулы"),
         ["formulas.lede"] = ("Every equation the packages evaluate, with the conventions that make its numbers comparable to a catalog, and the type that implements it.", "Каждое уравнение, которое считают пакеты, с соглашениями, делающими его числа сравнимыми с каталогом, и типом, который его реализует."),
         ["formulas.refraction.h"] = ("Refraction", "Преломление"),
@@ -361,7 +402,7 @@ public static class Strings
         ["formulas.colour.eq1"] = ("likewise Y, Z", "аналогично Y, Z"),
 
         // About
-        ["about.title"] = ("About · Caustikon", "О проекте · Caustikon"),
+        ["about.title"] = ("About — Caustikon", "О проекте — Caustikon"),
         ["about.h1"] = ("About", "О проекте"),
         ["about.lede"] = ("Caustikon is two .NET packages and this site. The packages are the product; the site runs them in your browser so the numbers can be inspected without installing anything.", "Caustikon — это два пакета .NET и этот сайт. Продукт — пакеты; сайт запускает их в браузере, чтобы числа можно было разглядеть, ничего не устанавливая."),
         ["about.data.h"] = ("Where the data comes from", "Откуда данные"),

@@ -3,17 +3,17 @@
 
 @if (glass is null)
 {
-    <PageTitle>@L["glass.notfound.h"] · Caustikon</PageTitle>
+    <PageTitle>@L["glass.notfound.h"] — Caustikon</PageTitle>
     <h1>@L["glass.notfound.h"]</h1>
     <p>@H("glass.notfound.p", "<code>" + System.Net.WebUtility.HtmlEncode(Name) + "</code>", "<code>" + System.Net.WebUtility.HtmlEncode(Vendor) + "</code>")</p>
 }
 else
 {
-    <PageTitle>@glass.VendorDisplayName @glass.Name · Caustikon</PageTitle>
+    <PageTitle>@glass.VendorDisplayName @glass.Name — Caustikon</PageTitle>
 
     <p class="muted"><a href="catalog">@L["nav.catalog"]</a> › @glass.VendorDisplayName</p>
     <h1>@glass.Name <span class="badge">@Catalog.StatusText(L, glass.Status)</span> @if (glass.Category != "optical") { <span class="badge">@glass.Category</span> }</h1>
-    <p class="lede">@glass.VendorDisplayName · @(glass.GlassCode is null ? "" : L["glass.code"] + " " + glass.GlassCode + " · ")@T("glass.fit", glass.Formula, SiteInfo.Compact(glass.Model.MinimumWavelengthNanometers), SiteInfo.Compact(glass.Model.MaximumWavelengthNanometers))</p>
+    <p class="lede">@glass.VendorDisplayName. @(glass.GlassCode is null ? "" : L["glass.code"] + " " + glass.GlassCode + ". ")@T("glass.fit", glass.Formula, SiteInfo.Compact(glass.Model.MinimumWavelengthNanometers), SiteInfo.Compact(glass.Model.MaximumWavelengthNanometers))</p>
 
     <div class="figures">
         <div class="figure"><div class="value">@Printed(glass.CatalogIndexD, 5)</div><div class="label">@H("glass.nd", SiteInfo.Number(glass.IndexD, 5))</div></div>
@@ -62,7 +62,7 @@ else
                     <SpectrumStrip Transmittance="SpectralTransmittance" Label="@T("spectrum.glass", thickness, glass.Name)" />
                     <div class="swatch-block" style="background: @c.Hex; margin-top: 0.8rem"></div>
                     <dl class="kv">
-                        <dt>@L["glass.colour.srgb"]</dt><dd>@c.Hex · @c.Rgb8.Red, @c.Rgb8.Green, @c.Rgb8.Blue</dd>
+                        <dt>@L["glass.colour.srgb"]</dt><dd>@c.Hex, rgb(@c.Rgb8.Red, @c.Rgb8.Green, @c.Rgb8.Blue)</dd>
                         <dt>@L["glass.colour.y"]</dt><dd>@SiteInfo.Number(c.Y, 4)</dd>
                         <dt>XYZ</dt><dd>@SiteInfo.Number(c.X, 4), @SiteInfo.Number(c.Y, 4), @SiteInfo.Number(c.Z, 4)</dd>
                         <dt>@L["glass.colour.illuminant"]</dt><dd>@L["glass.colour.illuminant.v"]</dd>
@@ -98,7 +98,7 @@ else
                             <tr>
                                 <td>@label</td>
                                 <td class="num">@SiteInfo.Number(n, 5)</td>
-                                <td class="num">@((thermal.AbsoluteIndexShift(n, wavelength, temperature) * 1e6).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture)) × 10⁻⁶</td>
+                                <td class="num">@(SiteInfo.Number(thermal.AbsoluteIndexShift(n, wavelength, temperature) * 1e6, "+0.0;-0.0;0.0")) × 10⁻⁶</td>
                                 <td class="num">@SiteInfo.Number(thermal.AbsoluteSlopeAtReference(n, wavelength) * 1e6, 2)</td>
                             </tr>
                         }

@@ -276,7 +276,8 @@ public sealed class GlassRenderer
 
     private Vector3 Ground(float x, float z)
     {
-        float u = x / tileUnits, v = z / tileUnits;
+        // Half a tile of offset puts a tile centre, not a tile edge, under the solid: an edge there is magnified into a seam.
+        float u = x / tileUnits + 0.5f, v = z / tileUnits + 0.5f;
         switch (backdrop)
         {
             case Backdrop.Stripes:

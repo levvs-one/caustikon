@@ -19,6 +19,7 @@ public sealed class Locale
             }
 
             code = next;
+            SiteInfo.UseLanguage(code);
             Changed?.Invoke();
         }
     }

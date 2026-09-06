@@ -103,7 +103,8 @@ float fresnel(float cosI, float n1, float n2) {
 }
 
 vec3 ground(float x, float z) {
-    float u = x / uTile, v = z / uTile;
+    // Half a tile of offset puts a tile centre, not a tile edge, under the solid: an edge there is magnified into a seam.
+    float u = x / uTile + 0.5, v = z / uTile + 0.5;
     if (uBackdrop == 1) {
         int band = int(mod(floor(v), 5.0));
         if (band == 0) return vec3(0.80, 0.12, 0.05);
@@ -200,18 +201,40 @@ float compand(float c) {
     return c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1.0 / 2.4) - 0.055;
 }
 
+uniform vec2 uJitter;
+uniform bool uLinear;
+
 void main() {
     vec3 colour;
     if (uSamples >= 4) {
         colour = (shade(gl_FragCoord.xy + vec2(-0.25, -0.25)) + shade(gl_FragCoord.xy + vec2(0.25, -0.25))
                 + shade(gl_FragCoord.xy + vec2(-0.25, 0.25)) + shade(gl_FragCoord.xy + vec2(0.25, 0.25))) * 0.25;
     } else {
-        colour = shade(gl_FragCoord.xy);
+        colour = shade(gl_FragCoord.xy + uJitter);
     }
-    outColour = vec4(compand(colour.r), compand(colour.g), compand(colour.b), 1.0);
+    outColour = uLinear ? vec4(colour, 1.0) : vec4(compand(colour.r), compand(colour.g), compand(colour.b), 1.0);
+}`;
+
+    // Shows the running average of the accumulated samples, companded to sRGB.
+    const RESOLVE = `#version 300 es
+precision highp float;
+out vec4 outColour;
+uniform sampler2D uAccum;
+uniform float uCount;
+float compand(float c) {
+    c = clamp(c, 0.0, 1.0);
+    return c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1.0 / 2.4) - 0.055;
+}
+void main() {
+    vec3 c = texelFetch(uAccum, ivec2(gl_FragCoord.xy), 0).rgb / uCount;
+    outColour = vec4(compand(c.r), compand(c.g), compand(c.b), 1.0);
 }`;
 
     const views = new Map();
+    const STILL_SAMPLES = 64;
+    const DEFAULT_PITCH = Math.atan2(0.7, 3.6);
+    const DEFAULT_DISTANCE = Math.hypot(0.7, 3.6);
+    const TAN_HALF = Math.tan(30 * Math.PI / 360);
 
     function compile(gl, type, source) {
         const shader = gl.createShader(type);
@@ -225,24 +248,33 @@ void main() {
         return shader;
     }
 
+    function link(gl, fragment) {
+        const program = gl.createProgram();
+        gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, VERTEX));
+        gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, fragment));
+        gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            throw new Error(gl.getProgramInfoLog(program));
+        }
+        return program;
+    }
+
     function setup(canvas) {
         const gl = canvas.getContext("webgl2", { antialias: false, alpha: false, preserveDrawingBuffer: true });
         if (!gl) {
             return null;
         }
-        const program = gl.createProgram();
-        gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, VERTEX));
-        gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, FRAGMENT));
-        gl.linkProgram(program);
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            throw new Error(gl.getProgramInfoLog(program));
-        }
-        gl.useProgram(program);
+        const program = link(gl, FRAGMENT);
         const u = name => gl.getUniformLocation(program, name);
+        // Accumulating many jittered samples needs a float render target; without the extension the still image
+        // falls back to four fixed samples per pixel in one pass.
+        const floatTargets = !!gl.getExtension("EXT_color_buffer_float");
         const view = {
             canvas, gl, program,
+            resolve: floatTargets ? link(gl, RESOLVE) : null,
+            floatTargets,
             loc: {
-                resolution: u("uResolution"), samples: u("uSamples"),
+                resolution: u("uResolution"), samples: u("uSamples"), jitter: u("uJitter"), linear: u("uLinear"),
                 eye: u("uEye"), forward: u("uForward"), right: u("uRight"), up: u("uUp"), tanHalf: u("uTanHalf"),
                 sphere: u("uSphere"), centre: u("uCentre"), planeCount: u("uPlaneCount"), planes: u("uPlanes"),
                 index: u("uIndex"), weight: u("uWeight"), alpha: u("uAlpha"), mmPerUnit: u("uMmPerUnit"),
@@ -250,14 +282,38 @@ void main() {
                 keyIntensity: u("uKeyIntensity"), ambient: u("uAmbient"),
             },
             scene: null,
+            accum: null, fbo: null, accumWidth: 0, accumHeight: 0, count: 0,
             // Camera: the default matches the CPU renderer's fixed eye at (0, 0.55, -3.6) looking at (0, -0.15, 0).
-            yaw: 0, pitch: Math.atan2(0.7, 3.6), distance: Math.hypot(0.7, 3.6),
+            yaw: 0, pitch: DEFAULT_PITCH, distance: DEFAULT_DISTANCE,
             target: [0, -0.15, 0],
             dragging: false, lastX: 0, lastY: 0,
-            frame: 0, fineTimer: 0, lastMs: 0,
+            frame: 0, fallback: 0, lastMs: 0, mode: "still",
         };
+        if (view.resolve) {
+            view.resolveLoc = { accum: gl.getUniformLocation(view.resolve, "uAccum"), count: gl.getUniformLocation(view.resolve, "uCount") };
+        }
         attach(view);
         return view;
+    }
+
+    function camera(view) {
+        const cp = Math.cos(view.pitch), sp = Math.sin(view.pitch), cy = Math.cos(view.yaw), sy = Math.sin(view.yaw);
+        const t = view.target;
+        const eye = [t[0] + view.distance * sy * cp, t[1] + view.distance * sp, t[2] - view.distance * cy * cp];
+        const forward = normalize([t[0] - eye[0], t[1] - eye[1], t[2] - eye[2]]);
+        const right = normalize(cross([0, 1, 0], forward));
+        const up = cross(forward, right);
+        return { eye, forward, right, up };
+    }
+
+    // The world-space direction through a point on the canvas, in CSS pixels from its top-left corner.
+    function rayThrough(view, px, py) {
+        const { forward, right, up } = camera(view);
+        const w = view.canvas.clientWidth, h = view.canvas.clientHeight;
+        const aspect = w / h;
+        const sx = (px / w * 2 - 1) * TAN_HALF * aspect;
+        const sy = (1 - py / h * 2) * TAN_HALF;
+        return normalize([forward[0] + right[0] * sx + up[0] * sy, forward[1] + right[1] * sx + up[1] * sy, forward[2] + right[2] * sx + up[2] * sy]);
     }
 
     function attach(view) {
@@ -276,31 +332,43 @@ void main() {
             view.lastY = e.clientY;
             view.yaw -= dx * 0.008;
             view.pitch = Math.min(1.45, Math.max(0.02, view.pitch + dy * 0.008));
-            request(view, 1);
+            request(view, "moving");
         });
         const stop = () => {
             if (!view.dragging) return;
             view.dragging = false;
-            request(view, 4);
+            request(view, "still");
         };
         c.addEventListener("pointerup", stop);
         c.addEventListener("pointercancel", stop);
         c.addEventListener("wheel", e => {
             if (!(e.ctrlKey || e.metaKey)) return;
             e.preventDefault();
-            view.distance = Math.min(9, Math.max(1.5, view.distance * Math.exp(e.deltaY * 0.0012)));
-            request(view, 1);
-            clearTimeout(view.fineTimer);
-            view.fineTimer = setTimeout(() => request(view, 4), 160);
+            // Dolly toward the point under the cursor: the eye slides along that ray and the target follows,
+            // so whatever the cursor is on stays under it while the view closes in.
+            const factor = Math.exp(e.deltaY * 0.0012);
+            const next = Math.min(9, Math.max(1.2, view.distance * factor));
+            const f = next / view.distance;
+            const rect = c.getBoundingClientRect();
+            const dir = rayThrough(view, e.clientX - rect.left, e.clientY - rect.top);
+            const { eye, forward } = camera(view);
+            const move = view.distance * (1 - f);
+            const eye2 = [eye[0] + dir[0] * move, eye[1] + dir[1] * move, eye[2] + dir[2] * move];
+            view.target = [eye2[0] + forward[0] * next, eye2[1] + forward[1] * next, eye2[2] + forward[2] * next];
+            view.distance = next;
+            request(view, "moving");
+            clearTimeout(view.settle);
+            view.settle = setTimeout(() => request(view, "still"), 160);
         }, { passive: false });
         c.addEventListener("dblclick", () => {
             view.yaw = 0;
-            view.pitch = Math.atan2(0.7, 3.6);
-            view.distance = Math.hypot(0.7, 3.6);
-            request(view, 4);
+            view.pitch = DEFAULT_PITCH;
+            view.distance = DEFAULT_DISTANCE;
+            view.target = [0, -0.15, 0];
+            request(view, "still");
         });
         if (typeof ResizeObserver !== "undefined") {
-            new ResizeObserver(() => request(view, 4)).observe(c);
+            new ResizeObserver(() => request(view, "still")).observe(c);
         }
     }
 
@@ -316,48 +384,122 @@ void main() {
     }
 
     // One draw per animation frame; a timer stands in when the tab is hidden and frames do not come.
-    function request(view, samples) {
-        view.pendingSamples = Math.max(view.pendingSamples || 0, samples);
+    // "moving": one quick sample. "still": start accumulating from scratch. "continue": add one more sample.
+    function request(view, mode) {
+        if (mode !== "continue") {
+            view.mode = mode;
+            view.count = 0;
+        }
         if (view.frame) return;
         const run = () => {
             if (!view.frame) return;
             cancelAnimationFrame(view.frame);
             clearTimeout(view.fallback);
             view.frame = 0;
-            const s = view.pendingSamples;
-            view.pendingSamples = 0;
-            draw(view, s);
+            draw(view);
         };
         view.frame = requestAnimationFrame(run);
         view.fallback = setTimeout(run, 250);
     }
 
-    function draw(view, samples) {
-        if (!view.scene) return;
+    function ensureAccum(view) {
+        const { gl } = view;
+        const w = view.canvas.width, h = view.canvas.height;
+        if (view.accum && view.accumWidth === w && view.accumHeight === h) return;
+        if (view.accum) {
+            gl.deleteTexture(view.accum);
+            gl.deleteFramebuffer(view.fbo);
+        }
+        view.accum = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, view.accum);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        view.fbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, view.fbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, view.accum, 0);
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+            view.floatTargets = false;
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        view.accumWidth = w;
+        view.accumHeight = h;
+        view.count = 0;
+    }
+
+    function setCamera(view) {
         const { gl, loc } = view;
-        fit(view);
-        gl.viewport(0, 0, view.canvas.width, view.canvas.height);
-        const cp = Math.cos(view.pitch), sp = Math.sin(view.pitch), cy = Math.cos(view.yaw), sy = Math.sin(view.yaw);
-        const t = view.target;
-        const eye = [t[0] + view.distance * sy * cp, t[1] + view.distance * sp, t[2] - view.distance * cy * cp];
-        const forward = normalize([t[0] - eye[0], t[1] - eye[1], t[2] - eye[2]]);
-        const right = normalize(cross([0, 1, 0], forward));
-        const up = cross(forward, right);
+        const { eye, forward, right, up } = camera(view);
         gl.uniform2f(loc.resolution, view.canvas.width, view.canvas.height);
-        gl.uniform1i(loc.samples, samples);
         gl.uniform3fv(loc.eye, eye);
         gl.uniform3fv(loc.forward, forward);
         gl.uniform3fv(loc.right, right);
         gl.uniform3fv(loc.up, up);
-        gl.uniform1f(loc.tanHalf, Math.tan(30 * Math.PI / 360));
+        gl.uniform1f(loc.tanHalf, TAN_HALF);
+    }
+
+    function draw(view) {
+        if (!view.scene) return;
+        const { gl, loc } = view;
+        fit(view);
+        const w = view.canvas.width, h = view.canvas.height;
+        gl.useProgram(view.program);
+        setCamera(view);
         const started = performance.now();
+
+        if (view.mode === "moving" || !view.floatTargets) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.viewport(0, 0, w, h);
+            gl.disable(gl.BLEND);
+            gl.uniform1i(loc.samples, view.mode === "moving" ? 1 : 4);
+            gl.uniform2f(loc.jitter, 0, 0);
+            gl.uniform1i(loc.linear, 0);
+            gl.drawArrays(gl.TRIANGLES, 0, 3);
+            view.lastMs = performance.now() - started;
+            return;
+        }
+
+        ensureAccum(view);
+        if (!view.floatTargets) {
+            draw(view);
+            return;
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, view.fbo);
+        gl.viewport(0, 0, w, h);
+        if (view.count === 0) {
+            gl.disable(gl.BLEND);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE);
+        gl.uniform1i(loc.samples, 1);
+        gl.uniform2f(loc.jitter, Math.random() - 0.5, Math.random() - 0.5);
+        gl.uniform1i(loc.linear, 1);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
+        view.count++;
+
+        gl.disable(gl.BLEND);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, w, h);
+        gl.useProgram(view.resolve);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, view.accum);
+        gl.uniform1i(view.resolveLoc.accum, 0);
+        gl.uniform1f(view.resolveLoc.count, view.count);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.useProgram(view.program);
         view.lastMs = performance.now() - started;
+
+        if (view.count < STILL_SAMPLES) {
+            request(view, "continue");
+        }
     }
 
     function upload(view, scene) {
         const { gl, loc } = view;
         view.scene = scene;
+        gl.useProgram(view.program);
         gl.uniform1i(loc.sphere, scene.sphere ? 1 : 0);
         gl.uniform3fv(loc.centre, scene.centre);
         gl.uniform1i(loc.planeCount, scene.planeCount);
@@ -404,14 +546,14 @@ void main() {
                 views.set(canvas, view);
             }
             upload(view, scene);
-            request(view, 4);
+            request(view, "still");
             return true;
         },
-        // What the canvas is currently drawing at: backing width, height, and the last frame's time in ms.
+        // Backing width and height, the last frame's time in ms, and how many samples per pixel the picture holds.
         stats(id) {
             const canvas = document.getElementById(id);
             const view = canvas && views.get(canvas);
-            return view ? [view.canvas.width, view.canvas.height, view.lastMs] : [0, 0, 0];
+            return view ? [view.canvas.width, view.canvas.height, view.lastMs, view.floatTargets ? view.count : 4] : [0, 0, 0, 0];
         },
     };
 })();

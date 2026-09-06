@@ -1,0 +1,57 @@
+@using Caustikon.Site.Localization
+@inject Locale L
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@* "Give Me!" with an arrow: one entry per craft, each leading to its own page of methods, advice, examples and code. *@
+<div class="give @(open ? "open" : "")">
+    <button class="give-button" @onclick="Toggle" aria-haspopup="menu" aria-expanded="@open">
+        <span>@L["nav.give"]</span>
+        <svg class="chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+    </button>
+    @if (open)
+    {
+        <ul class="give-list" role="menu">
+            @foreach ((string slug, string key) in Give.Topics)
+            {
+                <li role="menuitem" @onclick="() => Go(slug)">
+                    <strong>@L["give." + key + ".name"]</strong>
+                    <span>@L["give." + key + ".tag"]</span>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private bool open;
+
+    protected override void OnInitialized()
+    {
+        L.Changed += StateHasChanged;
+        Navigation.LocationChanged += OnMoved;
+    }
+
+    private void Toggle() => open = !open;
+
+    private void Go(string slug)
+    {
+        open = false;
+        Navigation.NavigateTo("give/" + slug);
+    }
+
+    private void OnMoved(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        if (open)
+        {
+            open = false;
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        L.Changed -= StateHasChanged;
+        Navigation.LocationChanged -= OnMoved;
+    }
+}

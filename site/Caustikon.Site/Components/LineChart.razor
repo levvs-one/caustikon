@@ -151,7 +151,7 @@
         return ([.. ticks], decimals);
     }
 
-    private static string FormatTick(double value, int decimals) => value.ToString("F" + decimals, CultureInfo.InvariantCulture);
+    private static string FormatTick(double value, int decimals) => SiteInfo.Number(value, decimals);
 
     private static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 

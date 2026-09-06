@@ -217,7 +217,7 @@
                         travel = Math.Clamp(travel, 0.05, 6);
                         Vector2 end = hit + outDir * (float)travel;
                         double deviation = Math.Acos(Math.Clamp(Vector2.Dot(incident, outDir), -1, 1)) * 180 / Math.PI;
-                        AppendSegment(s, hit, end, colour, outWeight, $"{wavelength:0.#} nm · n {nGlass:0.00000} · {deviation:0.000}° · {outWeight * 100:0.0}%");
+                        AppendSegment(s, hit, end, colour, outWeight, $"{SiteInfo.Number(wavelength, "0.#")} nm, n {SiteInfo.Number(nGlass, 5)}, {SiteInfo.Number(deviation, 3)}°, {SiteInfo.Number(outWeight * 100, 1)}%");
                         if (outDir.X > 1e-6 && Math.Abs(end.X - screenX) < 1e-3)
                         {
                             Vector2 p = P(end);

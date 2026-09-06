@@ -49,13 +49,13 @@
         foreach (double tick in xTicks)
         {
             b.Append("<line class=\"grid\" x1=\"").Append(F(X(tick))).Append("\" x2=\"").Append(F(X(tick))).Append("\" y1=\"").Append(F(Top)).Append("\" y2=\"").Append(F(Bottom)).Append("\"/>");
-            b.Append("<text x=\"").Append(F(X(tick))).Append("\" y=\"").Append(F(Bottom + 16)).Append("\" text-anchor=\"middle\">").Append(tick.ToString("0", CultureInfo.InvariantCulture)).Append("</text>");
+            b.Append("<text x=\"").Append(F(X(tick))).Append("\" y=\"").Append(F(Bottom + 16)).Append("\" text-anchor=\"middle\">").Append(SiteInfo.Number(tick, 0)).Append("</text>");
         }
 
         foreach (double tick in yTicks)
         {
             b.Append("<line class=\"grid\" x1=\"").Append(F(Left)).Append("\" x2=\"").Append(F(Right)).Append("\" y1=\"").Append(F(Y(tick))).Append("\" y2=\"").Append(F(Y(tick))).Append("\"/>");
-            b.Append("<text x=\"").Append(F(Left - 8)).Append("\" y=\"").Append(F(Y(tick) + 4)).Append("\" text-anchor=\"end\">").Append(tick.ToString("0.00", CultureInfo.InvariantCulture)).Append("</text>");
+            b.Append("<text x=\"").Append(F(Left - 8)).Append("\" y=\"").Append(F(Y(tick) + 4)).Append("\" text-anchor=\"end\">").Append(SiteInfo.Number(tick, 2)).Append("</text>");
         }
 
         b.Append("<line class=\"axis\" x1=\"").Append(F(Left)).Append("\" x2=\"").Append(F(Right)).Append("\" y1=\"").Append(F(Bottom)).Append("\" y2=\"").Append(F(Bottom)).Append("\"/>");

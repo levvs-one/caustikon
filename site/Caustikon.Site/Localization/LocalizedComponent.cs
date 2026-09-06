@@ -11,7 +11,7 @@ public abstract class LocalizedComponent : ComponentBase
     [CascadingParameter(Name = "Lang")] public string Lang { get; set; } = "en";
 
     /// <summary>The string for <paramref name="key"/> with <paramref name="args"/> substituted.</summary>
-    protected string T(string key, params object[] args) => args.Length == 0 ? L[key] : string.Format(CultureInfo.InvariantCulture, L[key], args);
+    protected string T(string key, params object[] args) => args.Length == 0 ? L[key] : string.Format(SiteInfo.Format, L[key], args);
 
     /// <summary>The string for <paramref name="key"/> with <paramref name="args"/> substituted, rendered as the site's own markup.</summary>
     protected MarkupString H(string key, params object[] args) => new(T(key, args));

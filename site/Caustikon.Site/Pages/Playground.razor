@@ -87,7 +87,7 @@
                 <SpectrumStrip Transmittance="SlabTransmittance" Label="@T("spectrum.slab", thickness)" />
                 <div class="swatch-block" style="background: @c.Hex; margin-top: 0.8rem"></div>
                 <dl class="kv">
-                    <dt>@L["play.slab.colour"]</dt><dd>@c.Hex · @c.Rgb8.Red, @c.Rgb8.Green, @c.Rgb8.Blue</dd>
+                    <dt>@L["play.slab.colour"]</dt><dd>@c.Hex, rgb(@c.Rgb8.Red, @c.Rgb8.Green, @c.Rgb8.Blue)</dd>
                     <dt>@L["play.slab.y"]</dt><dd>@SiteInfo.Number(c.Y, 4)</dd>
                     <dt>@L["play.slab.path"]</dt><dd>@SiteInfo.Number(pathLength, 2) mm</dd>
                 </dl>
