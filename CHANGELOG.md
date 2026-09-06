@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `Caustikon.Glasses` gains a `Liquids` vendor: water (Daimon and Masumura 2007 fit, Hale and Querry 1973 absorption), ethanol, methanol, acetone, glycerol, ethylene glycol, benzene, toluene and carbon disulfide, from the database's material measurements. Their catalog `nd` and `Vd` are the fit's own values and the provenance says so.
+
 All notable changes to Caustikon are recorded here.
 
 ## Unreleased

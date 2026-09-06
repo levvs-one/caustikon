@@ -1,6 +1,6 @@
 # Caustikon.Glasses
 
-Optical glass catalog for [Caustikon](https://github.com/levvs-one/caustikon): 1646 glasses
+Optical glass catalog for [Caustikon](https://github.com/levvs-one/caustikon): 1646 manufacturer glasses and nine liquids
 from SCHOTT, OHARA, HOYA, CDGM, HIKARI, SUMITA and others, each with its dispersion model,
 tabulated absorption, temperature coefficients where the manufacturer publishes them, and a
 record of where every number came from.

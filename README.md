@@ -4,7 +4,8 @@ Geometric optics for .NET, with the glass included.
 
 `Caustikon` is the mathematics: vector refraction, exact Fresnel power reflectance, Schlick's
 approximation, and dispersion models as allocation-free value types. `Caustikon.Glasses` is a
-catalog of 1646 manufacturer glasses from SCHOTT, OHARA, HOYA, CDGM, HIKARI, SUMITA and others,
+catalog of 1646 manufacturer glasses from SCHOTT, OHARA, HOYA, CDGM, HIKARI, SUMITA and others, plus nine
+liquids (water, ethanol, glycerol, benzene and more) from published measurements,
 each with its dispersion fit, tabulated absorption, temperature coefficients where published,
 and a citation for every number. Both target .NET 8 and .NET 10 with no dependencies outside
 the base class library.

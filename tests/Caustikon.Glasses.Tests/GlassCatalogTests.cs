@@ -89,7 +89,7 @@ public sealed class GlassCatalogTests
             Assert.IsTrue(provenance.Source.Contains("CC0", StringComparison.Ordinal), glass.Name);
             Assert.IsFalse(string.IsNullOrWhiteSpace(provenance.Citation), glass.Name);
             Assert.IsFalse(string.IsNullOrWhiteSpace(provenance.Path), glass.Name);
-            Assert.IsTrue(provenance.Path!.StartsWith("data/specs/" + glass.Vendor + "/", StringComparison.Ordinal), provenance.Path);
+            Assert.IsTrue(provenance.Path!.StartsWith(glass.Vendor == "liquids" ? "data/" : "data/specs/" + glass.Vendor + "/", StringComparison.Ordinal), provenance.Path);
             Assert.AreEqual(new DateOnly(2026, 9, 5), provenance.RetrievedOn, glass.Name);
             Assert.AreNotEqual(DispersionFormula.Unspecified, glass.Formula, glass.Name);
         }

@@ -17,6 +17,7 @@ public static partial class GlassCatalog
         Schott.Entries,
         Sumita.Entries,
         Vitron.Entries,
+        Liquids.Entries,
     ];
 
     private static readonly string[] VendorKeys =
@@ -30,5 +31,6 @@ public static partial class GlassCatalog
         "schott",
         "sumita",
         "vitron",
+        "liquids",
     ];
 }

@@ -2,7 +2,7 @@
   "source": "RefractiveIndex.INFO database (https://github.com/polyanskiy/refractiveindex.info-database), CC0 1.0 Universal",
   "databaseCommit": "c5c2f18",
   "retrievedOn": "2026-09-05",
-  "glassCount": 1646,
+  "glassCount": 1655,
   "vendors": [
     {
       "vendor": "ami",
@@ -102,6 +102,17 @@
       "withExtinction": 5,
       "withThermal": 0,
       "withCatalogIndexAndAbbe": 0
+    },
+    {
+      "vendor": "liquids",
+      "displayName": "Liquids",
+      "glassCount": 9,
+      "sellmeier": 5,
+      "polynomial": 3,
+      "cauchy": 1,
+      "withExtinction": 5,
+      "withThermal": 0,
+      "withCatalogIndexAndAbbe": 9
     }
   ],
   "maxAbsoluteIndexDDeviation": 0.0004930968347025555,

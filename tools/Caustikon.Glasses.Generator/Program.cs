@@ -70,6 +70,62 @@ foreach (string vendorDirectory in Directory.GetDirectories(specs).OrderBy(stati
     }
 }
 
+// Liquids come from the database's material entries rather than a manufacturer catalog: one reference for the
+// dispersion formula and, where a separate measurement gives it, one for the tabulated k. Each pick is the entry
+// with a closed-form fit covering the visible range; the file names carry the reference.
+LiquidSpec[] liquids =
+[
+    new("Water", "main/H2O/nk/Daimon-20.0C.yml", "main/H2O/nk/Hale.yml"),
+    new("Ethanol", "organic/C2H6O - ethanol/nk/Sani-formula.yml", null),
+    new("Methanol", "organic/CH4O - methanol/nk/Moutzouris.yml", null),
+    new("Acetone", "organic/C3H6O - acetone/nk/Chang.yml", null),
+    new("Glycerol", "organic/C3H8O3 - glycerol/nk/Gupta.yml", "organic/C3H8O3 - glycerol/nk/Wang.yml"),
+    new("Ethylene glycol", "organic/C2H6O2 - ethylene glycol/nk/Sani-formula.yml", null),
+    new("Benzene", "organic/C6H6 - benzene/nk/Moutzouris.yml", null),
+    new("Toluene", "organic/C7H8 - toluene/nk/Moutzouris.yml", "organic/C7H8 - toluene/nk/Kedenburg.yml"),
+    new("Carbon disulfide", "main/CS2/nk/Chang.yml", null),
+];
+List<GlassEntry> liquidEntries = [];
+foreach (LiquidSpec liquid in liquids)
+{
+    string file = Path.Combine(database, "data", liquid.FormulaPath);
+    string relative = "data/" + liquid.FormulaPath;
+    try
+    {
+        GlassEntry? entry = ReadEntry(file, relative, "liquids", yaml, source, retrieved, out string? skipReason, liquid.Name);
+        if (entry is null)
+        {
+            skipped.Add(new SkippedEntry(relative, skipReason ?? "unspecified"));
+            continue;
+        }
+
+        if (entry.Extinction is null && liquid.ExtinctionPath is not null)
+        {
+            string kFile = Path.Combine(database, "data", liquid.ExtinctionPath);
+            (ExtinctionTable? table, string kCitation) = ReadExtinctionFile(kFile, yaml);
+            if (table is not null)
+            {
+                entry = entry with
+                {
+                    Extinction = table,
+                    Provenance = entry.Provenance with { Notes = Append(entry.Provenance.Notes, "Extinction k from data/" + liquid.ExtinctionPath + ": " + kCitation + ".") },
+                };
+            }
+        }
+
+        liquidEntries.Add(entry);
+    }
+    catch (Exception exception) when (exception is InvalidOperationException or FormatException or ArgumentException or YamlDotNet.Core.YamlException)
+    {
+        skipped.Add(new SkippedEntry(relative, "unreadable: " + exception.Message));
+    }
+}
+
+if (liquidEntries.Count > 0)
+{
+    vendors.Add(new VendorOutput("liquids", VendorDisplayName("liquids"), VendorClassName("liquids"), liquidEntries));
+}
+
 AssignIdentifiers(vendors);
 
 string dataDirectory = Path.Combine(repository, "data", "glasses");
@@ -113,7 +169,7 @@ foreach (VendorSummary summary in manifest.Vendors)
 
 return 0;
 
-static GlassEntry? ReadEntry(string file, string relativePath, string vendorKey, IDeserializer yaml, string source, DateOnly retrieved, out string? skipReason)
+static GlassEntry? ReadEntry(string file, string relativePath, string vendorKey, IDeserializer yaml, string source, DateOnly retrieved, out string? skipReason, string? nameOverride = null)
 {
     skipReason = null;
     // Source files use CRLF and sometimes leave an empty literal block ("COMMENTS: |") holding only spaces, which the
@@ -142,7 +198,7 @@ static GlassEntry? ReadEntry(string file, string relativePath, string vendorKey,
         {
             formulaBlock ??= block;
         }
-        else if (type == "tabulated k")
+        else if (type is "tabulated k" or "tabulated nk")
         {
             extinctionBlock ??= block;
         }
@@ -229,8 +285,8 @@ static GlassEntry? ReadEntry(string file, string relativePath, string vendorKey,
         return null;
     }
 
-    string name = Path.GetFileNameWithoutExtension(file);
-    string category = CategoryOf(relativePath, vendorKey);
+    string name = nameOverride ?? Path.GetFileNameWithoutExtension(file);
+    string category = vendorKey == "liquids" ? "liquid" : CategoryOf(relativePath, vendorKey);
 
     (string citation, Uri? url) = ParseReferences(document.GetValueOrDefault("REFERENCES") as string);
     double? temperature = null;
@@ -290,7 +346,19 @@ static GlassEntry? ReadEntry(string file, string relativePath, string vendorKey,
     ExtinctionTable? extinction = null;
     if (extinctionBlock?.GetValueOrDefault("data") is string extinctionText)
     {
-        extinction = ParseExtinction(extinctionText);
+        extinction = ParseExtinction(extinctionText, (string)extinctionBlock["type"] == "tabulated nk" ? 2 : 1);
+    }
+
+    // A liquid has no datasheet: the catalog values are the fit's own, and the record says so.
+    if (vendorKey == "liquids" && nd is null)
+    {
+        double? fittedNd = Evaluate(model, 587.5618d), fittedNf = Evaluate(model, 486.1327d), fittedNc = Evaluate(model, 656.2725d);
+        if (fittedNd is { } d0 && fittedNf is { } f0 && fittedNc is { } c0)
+        {
+            nd = Math.Round(d0, 5);
+            vd = Math.Round((d0 - 1d) / (f0 - c0), 2);
+            notes = Append(notes, "No printed nd or Vd: the catalog values are evaluated from the fit at the d, F and C lines.");
+        }
     }
 
     if (status.Length == 0 && category == "obsolete")
@@ -362,21 +430,43 @@ static (string Citation, Uri? Url) ParseReferences(string? references)
     return (text.Length == 0 ? "Not cited by the source entry" : text, url);
 }
 
-static ExtinctionTable? ParseExtinction(string text)
+static ExtinctionTable? ParseExtinction(string text, int column = 1)
 {
     SortedDictionary<double, double> samples = [];
     foreach (string line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
     {
         double[] values = ParseNumbers(line);
-        if (values.Length < 2 || !double.IsFinite(values[0]) || values[0] <= 0d || !double.IsFinite(values[1]) || values[1] < 0d)
+        if (values.Length <= column || !double.IsFinite(values[0]) || values[0] <= 0d || !double.IsFinite(values[column]) || values[column] < 0d)
         {
             continue;
         }
 
-        samples[values[0] * 1000d] = values[1];
+        samples[values[0] * 1000d] = values[column];
     }
 
     return samples.Count >= 2 ? new ExtinctionTable([.. samples.Keys], [.. samples.Values]) : null;
+}
+
+// The k table of a measurement that is not the one the dispersion fit came from, with its citation.
+static (ExtinctionTable? Table, string Citation) ReadExtinctionFile(string file, IDeserializer yaml)
+{
+    string text = Regex.Replace(File.ReadAllText(file).Replace("\r\n", "\n", StringComparison.Ordinal), "[ \t]+$", "", RegexOptions.Multiline);
+    Dictionary<object, object> document = yaml.Deserialize<Dictionary<object, object>>(text);
+    (string citation, _) = ParseReferences(document.GetValueOrDefault("REFERENCES") as string);
+    if (document.GetValueOrDefault("DATA") is not List<object> data)
+    {
+        return (null, citation);
+    }
+
+    foreach (object item in data)
+    {
+        if (item is Dictionary<object, object> block && block.GetValueOrDefault("type") is string type && type is "tabulated k" or "tabulated nk" && block.GetValueOrDefault("data") is string body)
+        {
+            return (ParseExtinction(body, type == "tabulated nk" ? 2 : 1), citation);
+        }
+    }
+
+    return (null, citation);
 }
 
 static void AssignIdentifiers(List<VendorOutput> vendors)
@@ -444,6 +534,7 @@ static string VendorDisplayName(string key) => key switch
     "lightpath" => "LightPath",
     "nsg" => "NSG",
     "barberini" => "Barberini",
+    "liquids" => "Liquids",
     _ => key.ToUpperInvariant(),
 };
 
@@ -734,6 +825,8 @@ enum DispersionForm
 }
 
 sealed record VendorOutput(string Key, string DisplayName, string ClassName, List<GlassEntry> Entries);
+
+sealed record LiquidSpec(string Name, string FormulaPath, string? ExtinctionPath);
 
 sealed record ThermalCoefficients(double D0, double D1, double D2, double E0, double E1, double LambdaTkUm);
 
