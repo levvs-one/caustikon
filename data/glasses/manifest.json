@@ -110,7 +110,7 @@
       "sellmeier": 5,
       "polynomial": 3,
       "cauchy": 1,
-      "withExtinction": 5,
+      "withExtinction": 4,
       "withThermal": 0,
       "withCatalogIndexAndAbbe": 9
     }

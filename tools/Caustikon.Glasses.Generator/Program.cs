@@ -79,7 +79,7 @@ LiquidSpec[] liquids =
     new("Ethanol", "organic/C2H6O - ethanol/nk/Sani-formula.yml", null),
     new("Methanol", "organic/CH4O - methanol/nk/Moutzouris.yml", null),
     new("Acetone", "organic/C3H6O - acetone/nk/Chang.yml", null),
-    new("Glycerol", "organic/C3H8O3 - glycerol/nk/Gupta.yml", "organic/C3H8O3 - glycerol/nk/Wang.yml"),
+    new("Glycerol", "organic/C3H8O3 - glycerol/nk/Gupta.yml", null),   // Wang's k table starts at 1200 nm: nothing in it is visible
     new("Ethylene glycol", "organic/C2H6O2 - ethylene glycol/nk/Sani-formula.yml", null),
     new("Benzene", "organic/C6H6 - benzene/nk/Moutzouris.yml", null),
     new("Toluene", "organic/C7H8 - toluene/nk/Moutzouris.yml", "organic/C7H8 - toluene/nk/Kedenburg.yml"),
