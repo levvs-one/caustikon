@@ -1,158 +1,291 @@
 @using System.Numerics
-@* White light through an equilateral prism of a real glass. Every ray is traced with Dielectric.RefractUnit at its own
-   wavelength, coloured by the CIE observer, and composited additively so overlapping rays add up to white like light does. *@
+@inject IJSRuntime Js
+@* White light through a polygon of a real glass. Every ray is traced edge by edge with Dielectric.RefractUnit at its own
+   wavelength, reflected inside where the exit angle is beyond critical, coloured by the CIE observer, and composited
+   additively so overlapping rays add up to white like light does. The polygon can be anything the caller supplies. *@
 
-<div class="bench">
+<div class="bench @(Drawing ? "drawing" : "")" @onclick="OnClick">
     @((MarkupString)svg)
 </div>
 
 @code {
     [Parameter, EditorRequired] public Glass Glass { get; set; } = default!;
-    [Parameter] public double IncidenceDegrees { get; set; } = 50;
+    [Parameter] public IReadOnlyList<Vector2> Vertices { get; set; } = [];
+    [Parameter] public double BeamAngleDegrees { get; set; } = 20;
+    [Parameter] public double BeamHeight { get; set; } = 0.15;
     [Parameter] public int RayCount { get; set; } = 61;
+    [Parameter] public bool Drawing { get; set; }
+    [Parameter] public EventCallback<Vector2> PointAdded { get; set; }
+    [Parameter] public EventCallback<PrismScene> Traced { get; set; }
 
-    private const double W = 1000, H = 520;
+    private (double, double, int) reported = (double.NaN, double.NaN, -1);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The parent shows this scene's numbers; tell it when they change, after the trace that produced them has rendered.
+        (double, double, int) current = (MinimumDeviation, MaximumDeviation, RaysThatExit);
+        if (!Same(current, reported))
+        {
+            reported = current;
+            await Traced.InvokeAsync(this);
+        }
+    }
+
+    private static bool Same((double Min, double Max, int Exits) a, (double Min, double Max, int Exits) b) =>
+        a.Exits == b.Exits && (a.Min.Equals(b.Min) || (double.IsNaN(a.Min) && double.IsNaN(b.Min))) && (a.Max.Equals(b.Max) || (double.IsNaN(a.Max) && double.IsNaN(b.Max)));
+
+    private const double W = 1000, H = 520, Scale = 300;
+    private static readonly Vector2 Origin = new(300, 440);
+    private const string SvgId = "bench-svg";
     private string svg = "";
 
     public double MinimumDeviation { get; private set; } = double.NaN;
     public double MaximumDeviation { get; private set; } = double.NaN;
     public double SpreadDegrees => MaximumDeviation - MinimumDeviation;
-
-    /// <summary>Height of the visible spectrum on a screen one meter from the exit face, in millimeters.</summary>
-    public double SpectrumMillimetersAtOneMeter => 1000 * Math.Tan(SpreadDegrees * Math.PI / 180);
+    public double SpectrumMillimetersAtOneMeter => double.IsNaN(SpreadDegrees) ? double.NaN : 1000d * Math.Tan(SpreadDegrees * Math.PI / 180d);
+    public int RaysThatExit { get; private set; }
 
     protected override void OnParametersSet()
     {
-        // Prism in scene units: equilateral, side 1, apex up. Scene scale and placement chosen so the fan fits.
-        const double scale = 300;
-        const float screenX = 2.05f; // a screen 1.55 prism-sides to the right of the prism base's right corner
-        Vector2 origin = new(250, 400);
-        Vector2 a = new(0, 0), b = new(1, 0), c = new(0.5f, MathF.Sqrt(3) / 2);
-        Vector2[] vertices = [a, b, c];
-
-        // Entry point on the left face at 55 % of the way up; the incident direction makes IncidenceDegrees with that face's normal.
-        Vector2 entry = a + (c - a) * 0.55f;
-        Vector2 leftNormal = OutwardNormal(vertices, 2); // edge c→a
-        double theta = IncidenceDegrees * Math.PI / 180;
-        // Rotate the inward normal by theta toward the apex side so the beam comes from lower-left.
-        Vector2 inward = -leftNormal;
-        Vector2 incident = Rotate(inward, theta);
-        Vector2 source = entry - incident * 1.2f;
+        Vector2[] vertices = [.. Vertices];
+        double angle = BeamAngleDegrees * Math.PI / 180;
+        Vector2 incident = new((float)Math.Cos(angle), (float)Math.Sin(angle));
+        Vector2 source = new(-0.75f, (float)BeamHeight);
 
         System.Text.StringBuilder s = new();
-        s.Append("<svg class=\"prism\" viewBox=\"0 0 ").Append(F(W)).Append(' ').Append(F(H)).Append("\" preserveAspectRatio=\"xMidYMid meet\" role=\"img\" aria-label=\"White light dispersed by a prism of ").Append(Esc(Glass.VendorDisplayName + " " + Glass.Name)).Append("\">");
+        s.Append("<svg id=\"").Append(SvgId).Append("\" class=\"prism\" viewBox=\"0 0 ").Append(F(W)).Append(' ').Append(F(H))
+         .Append("\" preserveAspectRatio=\"xMidYMid meet\" role=\"img\" aria-label=\"White light dispersed by ")
+         .Append(Esc(Glass.VendorDisplayName + " " + Glass.Name)).Append("\">");
         s.Append("<rect width=\"100%\" height=\"100%\" fill=\"#0c1013\"/>");
 
-        // Incoming white beam.
-        s.Append("<line class=\"beam\" x1=\"").Append(F(P(source, origin, scale).X)).Append("\" y1=\"").Append(F(P(source, origin, scale).Y))
-         .Append("\" x2=\"").Append(F(P(entry, origin, scale).X)).Append("\" y2=\"").Append(F(P(entry, origin, scale).Y)).Append("\"/>");
+        // The screen the fan lands on.
+        const double screenX = 2.2;
+        s.Append("<line class=\"screen\" x1=\"").Append(F(P(new Vector2((float)screenX, -0.4f)).X)).Append("\" y1=\"").Append(F(P(new Vector2((float)screenX, -0.4f)).Y))
+         .Append("\" x2=\"").Append(F(P(new Vector2((float)screenX, 1.35f)).X)).Append("\" y2=\"").Append(F(P(new Vector2((float)screenX, 1.35f)).Y)).Append("\"/>");
+
+        bool hasShape = vertices.Length >= 3;
+        (Vector2 entry, int entryEdge) = hasShape ? Intersect(source, incident, vertices, -1) : (source + incident * 3f, -1);
+        bool hits = hasShape && entryEdge >= 0;
+        Vector2 beamEnd = hits ? entry : source + incident * 3.2f;
+
+        s.Append("<line class=\"beam\" x1=\"").Append(F(P(source).X)).Append("\" y1=\"").Append(F(P(source).Y))
+         .Append("\" x2=\"").Append(F(P(beamEnd).X)).Append("\" y2=\"").Append(F(P(beamEnd).Y)).Append("\"/>");
 
         double minDev = double.PositiveInfinity, maxDev = double.NegativeInfinity;
-        System.Text.StringBuilder hits = new();
-        s.Append("<g class=\"fan\">");
-        for (int i = 0; i < RayCount; i++)
+        int exits = 0;
+        System.Text.StringBuilder hitsOnScreen = new();
+        if (hits)
         {
-            double wavelength = 400 + 300.0 * i / (RayCount - 1);
-            if (Glass.IndexAt(wavelength, out double n) != DispersionStatus.Success)
+            s.Append("<g class=\"fan\">");
+            for (int i = 0; i < RayCount; i++)
             {
-                continue;
-            }
-
-            (double r, double g, double bl) = GlassColour.Monochromatic(wavelength);
-            string colour = $"rgb({(int)Math.Round(r * 255)},{(int)Math.Round(g * 255)},{(int)Math.Round(bl * 255)})";
-
-            // Entry refraction.
-            if (Refract(incident, leftNormal, 1f, (float)n, out Vector2 inside) != RefractionKind.Refracted)
-            {
-                continue;
-            }
-
-            List<Vector2> path = [entry];
-            Vector2 position = entry;
-            Vector2 direction = inside;
-            int lastEdge = 2;
-            Vector2? exitDirection = null;
-            for (int bounce = 0; bounce < 4 && exitDirection is null; bounce++)
-            {
-                (Vector2 hit, int edge) = Intersect(position, direction, vertices, lastEdge);
-                path.Add(hit);
-                Vector2 normal = OutwardNormal(vertices, edge);
-                RefractionKind kind = Refract(direction, -normal, (float)n, 1f, out Vector2 outDir);
-                if (kind == RefractionKind.Refracted)
+                double wavelength = 400 + 300.0 * i / (RayCount - 1);
+                if (Glass.IndexAt(wavelength, out double n) != DispersionStatus.Success)
                 {
-                    exitDirection = outDir;
+                    continue;
                 }
-                else
+
+                (double r, double g, double bl) = GlassColour.Monochromatic(wavelength);
+                string colour = $"rgb({(int)Math.Round(r * 255)},{(int)Math.Round(g * 255)},{(int)Math.Round(bl * 255)})";
+
+                Vector2 entryNormal = OutwardNormal(vertices, entryEdge, entry);
+                if (Refract(incident, entryNormal, 1f, (float)n, out Vector2 inside) != RefractionKind.Refracted)
                 {
-                    direction = Reflect(direction, normal);
-                    position = hit;
-                    lastEdge = edge;
+                    continue;
                 }
+
+                List<Vector2> path = [entry];
+                Vector2 position = entry;
+                Vector2 direction = inside;
+                int lastEdge = entryEdge;
+                Vector2? exitDirection = null;
+                for (int bounce = 0; bounce < 8 && exitDirection is null; bounce++)
+                {
+                    (Vector2 hit, int edge) = Intersect(position, direction, vertices, lastEdge);
+                    if (edge < 0)
+                    {
+                        break;
+                    }
+
+                    path.Add(hit);
+                    Vector2 normal = OutwardNormal(vertices, edge, hit);
+                    RefractionKind kind = Refract(direction, -normal, (float)n, 1f, out Vector2 outDir);
+                    if (kind == RefractionKind.Refracted)
+                    {
+                        exitDirection = outDir;
+                    }
+                    else
+                    {
+                        direction = Reflect(direction, normal);
+                        position = hit;
+                        lastEdge = edge;
+                    }
+                }
+
+                s.Append("<polyline class=\"ray\" style=\"stroke:").Append(colour).Append("\" points=\"");
+                foreach (Vector2 point in path)
+                {
+                    Vector2 p = P(point);
+                    s.Append(F(p.X)).Append(',').Append(F(p.Y)).Append(' ');
+                }
+
+                if (exitDirection is { } exit)
+                {
+                    Vector2 start = path[^1];
+                    double travel = exit.X > 1e-6 ? (screenX - start.X) / exit.X : 3.5;
+                    travel = Math.Clamp(travel, 0.05, 3.5);
+                    Vector2 end = start + exit * (float)travel;
+                    Vector2 p = P(end);
+                    s.Append(F(p.X)).Append(',').Append(F(p.Y));
+                    if (exit.X > 1e-6 && Math.Abs(end.X - screenX) < 1e-3)
+                    {
+                        hitsOnScreen.Append("<line class=\"hit\" style=\"stroke:").Append(colour).Append("\" x1=\"").Append(F(p.X - 7)).Append("\" x2=\"").Append(F(p.X + 7))
+                                    .Append("\" y1=\"").Append(F(p.Y)).Append("\" y2=\"").Append(F(p.Y)).Append("\"/>");
+                    }
+
+                    double deviation = Math.Acos(Math.Clamp(Vector2.Dot(incident, exit), -1, 1)) * 180 / Math.PI;
+                    minDev = Math.Min(minDev, deviation);
+                    maxDev = Math.Max(maxDev, deviation);
+                    exits++;
+                }
+
+                s.Append("\"/>");
             }
 
-            s.Append("<polyline class=\"ray\" style=\"stroke:").Append(colour).Append("\" points=\"");
-            foreach (Vector2 point in path)
+            s.Append("</g>");
+            s.Append("<g class=\"fan\">").Append(hitsOnScreen).Append("</g>");
+        }
+
+        if (hasShape)
+        {
+            s.Append("<polygon class=\"glass\" points=\"");
+            foreach (Vector2 v in vertices)
             {
-                Vector2 p = P(point, origin, scale);
+                Vector2 p = P(v);
                 s.Append(F(p.X)).Append(',').Append(F(p.Y)).Append(' ');
-            }
-
-            if (exitDirection is { } exit)
-            {
-                Vector2 start = path[^1];
-                float travel = exit.X > 0.01f ? (screenX - start.X) / exit.X : 3f;
-                Vector2 end = start + exit * Math.Clamp(travel, 0.1f, 4f);
-                Vector2 p = P(end, origin, scale);
-                s.Append(F(p.X)).Append(',').Append(F(p.Y));
-                double deviation = Math.Acos(Math.Clamp(Vector2.Dot(incident, exit), -1, 1)) * 180 / Math.PI;
-                minDev = Math.Min(minDev, deviation);
-                maxDev = Math.Max(maxDev, deviation);
-                if (exit.X > 0.01f && p.Y > 0 && p.Y < H)
-                {
-                    hits.Append("<line class=\"hit\" style=\"stroke:").Append(colour).Append("\" x1=\"").Append(F(p.X - 4)).Append("\" x2=\"").Append(F(p.X + 10)).Append("\" y1=\"").Append(F(p.Y)).Append("\" y2=\"").Append(F(p.Y)).Append("\"/>");
-                }
             }
 
             s.Append("\"/>");
         }
 
-        s.Append("</g>");
-        // The screen: a vertical line where the fan lands, each wavelength marked at its true height.
-        double sx = origin.X + screenX * scale;
-        s.Append("<line class=\"screen\" x1=\"").Append(F(sx)).Append("\" x2=\"").Append(F(sx)).Append("\" y1=\"").Append(F(20)).Append("\" y2=\"").Append(F(H - 20)).Append("\"/>");
-        s.Append("<g class=\"hits\">").Append(hits).Append("</g>");
-
-        // Prism outline on top.
-        s.Append("<polygon class=\"glass\" points=\"");
-        foreach (Vector2 v in vertices)
+        if (Drawing)
         {
-            Vector2 p = P(v, origin, scale);
-            s.Append(F(p.X)).Append(',').Append(F(p.Y)).Append(' ');
+            foreach (Vector2 v in vertices)
+            {
+                Vector2 p = P(v);
+                s.Append("<circle class=\"corner\" cx=\"").Append(F(p.X)).Append("\" cy=\"").Append(F(p.Y)).Append("\" r=\"5\"/>");
+            }
+
+            if (vertices.Length < 3)
+            {
+                s.Append("<text class=\"hint\" x=\"").Append(F(W / 2)).Append("\" y=\"").Append(F(H / 2)).Append("\" text-anchor=\"middle\">click three or more points to shape the glass</text>");
+            }
         }
 
-        s.Append("\"/>");
         s.Append("</svg>");
         svg = s.ToString();
         MinimumDeviation = double.IsFinite(minDev) ? minDev : double.NaN;
         MaximumDeviation = double.IsFinite(maxDev) ? maxDev : double.NaN;
+        RaysThatExit = exits;
     }
 
-    private static Vector2 P(Vector2 scene, Vector2 origin, double scale) => new((float)(origin.X + scene.X * scale), (float)(origin.Y - scene.Y * scale));
-
-    private static Vector2 Rotate(Vector2 v, double radians)
+    private async Task OnClick(MouseEventArgs e)
     {
-        double c = Math.Cos(radians), s = Math.Sin(radians);
-        return new Vector2((float)(v.X * c - v.Y * s), (float)(v.X * s + v.Y * c));
+        if (!Drawing)
+        {
+            return;
+        }
+
+        double[] point = await Js.InvokeAsync<double[]>("caustikonSvg.toUser", SvgId, e.ClientX, e.ClientY);
+        Vector2 scene = new((float)((point[0] - Origin.X) / Scale), (float)((Origin.Y - point[1]) / Scale));
+        await PointAdded.InvokeAsync(scene);
     }
 
-    private static Vector2 OutwardNormal(Vector2[] vertices, int edge)
+    /// <summary>A regular polygon with <paramref name="sides"/> corners, one corner pointing up, sized to sit on the bench.</summary>
+    public static Vector2[] RegularPolygon(int sides)
+    {
+        sides = Math.Clamp(sides, 3, 24);
+        double radius = sides == 3 ? 0.577 : 0.52;
+        Vector2 centre = new(0.5f, sides == 3 ? 0.289f : 0.45f);
+        Vector2[] vertices = new Vector2[sides];
+        for (int i = 0; i < sides; i++)
+        {
+            double a = Math.PI / 2 + 2 * Math.PI * i / sides;
+            vertices[i] = centre + new Vector2((float)(radius * Math.Cos(a)), (float)(radius * Math.Sin(a)));
+        }
+
+        return vertices;
+    }
+
+    /// <summary>A biconvex lens: two circular arcs of the given radius, centre thickness 0.16, height 0.9.</summary>
+    public static Vector2[] Lens(double surfaceRadius = 0.75)
+    {
+        const double halfHeight = 0.45, centreThickness = 0.16;
+        double sag = surfaceRadius - Math.Sqrt(surfaceRadius * surfaceRadius - halfHeight * halfHeight);
+        Vector2 centre = new(0.5f, 0.45f);
+        List<Vector2> vertices = [];
+        const int steps = 24;
+        // Right surface, bottom to top; left surface, top to bottom.
+        for (int i = 0; i <= steps; i++)
+        {
+            double y = -halfHeight + 2 * halfHeight * i / steps;
+            double x = centreThickness / 2 + sag - (surfaceRadius - Math.Sqrt(surfaceRadius * surfaceRadius - y * y));
+            vertices.Add(centre + new Vector2((float)x, (float)y));
+        }
+
+        for (int i = steps; i >= 0; i--)
+        {
+            double y = -halfHeight + 2 * halfHeight * i / steps;
+            double x = -(centreThickness / 2 + sag - (surfaceRadius - Math.Sqrt(surfaceRadius * surfaceRadius - y * y)));
+            vertices.Add(centre + new Vector2((float)x, (float)y));
+        }
+
+        return [.. vertices];
+    }
+
+    /// <summary>A flat plate, tilted by <paramref name="tiltDegrees"/>, to show lateral displacement without deviation.</summary>
+    public static Vector2[] Plate(double tiltDegrees = 20)
+    {
+        double a = tiltDegrees * Math.PI / 180;
+        Vector2 centre = new(0.5f, 0.45f);
+        Vector2 along = new((float)Math.Sin(a), (float)Math.Cos(a));
+        Vector2 across = new((float)Math.Cos(a), -(float)Math.Sin(a));
+        const float halfLength = 0.5f, halfThickness = 0.11f;
+        return
+        [
+            centre - along * halfLength - across * halfThickness,
+            centre - along * halfLength + across * halfThickness,
+            centre + along * halfLength + across * halfThickness,
+            centre + along * halfLength - across * halfThickness,
+        ];
+    }
+
+    private static Vector2 P(Vector2 scene) => new((float)(Origin.X + scene.X * Scale), (float)(Origin.Y - scene.Y * Scale));
+
+    private static Vector2 OutwardNormal(Vector2[] vertices, int edge, Vector2 at)
     {
         Vector2 p0 = vertices[edge];
         Vector2 p1 = vertices[(edge + 1) % vertices.Length];
         Vector2 along = Vector2.Normalize(p1 - p0);
         Vector2 normal = new(along.Y, -along.X);
-        Vector2 centroid = (vertices[0] + vertices[1] + vertices[2]) / 3f;
-        return Vector2.Dot(normal, p0 - centroid) < 0 ? -normal : normal;
+        // Outward is away from the polygon's interior: test a point just inside along the normal.
+        Vector2 probe = at - normal * 1e-3f;
+        return Contains(vertices, probe) ? normal : -normal;
+    }
+
+    private static bool Contains(Vector2[] vertices, Vector2 point)
+    {
+        bool inside = false;
+        for (int i = 0, j = vertices.Length - 1; i < vertices.Length; j = i++)
+        {
+            Vector2 a = vertices[i], b = vertices[j];
+            if ((a.Y > point.Y) != (b.Y > point.Y) && point.X < (b.X - a.X) * (point.Y - a.Y) / (b.Y - a.Y) + a.X)
+            {
+                inside = !inside;
+            }
+        }
+
+        return inside;
     }
 
     private static (Vector2 Point, int Edge) Intersect(Vector2 origin, Vector2 direction, Vector2[] vertices, int skipEdge)
@@ -179,7 +312,7 @@
             Vector2 d = p0 - origin;
             double t = (d.X * e.Y - d.Y * e.X) / denominator;
             double u = (d.X * direction.Y - d.Y * direction.X) / denominator;
-            if (t > 1e-6 && u >= -1e-6 && u <= 1 + 1e-6 && t < best)
+            if (t > 1e-5 && u >= -1e-6 && u <= 1 + 1e-6 && t < best)
             {
                 best = t;
                 bestEdge = edge;

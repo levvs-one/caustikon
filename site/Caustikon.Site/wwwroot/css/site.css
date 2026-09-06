@@ -646,10 +646,17 @@ button.primary {
 
 .hero {
     display: grid;
-    grid-template-columns: minmax(280px, 3fr) minmax(320px, 4fr);
-    gap: 2rem 3rem;
-    align-items: center;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.4rem;
     margin: 0 0 2.5rem;
+}
+
+.hero-text {
+    max-width: 78ch;
+}
+
+.bench-controls .controls {
+    margin: 0.2rem 0 0.8rem;
 }
 
 .hero .readout {
@@ -682,11 +689,6 @@ button.primary {
     margin: 0.8rem 0 0;
 }
 
-@media (max-width: 860px) {
-    .hero {
-        grid-template-columns: 1fr;
-    }
-}
 
 .spectrum {
     width: 100%;
@@ -772,9 +774,6 @@ button.primary {
         grid-template-columns: 1fr;
     }
 
-    .hero > .bench {
-        order: -1;
-    }
 
     header.site .frame {
         height: auto;
@@ -933,4 +932,42 @@ button.primary {
 
 .snippet pre {
     margin: 0;
+}
+
+/* Bench shapes */
+
+.bench.drawing {
+    cursor: crosshair;
+}
+
+.prism .screen {
+    stroke: rgba(244, 239, 228, 0.35);
+    stroke-width: 1;
+}
+
+.prism .hit {
+    stroke-width: 2.5;
+    opacity: 0.9;
+}
+
+.prism .corner {
+    fill: #0c1013;
+    stroke: #f4efe4;
+    stroke-width: 1.5;
+}
+
+.prism .hint {
+    fill: rgba(244, 239, 228, 0.6);
+    font-size: 20px;
+    font-family: inherit;
+}
+
+.kv.map {
+    grid-template-columns: max-content 1fr;
+    gap: 0.5rem 1.4rem;
+    max-width: 78ch;
+}
+
+.kv.map dd {
+    color: var(--fg);
 }

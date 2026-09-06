@@ -1,17 +1,25 @@
 @page "/"
+@using System.Numerics
 
 <PageTitle>Caustikon</PageTitle>
 
 <div class="hero">
-    <div>
+    <div class="hero-text">
         <h1>Geometric optics for .NET, with the glass included</h1>
         <p class="lede">
             Refraction, exact Fresnel reflectance and dispersion as allocation-free value types, and a catalog of
             @SiteInfo.GlassCount manufacturer glasses with dispersion, absorption and temperature data, each number cited.
         </p>
+        <p class="muted">
+            Below: sixty-one wavelengths traced through a shape of the chosen glass with the packages' own refraction, reflected inside
+            where the exit angle is past critical, each drawn in its CIE colour and added like light. The marks on the right are where they land on a screen.
+        </p>
+    </div>
+    <PrismScene @ref="prism" Glass="prismGlass" Vertices="vertices" BeamAngleDegrees="beamAngle" BeamHeight="beamHeight" Drawing="@(shape == "custom")" PointAdded="AddPoint" Traced="OnTraced" />
+    <div class="bench-controls">
         <div class="controls">
             <label class="control">
-                <span>Prism glass</span>
+                <span>Glass</span>
                 <select @bind="prismKey">
                     @foreach ((string key, string label) in PrismChoices)
                     {
@@ -20,27 +28,67 @@
                 </select>
             </label>
             <label class="control">
-                <span class="range-label"><span>Angle of incidence</span><output>@incidence°</output></span>
-                <input type="range" min="25" max="75" step="0.5" @bind="incidence" @bind:event="oninput" />
+                <span>Shape</span>
+                <select @bind="shape">
+                    <option value="polygon">regular polygon</option>
+                    <option value="lens">biconvex lens</option>
+                    <option value="plate">tilted plate</option>
+                    <option value="custom">draw your own</option>
+                </select>
+            </label>
+            @if (shape == "polygon")
+            {
+                <label class="control">
+                    <span class="range-label"><span>Corners</span><output>@sides</output></span>
+                    <input type="range" min="3" max="12" step="1" @bind="sides" @bind:event="oninput" />
+                </label>
+            }
+            @if (shape == "custom")
+            {
+                <label class="control"><span>Click the bench to add corners</span><button @onclick="ClearCustom">Clear</button></label>
+            }
+            <label class="control">
+                <span class="range-label"><span>Beam angle</span><output>@beamAngle°</output></span>
+                <input type="range" min="-35" max="35" step="0.5" @bind="beamAngle" @bind:event="oninput" />
+            </label>
+            <label class="control">
+                <span class="range-label"><span>Beam height</span><output>@beamHeight.ToString("0.00", CultureInfo.InvariantCulture)</output></span>
+                <input type="range" min="-0.3" max="1.1" step="0.01" @bind="beamHeight" @bind:event="oninput" />
             </label>
         </div>
         <div class="readout">
-            <div><div class="value">@SiteInfo.Number(prism?.MinimumDeviation ?? double.NaN, 2)°</div><div class="label">deviation at 700 nm</div></div>
-            <div><div class="value">@SiteInfo.Number(prism?.MaximumDeviation ?? double.NaN, 2)°</div><div class="label">deviation at 400 nm</div></div>
-            <div><div class="value">@SiteInfo.Number(prism?.SpreadDegrees ?? double.NaN, 2)°</div><div class="label">spread</div></div>
-            <div><div class="value">@SiteInfo.Number(prism?.SpectrumMillimetersAtOneMeter ?? double.NaN, 0) mm</div><div class="label">spectrum on a screen 1 m away</div></div>
+            <div><div class="value">@SiteInfo.Number(minDeviation, 2)°</div><div class="label">smallest deviation</div></div>
+            <div><div class="value">@SiteInfo.Number(maxDeviation, 2)°</div><div class="label">largest deviation</div></div>
+            <div><div class="value">@SiteInfo.Number(maxDeviation - minDeviation, 2)°</div><div class="label">spread, 400–700 nm</div></div>
+            <div><div class="value">@SiteInfo.Number(double.IsNaN(maxDeviation) ? double.NaN : 1000 * Math.Tan((maxDeviation - minDeviation) * Math.PI / 180), 0) mm</div><div class="label">spectrum on a screen 1 m away</div></div>
+            <div><div class="value">@raysOut / 61</div><div class="label">rays that leave the glass</div></div>
         </div>
-        <p class="muted">Sixty-one wavelengths from 400 to 700 nm traced through an equilateral prism with the packages' own refraction, each drawn in its CIE colour and added like light; the marks on the right are where they land on a screen. Change the glass and the fan changes with its dispersion.</p>
     </div>
-    <PrismScene @ref="prism" Glass="prismGlass" IncidenceDegrees="incidence" />
 </div>
 
-<div class="figures">
-    <div class="figure"><div class="value">@SiteInfo.GlassCount</div><div class="label">glasses with closed-form dispersion</div></div>
-    <div class="figure"><div class="value">@SiteInfo.VendorCount</div><div class="label">manufacturers</div></div>
-    <div class="figure"><div class="value">@withExtinction</div><div class="label">with absorption tables</div></div>
-    <div class="figure"><div class="value">@withThermal</div><div class="label">with dn/dT coefficients</div></div>
-</div>
+<h2>What this is</h2>
+<p>
+    I wanted a glass library that does not make me go back to the manufacturer's PDF for every coefficient, so I imported every
+    manufacturer glass with a closed-form dispersion fit from the RefractiveIndex.INFO database: @SiteInfo.GlassCount glasses from
+    @SiteInfo.VendorCount makers, @withExtinction of them with absorption tables and @withThermal with temperature coefficients.
+    Each one carries the catalog it was transcribed from, the file it came from and the date I read it.
+</p>
+<p>
+    I did not trust the import until I could check it, so every glass is evaluated at the exact d, F and C lines and compared with the
+    n<sub>d</sub> and ν<sub>d</sub> its maker prints — numbers that do not depend on the fit — on every commit. N-BK7 I pinned further,
+    to its SCHOTT datasheet for internal transmittance and dn/dT. Nothing on this site is typed in: the pages run the packages and
+    show what comes out.
+</p>
+
+<h2>Where things are</h2>
+<dl class="kv map">
+    <dt><a href="catalog">Catalog</a></dt><dd>All @SiteInfo.GlassCount glasses on the Abbe diagram and in a filterable table; each opens to its curves, absorption, colour, temperature, coefficients and provenance.</dd>
+    <dt><a href="playground">Playground</a></dt><dd>One flat interface and one slab: angle, thickness, reflectance, refraction, dispersion and the transmitted colour, all live.</dd>
+    <dt><a href="render">Render</a></dt><dd>A sphere of any glass ray-traced spectrally in the browser, with the light where you put it.</dd>
+    <dt><a href="use">Use it</a></dt><dd>Three ways to take a glass into your own work: CSS for interfaces, GLSL for shaders, C# for computation, with the numbers filled in.</dd>
+    <dt><a href="formulas">Formulas</a></dt><dd>Every equation the packages evaluate, its conventions, and the type that implements it.</dd>
+    <dt><a href="about">About</a></dt><dd>Where the data comes from, how it is checked, what is not modelled, how to cite.</dd>
+</dl>
 
 <h2>Install</h2>
 <pre><code>dotnet add package Caustikon
@@ -64,35 +112,7 @@ FresnelPower r = Dielectric.Fresnel(0.866f, 1f, (float)nd);   // s @SiteInfo.Num
 Glass glass = GlassCatalog.Find("ohara", "S-BSL7")!;
 glass.Extinction!.InternalTransmittance(400, 10, out double t);   // @SiteInfo.Number(tau, 4)
 string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</code></pre>
-<p>The numbers in the comments are computed by this page from the packages, not typed in.</p>
-
-<div class="columns">
-    <div>
-        <h3>Catalog</h3>
-        <p>
-            Every glass comes from the RefractiveIndex.INFO database, public domain under CC0, and records the
-            manufacturer catalog it was transcribed from, the file path in the database and the retrieval date.
-            <a href="catalog">Browse the catalog</a> or open a glass such as <a href="glass/schott/N-BK7">SCHOTT N-BK7</a>.
-        </p>
-    </div>
-    <div>
-        <h3>Verified, not assumed</h3>
-        <p>
-            Every catalogued glass is evaluated in CI at the exact d, F and C lines and compared with the
-            <em>printed</em> n<sub>d</sub> and ν<sub>d</sub> of its manufacturer, which are independent of the fit.
-            N-BK7 is additionally pinned to its SCHOTT datasheet for internal transmittance and dn/dT.
-            <a href="about">How the checks work</a>.
-        </p>
-    </div>
-    <div>
-        <h3>Try it</h3>
-        <p>
-            The <a href="playground">playground</a> runs the same code in your browser: pick a glass, an angle
-            and a thickness, and read off refraction, reflectance, dispersion and the transmitted colour.
-            The <a href="formulas">formulas</a> page states each equation and names the type that implements it.
-        </p>
-    </div>
-</div>
+<p>The numbers in the comments are computed by this page from the packages.</p>
 
 @code {
     private static readonly (string Key, string Label)[] PrismChoices =
@@ -112,9 +132,16 @@ string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</c
     private double nd, rs, rp, tau;
     private string tintHex = "";
     private string prismKeyValue = "schott/N-BK7";
-    private double incidence = 60;
+    private string shapeValue = "polygon";
+    private int sidesValue = 3;
+    private double beamAngle = 20;
+    private double beamHeight = 0.15;
     private Glass prismGlass = GlassCatalog.Find("schott", "N-BK7")!;
     private PrismScene? prism;
+    private double minDeviation = double.NaN, maxDeviation = double.NaN;
+    private int raysOut;
+    private List<Vector2> custom = [];
+    private Vector2[] vertices = PrismScene.RegularPolygon(3);
 
     private string prismKey
     {
@@ -125,6 +152,41 @@ string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</c
             int slash = value.IndexOf('/');
             prismGlass = GlassCatalog.Find(value[..slash], value[(slash + 1)..]) ?? prismGlass;
         }
+    }
+
+    private string shape
+    {
+        get => shapeValue;
+        set { shapeValue = value; UpdateShape(); }
+    }
+
+    private int sides
+    {
+        get => sidesValue;
+        set { sidesValue = value; UpdateShape(); }
+    }
+
+    private void UpdateShape()
+    {
+        vertices = shapeValue switch
+        {
+            "lens" => PrismScene.Lens(),
+            "plate" => PrismScene.Plate(),
+            "custom" => [.. custom],
+            _ => PrismScene.RegularPolygon(sidesValue),
+        };
+    }
+
+    private void AddPoint(Vector2 point)
+    {
+        custom.Add(point);
+        UpdateShape();
+    }
+
+    private void ClearCustom()
+    {
+        custom.Clear();
+        UpdateShape();
     }
 
     protected override void OnInitialized()
@@ -140,12 +202,11 @@ string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</c
         tintHex = GlassColour.Transmitted(glass, 25d)!.Value.Hex;
     }
 
-    protected override void OnAfterRender(bool firstRender)
+    private void OnTraced(PrismScene scene)
     {
-        // The readout quotes the scene's numbers, which exist only after the scene has rendered.
-        if (firstRender)
-        {
-            StateHasChanged();
-        }
+        minDeviation = scene.MinimumDeviation;
+        maxDeviation = scene.MaximumDeviation;
+        raysOut = scene.RaysThatExit;
+        StateHasChanged();
     }
 }
