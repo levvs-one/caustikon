@@ -3,59 +3,17 @@
 
 <PageTitle>Caustikon</PageTitle>
 
-<div class="hero">
-    <div class="hero-text">
-        <h1>Geometric optics for .NET, with the glass included</h1>
-        <p class="lede">
-            Refraction, exact Fresnel reflectance and dispersion as allocation-free value types, and a catalog of
-            @SiteInfo.GlassCount manufacturer glasses with dispersion, absorption and temperature data, each number cited.
-        </p>
-        <p class="muted">
-            Below: sixty-one wavelengths traced through a shape of the chosen glass with the packages' own refraction, reflected inside
-            where the exit angle is past critical, each drawn in its CIE colour and added like light. The marks on the right are where they land on a screen.
-        </p>
-    </div>
-    <PrismScene @ref="prism" Glass="prismGlass" Vertices="vertices" BeamAngleDegrees="beamAngle" BeamHeight="beamHeight" Drawing="@(shape == "custom")" PointAdded="AddPoint" Traced="OnTraced" />
-    <div class="bench-controls">
-        <div class="controls">
-            <label class="control">
-                <span>Glass</span>
-                <select @bind="prismKey">
-                    @foreach ((string key, string label) in PrismChoices)
-                    {
-                        <option value="@key">@label</option>
-                    }
-                </select>
-            </label>
-            <label class="control">
-                <span>Shape</span>
-                <select @bind="shape">
-                    <option value="polygon">regular polygon</option>
-                    <option value="lens">biconvex lens</option>
-                    <option value="plate">tilted plate</option>
-                    <option value="custom">draw your own</option>
-                </select>
-            </label>
-            @if (shape == "polygon")
-            {
-                <label class="control">
-                    <span class="range-label"><span>Corners</span><output>@sides</output></span>
-                    <input type="range" min="3" max="12" step="1" @bind="sides" @bind:event="oninput" />
-                </label>
-            }
-            @if (shape == "custom")
-            {
-                <label class="control"><span>Click the bench to add corners</span><button @onclick="ClearCustom">Clear</button></label>
-            }
-            <label class="control">
-                <span class="range-label"><span>Beam angle</span><output>@beamAngle°</output></span>
-                <input type="range" min="-35" max="35" step="0.5" @bind="beamAngle" @bind:event="oninput" />
-            </label>
-            <label class="control">
-                <span class="range-label"><span>Beam height</span><output>@beamHeight.ToString("0.00", CultureInfo.InvariantCulture)</output></span>
-                <input type="range" min="-0.3" max="1.1" step="0.01" @bind="beamHeight" @bind:event="oninput" />
-            </label>
-        </div>
+<div class="hero-text">
+    <h1>Geometric optics for .NET, with the glass included</h1>
+    <p class="lede">
+        Refraction, exact Fresnel reflectance and dispersion as allocation-free value types, and a catalog of
+        @SiteInfo.GlassCount manufacturer glasses with dispersion, absorption and temperature data, each number cited.
+    </p>
+</div>
+
+<div class="bench-layout">
+    <div class="bench-main">
+        <PrismScene Glass="prismGlass" Vertices="vertices" BeamAngleDegrees="beamAngle" BeamHeight="beamHeight" Editable="editing" VerticesChanged="OnVerticesChanged" Traced="OnTraced" />
         <div class="readout">
             <div><div class="value">@SiteInfo.Number(minDeviation, 2)°</div><div class="label">smallest deviation</div></div>
             <div><div class="value">@SiteInfo.Number(maxDeviation, 2)°</div><div class="label">largest deviation</div></div>
@@ -63,7 +21,56 @@
             <div><div class="value">@SiteInfo.Number(double.IsNaN(maxDeviation) ? double.NaN : 1000 * Math.Tan((maxDeviation - minDeviation) * Math.PI / 180), 0) mm</div><div class="label">spectrum on a screen 1 m away</div></div>
             <div><div class="value">@raysOut / 61</div><div class="label">rays that leave the glass</div></div>
         </div>
+        <p class="muted">
+            Sixty-one wavelengths traced through the shape with the packages' own refraction, reflected inside where the exit angle is past
+            critical, each drawn in its CIE colour and added like light. The marks on the right are where they land on a screen.
+        </p>
     </div>
+    <aside class="bench-aside panel">
+        <label class="control">
+            <span>Glass</span>
+            <select @bind="prismKey">
+                @foreach ((string key, string label) in PrismChoices)
+                {
+                    <option value="@key">@label</option>
+                }
+            </select>
+        </label>
+        <label class="control">
+            <span>Shape</span>
+            <select @bind="shape">
+                <option value="polygon">regular polygon</option>
+                <option value="lens">biconvex lens</option>
+                <option value="plate">tilted plate</option>
+            </select>
+        </label>
+        @if (shape == "polygon")
+        {
+            <label class="control">
+                <span class="range-label"><span>Corners</span><output>@sides</output></span>
+                <input type="range" min="3" max="12" step="1" @bind="sides" @bind:event="oninput" />
+            </label>
+        }
+        <label class="control">
+            <span class="range-label"><span>Beam angle</span><output>@beamAngle°</output></span>
+            <input type="range" min="-35" max="35" step="0.5" @bind="beamAngle" @bind:event="oninput" />
+        </label>
+        <label class="control">
+            <span class="range-label"><span>Beam height</span><output>@beamHeight.ToString("0.00", CultureInfo.InvariantCulture)</output></span>
+            <input type="range" min="-0.3" max="1.1" step="0.01" @bind="beamHeight" @bind:event="oninput" />
+        </label>
+        <div class="control">
+            <label class="check"><input type="checkbox" @bind="editing" /> drag the corners</label>
+            @if (editing)
+            {
+                <div class="button-row">
+                    <button @onclick="AddCorner">Add a corner</button>
+                    <button @onclick="RemoveCorner" disabled="@(vertices.Length <= 3)">Remove one</button>
+                    <button @onclick="ResetShape">Reset</button>
+                </div>
+            }
+        </div>
+    </aside>
 </div>
 
 <h2>What this is</h2>
@@ -133,14 +140,13 @@ string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</c
     private string tintHex = "";
     private string prismKeyValue = "schott/N-BK7";
     private string shapeValue = "polygon";
+    private bool editing;
     private int sidesValue = 3;
     private double beamAngle = 20;
     private double beamHeight = 0.15;
     private Glass prismGlass = GlassCatalog.Find("schott", "N-BK7")!;
-    private PrismScene? prism;
     private double minDeviation = double.NaN, maxDeviation = double.NaN;
     private int raysOut;
-    private List<Vector2> custom = [];
     private Vector2[] vertices = PrismScene.RegularPolygon(3);
 
     private string prismKey
@@ -172,22 +178,41 @@ string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</c
         {
             "lens" => PrismScene.Lens(),
             "plate" => PrismScene.Plate(),
-            "custom" => [.. custom],
             _ => PrismScene.RegularPolygon(sidesValue),
         };
     }
 
-    private void AddPoint(Vector2 point)
+    private void OnVerticesChanged(Vector2[] moved) => vertices = moved;
+
+    private void AddCorner()
     {
-        custom.Add(point);
-        UpdateShape();
+        // Split the longest edge at its midpoint so the new corner has room to be dragged.
+        int longest = 0;
+        float best = -1;
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            float length = Vector2.Distance(vertices[i], vertices[(i + 1) % vertices.Length]);
+            if (length > best)
+            {
+                best = length;
+                longest = i;
+            }
+        }
+
+        List<Vector2> list = [.. vertices];
+        list.Insert(longest + 1, (vertices[longest] + vertices[(longest + 1) % vertices.Length]) / 2f);
+        vertices = [.. list];
     }
 
-    private void ClearCustom()
+    private void RemoveCorner()
     {
-        custom.Clear();
-        UpdateShape();
+        if (vertices.Length > 3)
+        {
+            vertices = vertices[..^1];
+        }
     }
+
+    private void ResetShape() => UpdateShape();
 
     protected override void OnInitialized()
     {

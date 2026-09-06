@@ -4,7 +4,7 @@
    wavelength, reflected inside where the exit angle is beyond critical, coloured by the CIE observer, and composited
    additively so overlapping rays add up to white like light does. The polygon can be anything the caller supplies. *@
 
-<div class="bench @(Drawing ? "drawing" : "")" @onclick="OnClick">
+<div class="bench @(Editable ? "editable" : "")" @onpointerdown="OnPointerDown" @onpointermove="OnPointerMove" @onpointerup="OnPointerUp" @onpointerleave="OnPointerUp">
     @((MarkupString)svg)
 </div>
 
@@ -14,8 +14,8 @@
     [Parameter] public double BeamAngleDegrees { get; set; } = 20;
     [Parameter] public double BeamHeight { get; set; } = 0.15;
     [Parameter] public int RayCount { get; set; } = 61;
-    [Parameter] public bool Drawing { get; set; }
-    [Parameter] public EventCallback<Vector2> PointAdded { get; set; }
+    [Parameter] public bool Editable { get; set; }
+    [Parameter] public EventCallback<Vector2[]> VerticesChanged { get; set; }
     [Parameter] public EventCallback<PrismScene> Traced { get; set; }
 
     private (double, double, int) reported = (double.NaN, double.NaN, -1);
@@ -168,17 +168,12 @@
             s.Append("\"/>");
         }
 
-        if (Drawing)
+        if (Editable)
         {
             foreach (Vector2 v in vertices)
             {
                 Vector2 p = P(v);
-                s.Append("<circle class=\"corner\" cx=\"").Append(F(p.X)).Append("\" cy=\"").Append(F(p.Y)).Append("\" r=\"5\"/>");
-            }
-
-            if (vertices.Length < 3)
-            {
-                s.Append("<text class=\"hint\" x=\"").Append(F(W / 2)).Append("\" y=\"").Append(F(H / 2)).Append("\" text-anchor=\"middle\">click three or more points to shape the glass</text>");
+                s.Append("<circle class=\"corner\" cx=\"").Append(F(p.X)).Append("\" cy=\"").Append(F(p.Y)).Append("\" r=\"7\"/>");
             }
         }
 
@@ -189,16 +184,62 @@
         RaysThatExit = exits;
     }
 
-    private async Task OnClick(MouseEventArgs e)
+    private int dragging = -1;
+    private double[] benchRect = [];
+
+    private async Task OnPointerDown(PointerEventArgs e)
     {
-        if (!Drawing)
+        if (!Editable || Vertices.Count == 0)
         {
             return;
         }
 
-        double[] point = await Js.InvokeAsync<double[]>("caustikonSvg.toUser", SvgId, e.ClientX, e.ClientY);
-        Vector2 scene = new((float)((point[0] - Origin.X) / Scale), (float)((Origin.Y - point[1]) / Scale));
-        await PointAdded.InvokeAsync(scene);
+        benchRect = await Js.InvokeAsync<double[]>("caustikonSvg.rect", SvgId);
+        Vector2 scene = ToScene(e.ClientX, e.ClientY);
+        double best = double.PositiveInfinity;
+        for (int i = 0; i < Vertices.Count; i++)
+        {
+            double d = Vector2.DistanceSquared(Vertices[i], scene);
+            if (d < best)
+            {
+                best = d;
+                dragging = i;
+            }
+        }
+
+        // 22 px in bench units is the grab radius.
+        if (Math.Sqrt(best) * Scale > 22)
+        {
+            dragging = -1;
+        }
+    }
+
+    private async Task OnPointerMove(PointerEventArgs e)
+    {
+        if (dragging < 0 || benchRect.Length < 4)
+        {
+            return;
+        }
+
+        Vector2[] moved = [.. Vertices];
+        Vector2 scene = ToScene(e.ClientX, e.ClientY);
+        moved[dragging] = new Vector2(Math.Clamp(scene.X, -0.2f, 2.0f), Math.Clamp(scene.Y, -0.4f, 1.35f));
+        await VerticesChanged.InvokeAsync(moved);
+    }
+
+    private Task OnPointerUp(PointerEventArgs e)
+    {
+        dragging = -1;
+        return Task.CompletedTask;
+    }
+
+    private Vector2 ToScene(double clientX, double clientY)
+    {
+        // The SVG keeps its aspect ratio and fills its box, so one scale serves both axes.
+        double scale = W / benchRect[2];
+        double ux = (clientX - benchRect[0]) * scale;
+        double uy = (clientY - benchRect[1]) * scale;
+        return new Vector2((float)((ux - Origin.X) / Scale), (float)((Origin.Y - uy) / Scale));
     }
 
     /// <summary>A regular polygon with <paramref name="sides"/> corners, one corner pointing up, sized to sit on the bench.</summary>

@@ -46,6 +46,14 @@ window.caustikonClipboard = {
 
 // Converts a client-space point to an SVG's user coordinates, for drawing on the optical bench.
 window.caustikonSvg = {
+    rect(id) {
+        const svg = document.getElementById(id);
+        if (!svg) {
+            return [0, 0, 1, 1];
+        }
+        const r = svg.getBoundingClientRect();
+        return [r.left, r.top, r.width, r.height];
+    },
     toUser(id, clientX, clientY) {
         const svg = document.getElementById(id);
         if (!svg) {

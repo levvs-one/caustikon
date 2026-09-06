@@ -644,22 +644,54 @@ button.primary {
     stroke-width: 1.2;
 }
 
-.hero {
+.hero-text {
+    max-width: 78ch;
+    margin-bottom: 1.4rem;
+}
+
+.bench-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1.4rem;
+    grid-template-columns: minmax(0, 3fr) minmax(250px, 1fr);
+    gap: 1.2rem 1.6rem;
+    align-items: start;
     margin: 0 0 2.5rem;
 }
 
-.hero-text {
-    max-width: 78ch;
+.bench-aside {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    position: sticky;
+    top: 64px;
 }
 
-.bench-controls .controls {
-    margin: 0.2rem 0 0.8rem;
+.bench-aside .control {
+    width: 100%;
 }
 
-.hero .readout {
+.bench-aside select,
+.bench-aside input[type="range"] {
+    width: 100%;
+    min-width: 0;
+}
+
+.button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+}
+
+.bench.editable {
+    cursor: grab;
+    touch-action: none;
+}
+
+.bench.editable:active {
+    cursor: grabbing;
+}
+
+.readout {
     display: flex;
     flex-wrap: wrap;
     gap: 0.8rem 1.6rem;
@@ -667,26 +699,22 @@ button.primary {
     font-variant-numeric: tabular-nums;
 }
 
-.hero .readout .value {
+.readout .value {
     white-space: nowrap;
 }
 
-.hero .readout > div {
+.readout > div {
     min-width: 7.5rem;
 }
 
-.hero .readout .value {
+.readout .value {
     font-size: 1.35rem;
     font-weight: 600;
 }
 
-.hero .readout .label {
+.readout .label {
     color: var(--muted);
     font-size: 0.8rem;
-}
-
-.hero .controls {
-    margin: 0.8rem 0 0;
 }
 
 
@@ -748,9 +776,31 @@ button.primary {
 
 .render-stage {
     display: grid;
-    grid-template-columns: minmax(240px, 480px) minmax(260px, 1fr);
-    gap: 1.5rem 2.5rem;
+    grid-template-columns: minmax(0, 3fr) minmax(250px, 1fr);
+    gap: 1.2rem 1.6rem;
     align-items: start;
+}
+
+.render-aside {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    position: sticky;
+    top: 64px;
+}
+
+.render-aside .control {
+    width: 100%;
+}
+
+.render-aside select,
+.render-aside input[type="range"] {
+    width: 100%;
+    min-width: 0;
+}
+
+.render-main .render-facts {
+    margin-top: 1rem;
 }
 
 .render-canvas {
@@ -770,8 +820,13 @@ button.primary {
 
 @media (max-width: 720px) {
     .render-stage,
-    .hero {
+    .bench-layout {
         grid-template-columns: 1fr;
+    }
+
+    .bench-aside,
+    .render-aside {
+        position: static;
     }
 
 
@@ -936,10 +991,6 @@ button.primary {
 
 /* Bench shapes */
 
-.bench.drawing {
-    cursor: crosshair;
-}
-
 .prism .screen {
     stroke: rgba(244, 239, 228, 0.35);
     stroke-width: 1;
@@ -954,12 +1005,6 @@ button.primary {
     fill: #0c1013;
     stroke: #f4efe4;
     stroke-width: 1.5;
-}
-
-.prism .hint {
-    fill: rgba(244, 239, 228, 0.6);
-    font-size: 20px;
-    font-family: inherit;
 }
 
 .kv.map {
