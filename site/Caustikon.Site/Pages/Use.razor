@@ -1,16 +1,17 @@
 @page "/use"
 @inject IJSRuntime Js
+@inherits LocalizedComponent
 
-<PageTitle>Use a glass · Caustikon</PageTitle>
+<PageTitle>@L["use.title"]</PageTitle>
 
-<h1>Take a glass into your own work</h1>
-<p class="lede">Three paths, one source of numbers. Pick a glass and a thickness; every value below is computed from its catalog entry and can be pasted as is.</p>
+<h1>@L["use.h1"]</h1>
+<p class="lede">@L["use.lede"]</p>
 
 <div class="controls">
     <label class="control">
-        <span>Glass</span>
+        <span>@L["use.glass"]</span>
         <select @bind="selectedKey">
-            <optgroup label="Commonly used">
+            <optgroup label="@L["render.common"]">
                 @foreach ((string key, string label) in Featured)
                 {
                     <option value="@key">@label</option>
@@ -28,27 +29,23 @@
         </select>
     </label>
     <label class="control">
-        <span class="range-label"><span>Thickness</span><output>@thickness mm</output></span>
+        <span class="range-label"><span>@L["use.thickness"]</span><output>@thickness mm</output></span>
         <input type="range" min="1" max="50" step="1" @bind="thickness" />
     </label>
     <label class="control">
-        <span class="range-label"><span>Frost (blur, a design choice)</span><output>@blur px</output></span>
+        <span class="range-label"><span>@L["use.frost"]</span><output>@blur px</output></span>
         <input type="range" min="0" max="30" step="1" @bind="blur" />
     </label>
 </div>
 
 @if (glass is { } g0 && tint is { } c)
 {
-    <h2>1 · Interface</h2>
-    <p>
-        A panel of @g0.VendorDisplayName @g0.Name, @thickness mm thick, over whatever is behind it. The tint is the colour daylight has after
-        passing through that thickness; the edge is the Fresnel reflectance at 75°; the face sheen is the reflectance at normal incidence.
-        Blur is not physics — clear glass does not scatter — so it stays a slider you own.
-    </p>
+    <h2>@L["use.ui.h"]</h2>
+    <p>@T("use.ui.p", g0.VendorDisplayName, g0.Name, thickness)</p>
     <div class="use-demo">
         <div class="use-backdrop">
             <span style="background:#e4572e"></span><span style="background:#17bebb"></span><span style="background:#ffc914"></span><span style="background:#2e282a"></span><span style="background:#76b041"></span>
-            <p>Text behind the glass keeps its colour where the glass is clear and loses blue where the glass is a dense flint.</p>
+            <p>@L["use.demo.text"]</p>
         </div>
         <div class="glass-panel" style="@PanelStyle">
             <strong>@g0.Name</strong>
@@ -56,38 +53,30 @@
         </div>
     </div>
     <div class="snippet">
-        <div class="snippet-bar"><span>CSS custom properties and a panel class</span><button @onclick="() => Copy(cssSnippet)">Copy</button></div>
+        <div class="snippet-bar"><span>@L["use.css.label"]</span><button @onclick="() => Copy(cssSnippet)">@L["use.copy"]</button></div>
         <pre><code>@cssSnippet</code></pre>
     </div>
-    <p class="muted">
-        <code>--glass-shift</code> is the lateral displacement of a ray crossing the panel at 45°, per unit of thickness;
-        <code>--glass-fringe</code> is how much that displacement differs between 400 and 700 nm. Feed them to an SVG
-        <code>feOffset</code> per colour channel, scaled by your panel's thickness in pixels, for a chromatic edge that matches this glass rather than a guess.
-    </p>
+    <p class="muted">@H("use.css.note")</p>
 
-    <h2>2 · Shader</h2>
-    <p>
-        GLSL with this glass's own dispersion formula inlined: index at any wavelength in micrometers, an RGB triple at 610, 550 and 465 nm
-        for renderers that trace three channels, absorption per millimetre for the same three, and the exact unpolarized Fresnel reflectance.
-        No dependencies; paste into Unity, Godot, Unreal or a raw WebGL shader.
-    </p>
+    <h2>@L["use.glsl.h"]</h2>
+    <p>@L["use.glsl.p"]</p>
     <div class="snippet">
-        <div class="snippet-bar"><span>GLSL</span><button @onclick="() => Copy(glslSnippet)">Copy</button></div>
+        <div class="snippet-bar"><span>GLSL</span><button @onclick="() => Copy(glslSnippet)">@L["use.copy"]</button></div>
         <pre><code>@glslSnippet</code></pre>
     </div>
 
-    <h2>3 · .NET</h2>
-    <p>The packages themselves: the typed constant is a value type for the ray path, the catalog entry carries everything else.</p>
+    <h2>@L["use.cs.h"]</h2>
+    <p>@L["use.cs.p"]</p>
     <div class="snippet">
-        <div class="snippet-bar"><span>C#</span><button @onclick="() => Copy(csharpSnippet)">Copy</button></div>
+        <div class="snippet-bar"><span>C#</span><button @onclick="() => Copy(csharpSnippet)">@L["use.copy"]</button></div>
         <pre><code>@csharpSnippet</code></pre>
     </div>
 
-    <h2>Which path</h2>
+    <h2>@L["use.which.h"]</h2>
     <div class="columns">
-        <div><h3>Interface</h3><p>You are laying out panels, cards, overlays. Take the CSS. The numbers make a specific glass; the blur and the mix ratio are yours.</p></div>
-        <div><h3>Shader</h3><p>You are rendering surfaces in a game or a viewer. Take the GLSL: index per wavelength for dispersion, absorption per millimetre for thickness, Fresnel for the rim.</p></div>
-        <div><h3>.NET</h3><p>You are computing, not drawing: ray traces, tolerance studies, spectral transmittance, colorimetry. Take the packages and read the catalog entry's provenance.</p></div>
+        <div><h3>@L["use.which.ui.h"]</h3><p>@L["use.which.ui.p"]</p></div>
+        <div><h3>@L["use.which.glsl.h"]</h3><p>@L["use.which.glsl.p"]</p></div>
+        <div><h3>@L["use.which.cs.h"]</h3><p>@L["use.which.cs.p"]</p></div>
     </div>
 }
 

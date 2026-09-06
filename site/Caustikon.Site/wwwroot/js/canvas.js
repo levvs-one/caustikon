@@ -66,3 +66,20 @@ window.caustikonSvg = {
         return [user.x, user.y];
     }
 };
+
+// Remembers the visitor's language; falls back to the browser's.
+window.caustikonLang = {
+    get() {
+        let code = null;
+        try { code = localStorage.getItem("caustikon.lang"); } catch { }
+        if (!code) {
+            code = (navigator.language || "en").toLowerCase().startsWith("ru") ? "ru" : "en";
+        }
+        document.documentElement.lang = code;
+        return code;
+    },
+    set(code) {
+        try { localStorage.setItem("caustikon.lang", code); } catch { }
+        document.documentElement.lang = code;
+    }
+};

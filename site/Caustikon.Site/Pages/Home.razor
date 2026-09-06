@@ -1,34 +1,29 @@
 @page "/"
 @using System.Numerics
+@inherits LocalizedComponent
 
-<PageTitle>Caustikon</PageTitle>
+<PageTitle>@L["home.title"]</PageTitle>
 
 <div class="hero-text">
-    <h1>Geometric optics for .NET, with the glass included</h1>
-    <p class="lede">
-        Refraction, exact Fresnel reflectance and dispersion as allocation-free value types, and a catalog of
-        @SiteInfo.GlassCount manufacturer glasses with dispersion, absorption and temperature data, each number cited.
-    </p>
+    <h1>@L["home.h1"]</h1>
+    <p class="lede">@T("home.lede", SiteInfo.GlassCount)</p>
 </div>
 
 <div class="bench-layout">
     <div class="bench-main">
         <PrismScene Glass="prismGlass" Vertices="vertices" BeamAngleDegrees="beamAngle" BeamHeight="beamHeight" Editable="editing" VerticesChanged="OnVerticesChanged" Traced="OnTraced" />
         <div class="readout">
-            <div><div class="value">@SiteInfo.Number(minDeviation, 2)°</div><div class="label">smallest deviation</div></div>
-            <div><div class="value">@SiteInfo.Number(maxDeviation, 2)°</div><div class="label">largest deviation</div></div>
-            <div><div class="value">@SiteInfo.Number(maxDeviation - minDeviation, 2)°</div><div class="label">spread, 400–700 nm</div></div>
-            <div><div class="value">@SiteInfo.Number(double.IsNaN(maxDeviation) ? double.NaN : 1000 * Math.Tan((maxDeviation - minDeviation) * Math.PI / 180), 0) mm</div><div class="label">spectrum on a screen 1 m away</div></div>
-            <div><div class="value">@raysOut / 61</div><div class="label">rays that leave the glass</div></div>
+            <div><div class="value">@SiteInfo.Number(minDeviation, 2)°</div><div class="label">@L["home.readout.min"]</div></div>
+            <div><div class="value">@SiteInfo.Number(maxDeviation, 2)°</div><div class="label">@L["home.readout.max"]</div></div>
+            <div><div class="value">@SiteInfo.Number(maxDeviation - minDeviation, 2)°</div><div class="label">@L["home.readout.spread"]</div></div>
+            <div><div class="value">@SiteInfo.Number(double.IsNaN(maxDeviation) ? double.NaN : 1000 * Math.Tan((maxDeviation - minDeviation) * Math.PI / 180), 0) mm</div><div class="label">@L["home.readout.screen"]</div></div>
+            <div><div class="value">@raysOut / 61</div><div class="label">@L["home.readout.exit"]</div></div>
         </div>
-        <p class="muted">
-            Sixty-one wavelengths traced through the shape with the packages' own refraction, reflected inside where the exit angle is past
-            critical, each drawn in its CIE colour and added like light. The marks on the right are where they land on a screen.
-        </p>
+        <p class="muted">@L["home.bench.note"]</p>
     </div>
     <aside class="bench-aside panel">
         <label class="control">
-            <span>Glass</span>
+            <span>@L["home.bench.glass"]</span>
             <select @bind="prismKey">
                 @foreach ((string key, string label) in PrismChoices)
                 {
@@ -37,72 +32,62 @@
             </select>
         </label>
         <label class="control">
-            <span>Shape</span>
+            <span>@L["home.bench.shape"]</span>
             <select @bind="shape">
-                <option value="polygon">regular polygon</option>
-                <option value="lens">biconvex lens</option>
-                <option value="plate">tilted plate</option>
+                <option value="polygon">@L["home.shape.polygon"]</option>
+                <option value="lens">@L["home.shape.lens"]</option>
+                <option value="plate">@L["home.shape.plate"]</option>
             </select>
         </label>
         @if (shape == "polygon")
         {
             <label class="control">
-                <span class="range-label"><span>Corners</span><output>@sides</output></span>
+                <span class="range-label"><span>@L["home.bench.corners"]</span><output>@sides</output></span>
                 <input type="range" min="3" max="12" step="1" @bind="sides" @bind:event="oninput" />
             </label>
         }
         <label class="control">
-            <span class="range-label"><span>Beam angle</span><output>@beamAngle°</output></span>
+            <span class="range-label"><span>@L["home.bench.angle"]</span><output>@beamAngle°</output></span>
             <input type="range" min="-35" max="35" step="0.5" @bind="beamAngle" @bind:event="oninput" />
         </label>
         <label class="control">
-            <span class="range-label"><span>Beam height</span><output>@beamHeight.ToString("0.00", CultureInfo.InvariantCulture)</output></span>
+            <span class="range-label"><span>@L["home.bench.height"]</span><output>@beamHeight.ToString("0.00", CultureInfo.InvariantCulture)</output></span>
             <input type="range" min="-0.3" max="1.1" step="0.01" @bind="beamHeight" @bind:event="oninput" />
         </label>
         <div class="control">
-            <label class="check"><input type="checkbox" @bind="editing" /> drag the corners</label>
+            <label class="check"><input type="checkbox" @bind="editing" /> @L["home.bench.drag"]</label>
             @if (editing)
             {
                 <div class="button-row">
-                    <button @onclick="AddCorner">Add a corner</button>
-                    <button @onclick="RemoveCorner" disabled="@(vertices.Length <= 3)">Remove one</button>
-                    <button @onclick="ResetShape">Reset</button>
+                    <button @onclick="AddCorner">@L["home.bench.add"]</button>
+                    <button @onclick="RemoveCorner" disabled="@(vertices.Length <= 3)">@L["home.bench.remove"]</button>
+                    <button @onclick="ResetShape">@L["home.bench.reset"]</button>
                 </div>
             }
         </div>
     </aside>
 </div>
 
-<h2>What this is</h2>
-<p>
-    I wanted a glass library that does not make me go back to the manufacturer's PDF for every coefficient, so I imported every
-    manufacturer glass with a closed-form dispersion fit from the RefractiveIndex.INFO database: @SiteInfo.GlassCount glasses from
-    @SiteInfo.VendorCount makers, @withExtinction of them with absorption tables and @withThermal with temperature coefficients.
-    Each one carries the catalog it was transcribed from, the file it came from and the date I read it.
-</p>
-<p>
-    I did not trust the import until I could check it, so every glass is evaluated at the exact d, F and C lines and compared with the
-    n<sub>d</sub> and ν<sub>d</sub> its maker prints — numbers that do not depend on the fit — on every commit. N-BK7 I pinned further,
-    to its SCHOTT datasheet for internal transmittance and dn/dT. Nothing on this site is typed in: the pages run the packages and
-    show what comes out.
-</p>
+<h2>@L["home.what.h"]</h2>
+<p>@H("home.what.p1", SiteInfo.GlassCount, SiteInfo.VendorCount, withExtinction, withThermal)</p>
+<p>@H("home.what.p2")</p>
 
-<h2>Where things are</h2>
+<h2>@L["home.map.h"]</h2>
 <dl class="kv map">
-    <dt><a href="catalog">Catalog</a></dt><dd>All @SiteInfo.GlassCount glasses on the Abbe diagram and in a filterable table; each opens to its curves, absorption, colour, temperature, coefficients and provenance.</dd>
-    <dt><a href="playground">Playground</a></dt><dd>One flat interface and one slab: angle, thickness, reflectance, refraction, dispersion and the transmitted colour, all live.</dd>
-    <dt><a href="render">Render</a></dt><dd>A sphere of any glass ray-traced spectrally in the browser, with the light where you put it.</dd>
-    <dt><a href="use">Use it</a></dt><dd>Three ways to take a glass into your own work: CSS for interfaces, GLSL for shaders, C# for computation, with the numbers filled in.</dd>
-    <dt><a href="formulas">Formulas</a></dt><dd>Every equation the packages evaluate, its conventions, and the type that implements it.</dd>
-    <dt><a href="about">About</a></dt><dd>Where the data comes from, how it is checked, what is not modelled, how to cite.</dd>
+    <dt><a href="catalog">@L["nav.catalog"]</a></dt><dd>@T("home.map.catalog", SiteInfo.GlassCount)</dd>
+    <dt><a href="playground">@L["nav.playground"]</a></dt><dd>@L["home.map.playground"]</dd>
+    <dt><a href="render">@L["nav.render"]</a></dt><dd>@L["home.map.render"]</dd>
+    <dt><a href="use">@L["nav.use"]</a></dt><dd>@L["home.map.use"]</dd>
+    <dt><a href="formulas">@L["nav.formulas"]</a></dt><dd>@L["home.map.formulas"]</dd>
+    <dt><a href="about">@L["nav.about"]</a></dt><dd>@L["home.map.about"]</dd>
 </dl>
 
-<h2>Install</h2>
+<h2>@L["home.install.h"]</h2>
 <pre><code>dotnet add package Caustikon
 dotnet add package Caustikon.Glasses</code></pre>
-<p>Both packages target .NET 8 and .NET 10 and depend on nothing outside the base class library.</p>
+<p>@L["home.install.p"]</p>
 
-<h2>Use</h2>
+<h2>@L["home.use.h"]</h2>
 <pre><code>using Caustikon;
 using Caustikon.Glasses;
 
@@ -119,19 +104,19 @@ FresnelPower r = Dielectric.Fresnel(0.866f, 1f, (float)nd);   // s @SiteInfo.Num
 Glass glass = GlassCatalog.Find("ohara", "S-BSL7")!;
 glass.Extinction!.InternalTransmittance(400, 10, out double t);   // @SiteInfo.Number(tau, 4)
 string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</code></pre>
-<p>The numbers in the comments are computed by this page from the packages.</p>
+<p>@L["home.use.p"]</p>
 
 @code {
     private static readonly (string Key, string Label)[] PrismChoices =
     [
-        ("schott/N-BK7", "SCHOTT N-BK7 — borosilicate crown, νd 64"),
-        ("schott/N-FK58", "SCHOTT N-FK58 — fluor crown, νd 91"),
-        ("schott/N-LASF9", "SCHOTT N-LASF9 — dense lanthanum flint, νd 32"),
-        ("schott/SF57", "SCHOTT SF57 — dense flint, νd 24"),
-        ("schott/N-SF66", "SCHOTT N-SF66 — densest flint, νd 21"),
-        ("ohara/S-FPL53", "OHARA S-FPL53 — extra-low dispersion, νd 95"),
-        ("hoya/TAFD55", "HOYA TAFD55 — high-index, νd 27"),
-        ("cdgm/H-ZF88", "CDGM H-ZF88 — dense flint, νd 20"),
+        ("schott/N-BK7", "SCHOTT N-BK7 — νd 64"),
+        ("schott/N-FK58", "SCHOTT N-FK58 — νd 91"),
+        ("schott/N-LASF9", "SCHOTT N-LASF9 — νd 32"),
+        ("schott/SF57", "SCHOTT SF57 — νd 24"),
+        ("schott/N-SF66", "SCHOTT N-SF66 — νd 21"),
+        ("ohara/S-FPL53", "OHARA S-FPL53 — νd 95"),
+        ("hoya/TAFD55", "HOYA TAFD55 — νd 27"),
+        ("cdgm/H-ZF88", "CDGM H-ZF88 — νd 20"),
     ];
 
     private int withExtinction;

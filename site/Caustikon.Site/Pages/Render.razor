@@ -3,11 +3,12 @@
 @using System.Numerics
 @inject IJSRuntime Js
 @implements IDisposable
+@inherits LocalizedComponent
 
-<PageTitle>Render · Caustikon</PageTitle>
+<PageTitle>@L["render.title"]</PageTitle>
 
-<h1>Render</h1>
-<p class="lede">A solid of the chosen glass on a patterned ground, ray-traced in your browser with the packages' own refraction, reflectance and absorption at nine wavelengths. The fringes and the tint are computed, not drawn.</p>
+<h1>@L["render.h1"]</h1>
+<p class="lede">@L["render.lede"]</p>
 
 <div class="render-stage">
     <div class="render-main">
@@ -16,30 +17,25 @@
         {
             <div class="render-facts">
                 <dl class="kv">
-                    <dt>Glass</dt><dd>@g0.VendorDisplayName <a href="@Catalog.GlassLink(g0)">@g0.Name</a> · n<sub>d</sub> @SiteInfo.Number(g0.IndexD, 5) · ν<sub>d</sub> @SiteInfo.Number(g0.AbbeD, 2)</dd>
-                    <dt>n at 400 and 700 nm</dt><dd>@IndexAt(g0, 400) · @IndexAt(g0, 700)</dd>
-                    <dt>τ<sub>i</sub> across @sizeMm mm at 450 / 650 nm</dt><dd>@Tau(g0, 450) / @Tau(g0, 650)</dd>
-                    <dt>Ground pattern</dt><dd>16 mm tiles, so the solid's size reads against them</dd>
-                    <dt>Sampled wavelengths</dt><dd>@string.Join(", ", GlassRenderer.SampledWavelengths.Select(w => w.ToString("0", CultureInfo.InvariantCulture))) nm</dd>
+                    <dt>@L["render.fact.glass"]</dt><dd>@g0.VendorDisplayName <a href="@Catalog.GlassLink(g0)">@g0.Name</a> · n<sub>d</sub> @SiteInfo.Number(g0.IndexD, 5) · ν<sub>d</sub> @SiteInfo.Number(g0.AbbeD, 2)</dd>
+                    <dt>@L["render.fact.n"]</dt><dd>@IndexAt(g0, 400) · @IndexAt(g0, 700)</dd>
+                    <dt>@H("render.fact.tau", sizeMm)</dt><dd>@Tau(g0, 450) / @Tau(g0, 650)</dd>
+                    <dt>@L["render.fact.ground"]</dt><dd>@L["render.fact.ground.v"]</dd>
+                    <dt>@L["render.fact.samples"]</dt><dd>@string.Join(", ", GlassRenderer.SampledWavelengths.Select(w => w.ToString("0", CultureInfo.InvariantCulture))) nm</dd>
                     @if (lastMilliseconds > 0)
                     {
-                        <dt>Tracing time</dt><dd>@lastSize × @lastSize in @((lastMilliseconds / 1000.0).ToString("0.0", CultureInfo.InvariantCulture)) s; @refinedPixels edge pixels supersampled</dd>
+                        <dt>@L["render.fact.time"]</dt><dd>@T("render.fact.time.v", lastSize, (lastMilliseconds / 1000.0).ToString("0.0", CultureInfo.InvariantCulture), refinedPixels)</dd>
                     }
                 </dl>
-                <p class="muted">
-                    Each pixel traces nine rays, one per wavelength: Fresnel-weighted reflection off the surface, refraction in, up to six
-                    internal reflections with Beer–Lambert absorption over every chord from the glass's k(λ) table, refraction out.
-                    A flint spreads pattern edges into colour; a thick dense flint goes warm because its own k(λ) says so.
-                    Not simulated: shadows, caustics on the ground, coatings, polarization beyond the unpolarized split.
-                </p>
+                <p class="muted">@L["render.note"]</p>
             </div>
         }
     </div>
     <aside class="render-aside panel">
         <label class="control">
-            <span>Glass</span>
+            <span>@L["render.glass"]</span>
             <select @bind="selectedKey">
-                <optgroup label="Commonly used">
+                <optgroup label="@L["render.common"]">
                     @foreach ((string key, string label) in Featured)
                     {
                         <option value="@key">@label</option>
@@ -57,62 +53,62 @@
             </select>
         </label>
         <label class="control">
-            <span>Solid</span>
+            <span>@L["render.solid"]</span>
             <select @bind="shapeKey">
-                <option value="sphere">sphere</option>
-                <option value="cube">cube</option>
-                <option value="prism">prism</option>
-                <option value="octahedron">octahedron</option>
-                <option value="dodecahedron">dodecahedron</option>
-                <option value="icosahedron">icosahedron</option>
+                <option value="sphere">@L["render.solid.sphere"]</option>
+                <option value="cube">@L["render.solid.cube"]</option>
+                <option value="prism">@L["render.solid.prism"]</option>
+                <option value="octahedron">@L["render.solid.octahedron"]</option>
+                <option value="dodecahedron">@L["render.solid.dodecahedron"]</option>
+                <option value="icosahedron">@L["render.solid.icosahedron"]</option>
             </select>
         </label>
         @if (shapeKey == "prism")
         {
             <label class="control">
-                <span class="range-label"><span>Prism faces</span><output>@sides</output></span>
+                <span class="range-label"><span>@L["render.faces"]</span><output>@sides</output></span>
                 <input type="range" min="3" max="12" step="1" @bind="sides" />
             </label>
         }
         <label class="control">
-            <span class="range-label"><span>Size</span><output>@sizeMm mm</output></span>
+            <span class="range-label"><span>@L["render.size"]</span><output>@sizeMm mm</output></span>
             <input type="range" min="10" max="200" step="5" @bind="sizeMm" />
         </label>
         <label class="control">
-            <span>Backdrop</span>
+            <span>@L["render.backdrop"]</span>
             <select @bind="backdropKey">
-                <option value="checker">checker</option>
-                <option value="stripes">colour bands</option>
-                <option value="grid">millimetre paper</option>
-                <option value="paper">plain paper</option>
-                <option value="night">night</option>
+                <option value="checker">@L["render.backdrop.checker"]</option>
+                <option value="stripes">@L["render.backdrop.stripes"]</option>
+                <option value="grid">@L["render.backdrop.grid"]</option>
+                <option value="paper">@L["render.backdrop.paper"]</option>
+                <option value="night">@L["render.backdrop.night"]</option>
             </select>
         </label>
         <label class="control">
-            <span class="range-label"><span>Light around</span><output>@lightAzimuth°</output></span>
+            <span class="range-label"><span>@L["render.light.az"]</span><output>@lightAzimuth°</output></span>
             <input type="range" min="-180" max="180" step="5" @bind="lightAzimuth" />
         </label>
         <label class="control">
-            <span class="range-label"><span>Light height</span><output>@lightElevation°</output></span>
+            <span class="range-label"><span>@L["render.light.el"]</span><output>@lightElevation°</output></span>
             <input type="range" min="5" max="85" step="5" @bind="lightElevation" />
         </label>
         <label class="control">
-            <span class="range-label"><span>Lamp</span><output>@lightIntensity.ToString("0.0", CultureInfo.InvariantCulture)×</output></span>
+            <span class="range-label"><span>@L["render.lamp"]</span><output>@lightIntensity.ToString("0.0", CultureInfo.InvariantCulture)×</output></span>
             <input type="range" min="0" max="3" step="0.1" @bind="lightIntensity" />
         </label>
         <label class="control">
-            <span class="range-label"><span>Room</span><output>@ambient.ToString("0.0", CultureInfo.InvariantCulture)×</output></span>
+            <span class="range-label"><span>@L["render.room"]</span><output>@ambient.ToString("0.0", CultureInfo.InvariantCulture)×</output></span>
             <input type="range" min="0" max="2" step="0.1" @bind="ambient" />
         </label>
         <label class="control">
-            <span>Resolution</span>
+            <span>@L["render.resolution"]</span>
             <select @bind="size">
                 <option value="320">320 px</option>
                 <option value="480">480 px</option>
                 <option value="720">720 px</option>
             </select>
         </label>
-        <button class="primary" @onclick="Start" disabled="@rendering">@(rendering ? $"Rendering… {progress}%" : "Render")</button>
+        <button class="primary" @onclick="Start" disabled="@rendering">@(rendering ? T("render.rendering", progress) : L["render.button"])</button>
     </aside>
 </div>
 
@@ -268,7 +264,7 @@
     {
         if (g.Extinction is not { } extinction)
         {
-            return "no k data";
+            return L["render.nok"];
         }
 
         extinction.InternalTransmittance(Math.Clamp(wavelength, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers), sizeMm, out double t);

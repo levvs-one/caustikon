@@ -1,85 +1,49 @@
 @page "/formulas"
+@inherits LocalizedComponent
 
-<PageTitle>Formulas · Caustikon</PageTitle>
+<PageTitle>@L["formulas.title"]</PageTitle>
 
-<h1>Formulas</h1>
-<p class="lede">Every equation the packages evaluate, with the conventions that make its numbers comparable to a catalog, and the type that implements it.</p>
+<h1>@L["formulas.h1"]</h1>
+<p class="lede">@L["formulas.lede"]</p>
 
-<h2>Refraction</h2>
+<h2>@L["formulas.refraction.h"]</h2>
 <div class="equation">n<sub>i</sub> sin θ<sub>i</sub> = n<sub>t</sub> sin θ<sub>t</sub></div>
-<p>
-    <code>Dielectric.RefractUnit</code> takes unit vectors rather than angles. With η = n<sub>i</sub>/n<sub>t</sub>, the incident
-    direction I and a normal N pointing into the incident medium, the transmitted direction is
-    η·I<sub>tangent</sub> − √(1 − η²|I<sub>tangent</sub>|²)·N. When the square root's argument is negative the call reports total
-    internal reflection; within eight units of single-precision epsilon of zero it reports the critical angle and returns the
-    tangent direction. Both indices must share a reference medium: catalog indices are relative to air, so air is 1.
-</p>
+<p>@H("formulas.refraction.p")</p>
 
-<h2>Fresnel power reflectance</h2>
+<h2>@L["formulas.fresnel.h"]</h2>
 <div class="equation">
     R<sub>s</sub> = ((n<sub>i</sub> cos θ<sub>i</sub> − n<sub>t</sub> cos θ<sub>t</sub>) / (n<sub>i</sub> cos θ<sub>i</sub> + n<sub>t</sub> cos θ<sub>t</sub>))²<br />
     R<sub>p</sub> = ((n<sub>t</sub> cos θ<sub>i</sub> − n<sub>i</sub> cos θ<sub>t</sub>) / (n<sub>t</sub> cos θ<sub>i</sub> + n<sub>i</sub> cos θ<sub>t</sub>))²
 </div>
-<p>
-    <code>Dielectric.Fresnel</code> returns both polarizations; unpolarized light is their mean. Beyond the critical angle both are 1.
-    Two surfaces in series must be composed per polarization, (T<sub>s1</sub>T<sub>s2</sub> + T<sub>p1</sub>T<sub>p2</sub>)/2, because
-    light is partially polarized after the first; the playground does this. At normal incidence both reduce to
-    R₀ = ((n<sub>i</sub> − n<sub>t</sub>)/(n<sub>i</sub> + n<sub>t</sub>))², <code>Dielectric.NormalReflectance</code>, and Schlick's
-    approximation R₀ + (1 − R₀)(1 − cos θ)⁵ is <code>Dielectric.Schlick</code>; it does not know about total internal reflection.
-</p>
+<p>@H("formulas.fresnel.p")</p>
 
-<h2>Dispersion</h2>
-<p>λ is in micrometers in every form. Each model carries the wavelength interval its coefficients were fitted over and refuses to extrapolate.</p>
-<h3>Sellmeier — <code>Sellmeier</code>, <code>Sellmeier3</code></h3>
+<h2>@L["formulas.dispersion.h"]</h2>
+<p>@L["formulas.dispersion.p"]</p>
+<h3>@H("formulas.sellmeier.h")</h3>
 <div class="equation">n² − 1 = offset + Σ<sub>i</sub> B<sub>i</sub> λ² / (λ² − C<sub>i</sub>)</div>
-<p>
-    C<sub>i</sub> is the squared resonance wavelength in µm². SCHOTT, OHARA and CDGM publish this form. A source that lists the
-    resonance wavelengths themselves is imported by squaring them. A positive C<sub>i</sub> puts a pole at 1000·√C<sub>i</sub> nm;
-    a model whose interval contains an active pole cannot be constructed. Negative C<sub>i</sub>, which several CDGM fits carry,
-    has no pole and is accepted.
-</p>
-<h3>Polynomial — <code>Polynomial</code></h3>
+<p>@H("formulas.sellmeier.p")</p>
+<h3>@H("formulas.polynomial.h")</h3>
 <div class="equation">n² = a₀ + Σ<sub>i</sub> a<sub>i</sub> λ<sup>p<sub>i</sub></sup></div>
-<p>
-    The older "SCHOTT formula", still used by HOYA, SUMITA, HIKARI and part of OHARA, with powers 2, −2, −4, −6, −8 and sometimes −10, −12.
-    Even integer powers are evaluated by repeated multiplication or division applied to the coefficient, so a small coefficient over a
-    short wavelength cannot overflow before the ratio is formed.
-</p>
-<h3>Cauchy — <code>Cauchy</code>, <code>Cauchy3</code></h3>
+<p>@H("formulas.polynomial.p")</p>
+<h3>@H("formulas.cauchy.h")</h3>
 <div class="equation">n = a₀ + Σ<sub>i</sub> a<sub>i</sub> λ<sup>p<sub>i</sub></sup></div>
-<p>The same series in n rather than n²; index-matching liquids are catalogued this way.</p>
+<p>@L["formulas.cauchy.p"]</p>
 
-<h2>Abbe number</h2>
+<h2>@L["formulas.abbe.h"]</h2>
 <div class="equation">ν<sub>d</sub> = (n<sub>d</sub> − 1) / (n<sub>F</sub> − n<sub>C</sub>)</div>
-<p>
-    d = 587.5618 nm (He), F = 486.1327 nm (H), C = 656.2725 nm (H): <code>FraunhoferLines</code>. ν<sub>d</sub> divides by a difference of two
-    nearly equal numbers, which is why the catalog tests use it: an error in the fourth decimal of a coefficient shows up there
-    and nowhere else.
-</p>
+<p>@H("formulas.abbe.p")</p>
 
-<h2>Absorption</h2>
+<h2>@L["formulas.absorption.h"]</h2>
 <div class="equation">α = 4πk / λ &nbsp;&nbsp;&nbsp; τ<sub>i</sub>(d) = exp(−α d)</div>
-<p>
-    <code>TabulatedExtinction</code> holds the manufacturer's k(λ) and interpolates it linearly in log k, because k spans several
-    orders of magnitude across the visible. τ<sub>i</sub> is internal transmittance: bulk only, no surface reflection. Manufacturers
-    print τ<sub>i</sub> for 10 mm and 25 mm; the catalog reproduces SCHOTT's N-BK7 columns within their printed precision.
-</p>
+<p>@H("formulas.absorption.p")</p>
 
-<h2>Temperature</h2>
+<h2>@L["formulas.thermal.h"]</h2>
 <div class="equation">Δn<sub>abs</sub>(λ, T) = (n² − 1)/(2n) · [D₀ΔT + D₁ΔT² + D₂ΔT³ + (E₀ΔT + E₁ΔT²)/(λ² − λ<sub>TK</sub>²)]</div>
-<p>
-    <code>ThermalDispersion</code>, the form from SCHOTT TIE-19, with ΔT from 20 °C. It gives the change of the absolute index. The
-    relative index also depends on how air's index moves with temperature, which is not modelled. For N-BK7 the result matches the
-    datasheet's Δn<sub>abs</sub>/ΔT in all nine printed cells.
-</p>
+<p>@H("formulas.thermal.p")</p>
 
-<h2>Colour</h2>
+<h2>@L["formulas.colour.h"]</h2>
 <div class="equation">
-    X = Σ S(λ) T(λ) x̄(λ) / Σ S(λ) ȳ(λ), &nbsp; likewise Y, Z<br />
-    [R G B]<sub>linear</sub> = M<sub>sRGB</sub> · [X Y Z], then the sRGB transfer curve
+    X = Σ S(λ) T(λ) x̄(λ) / Σ S(λ) ȳ(λ), &nbsp; @L["formulas.colour.eq1"]<br />
+    [R G B]<sub>linear</sub> = M<sub>sRGB</sub> · [X Y Z], @L["formulas.colour.eq2"]
 </div>
-<p>
-    <code>GlassColour</code> integrates over 360–830 nm at 1 nm with the CIE 1931 2° observer and illuminant D65, normalized so that a
-    perfect transmitter has Y = 1. Y is therefore the luminous transmittance. Channels are clamped to [0, 1] and the result says
-    whether clamping happened.
-</p>
+<p>@H("formulas.colour.p")</p>

@@ -1,65 +1,30 @@
 @page "/about"
+@inherits LocalizedComponent
 
-<PageTitle>About · Caustikon</PageTitle>
+<PageTitle>@L["about.title"]</PageTitle>
 
-<h1>About</h1>
-<p class="lede">Caustikon is two .NET packages and this site. The packages are the product; the site runs them in your browser so the numbers can be inspected without installing anything.</p>
+<h1>@L["about.h1"]</h1>
+<p class="lede">@L["about.lede"]</p>
 
-<h2>Where the data comes from</h2>
-<p>
-    Every catalogued glass is transcribed from the RefractiveIndex.INFO database, which Mikhail Polyanskiy released into the public
-    domain under CC0 1.0. The database in turn transcribes manufacturer catalogs; each entry here names that catalog release,
-    links to the entry's file in the database, and records the date the database was read. The current import is commit
-    @manifestCommit, read on @retrieved.
-</p>
-<p>
-    Of @totalEntries manufacturer entries in the database, @SiteInfo.GlassCount have closed-form dispersion and are included.
-    The rest are tabulated-only (filters, some infrared and matching materials) and are listed by path and reason in the
-    repository's <a href="https://github.com/levvs-one/caustikon/blob/main/data/glasses/manifest.json" rel="noopener">manifest</a>.
-</p>
-<p>
-    Colour uses the CIE 1931 2° observer at 1 nm and illuminant D65 at 5 nm, copied unchanged from the colour-science project's
-    data tables (BSD-3-Clause). Licences and citations: <a href="https://github.com/levvs-one/caustikon/blob/main/DATA-LICENSE.md" rel="noopener">DATA-LICENSE.md</a>.
-</p>
+<h2>@L["about.data.h"]</h2>
+<p>@H("about.data.p1", manifestCommit, retrieved)</p>
+<p>@H("about.data.p2", totalEntries, SiteInfo.GlassCount)</p>
+<p>@H("about.data.p3")</p>
 
-<h2>How the numbers are checked</h2>
-<p>
-    A dispersion fit and the printed n<sub>d</sub> of a glass are two independent statements by the manufacturer. On every commit,
-    the test suite evaluates all @SiteInfo.GlassCount models at the exact d, F and C lines and compares with the printed n<sub>d</sub>
-    and ν<sub>d</sub>. The bound on n<sub>d</sub> is five units in the fifth decimal plus the rounding of the printed value; the bound
-    on ν<sub>d</sub> is that bound propagated through its definition. All pass. The largest deviation in the catalog, and which glass
-    it belongs to, is recorded in the manifest.
-</p>
-<p>
-    N-BK7 is pinned further, to the SCHOTT datasheet of 1 December 2023: seven internal-transmittance rows at 10 mm and 25 mm
-    and nine dn/dT cells across three temperature ranges and three lines, each within the datasheet's printed precision.
-    D65 through a perfect transmitter reproduces the D65 white point.
-</p>
+<h2>@L["about.check.h"]</h2>
+<p>@H("about.check.p1", SiteInfo.GlassCount)</p>
+<p>@H("about.check.p2")</p>
 
-<h2>What is not modelled</h2>
-<p>
-    Absorption is bulk only, from tabulated k; there is no scattering, no coating, no surface roughness. The index of air is 1 and
-    does not change with temperature or pressure, so temperature results are absolute-index shifts. There is no birefringence,
-    no polarization state beyond s and p power fractions at an interface, no thin-film interference, no diffraction. The
-    packages compute what happens at a plane dielectric boundary and in a homogeneous slab; scene geometry, lenses and rendering
-    belong to the caller.
-</p>
+<h2>@L["about.limits.h"]</h2>
+<p>@L["about.limits.p"]</p>
 
-<h2>Packages</h2>
+<h2>@L["about.packages.h"]</h2>
 <pre><code>dotnet add package Caustikon
 dotnet add package Caustikon.Glasses</code></pre>
-<p>
-    <code>Caustikon</code> is the mathematics: refraction, Fresnel, the dispersion models. <code>Caustikon.Glasses</code> is the
-    catalog with absorption, temperature and colour. Both target .NET 8 and .NET 10 with no dependencies beyond the base class
-    library. Source, issues and the data of record are on
-    <a href="https://github.com/levvs-one/caustikon" rel="noopener">GitHub</a>, under the MIT licence.
-</p>
+<p>@H("about.packages.p")</p>
 
-<h2>Citing</h2>
-<p>
-    For the glass data cite M. N. Polyanskiy, "Refractiveindex.info database of optical constants", <em>Scientific Data</em> 11, 94 (2024),
-    and the manufacturer catalog named in the glass's provenance. For the code cite the repository and the version shown in the footer.
-</p>
+<h2>@L["about.cite.h"]</h2>
+<p>@H("about.cite.p")</p>
 
 @code {
     private string manifestCommit = "c5c2f18";

@@ -1,0 +1,40 @@
+@using Caustikon.Site.Localization
+@inject Locale L
+@inject IJSRuntime Js
+@implements IDisposable
+
+<div class="lang @(open ? "open" : "")">
+    <button class="lang-button" @onclick="Toggle" aria-haspopup="listbox" aria-expanded="@open" title="Language / Язык">
+        <Flag Code="@L.Code" />
+        <span>@(L.IsRussian ? "RU" : "EN")</span>
+        <svg class="chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+    </button>
+    @if (open)
+    {
+        <ul class="lang-list" role="listbox">
+            <li role="option" aria-selected="@(!L.IsRussian)" @onclick="@(() => Choose("en"))">
+                <Flag Code="en" /><span>English, <span class="native">English</span></span>
+            </li>
+            <li role="option" aria-selected="@L.IsRussian" @onclick="@(() => Choose("ru"))">
+                <Flag Code="ru" /><span>Russian, <span class="native">Русский</span></span>
+            </li>
+        </ul>
+    }
+</div>
+
+@code {
+    private bool open;
+
+    protected override void OnInitialized() => L.Changed += StateHasChanged;
+
+    private void Toggle() => open = !open;
+
+    private async Task Choose(string code)
+    {
+        open = false;
+        L.Code = code;
+        await Js.InvokeVoidAsync("caustikonLang.set", L.Code);
+    }
+
+    public void Dispose() => L.Changed -= StateHasChanged;
+}

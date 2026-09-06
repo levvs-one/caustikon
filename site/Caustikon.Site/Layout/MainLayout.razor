@@ -1,39 +1,51 @@
+@using Caustikon.Site.Localization
 @inherits LayoutComponentBase
+@inject Locale L
+@implements IDisposable
 
-<header class="site">
-    <div class="frame">
-        <a class="wordmark" href="">
-            <svg viewBox="0 0 32 32" aria-hidden="true">
-                <polygon points="16,5 27,25 5,25" fill="none" stroke="currentColor" stroke-width="1.8" />
-                <line x1="2" y1="17" x2="11" y2="15" stroke="currentColor" stroke-width="1.8" />
-                <line x1="21" y1="15" x2="30" y2="19" stroke="var(--chart-2)" stroke-width="1.6" />
-                <line x1="21" y1="15" x2="30" y2="21.5" stroke="var(--chart-3)" stroke-width="1.6" />
-                <line x1="21" y1="15" x2="30" y2="24" stroke="var(--chart-1)" stroke-width="1.6" />
-            </svg>
-            Caustikon
-        </a>
-        <nav class="primary">
-            <NavLink href="catalog">Catalog</NavLink>
-            <NavLink href="playground">Playground</NavLink>
-            <NavLink href="render">Render</NavLink>
-            <NavLink href="use">Use it</NavLink>
-            <NavLink href="formulas">Formulas</NavLink>
-            <NavLink href="about">About</NavLink>
-            <a href="https://github.com/levvs-one/caustikon" rel="noopener">GitHub</a>
-        </nav>
-    </div>
-</header>
+<CascadingValue Name="Lang" Value="@L.Code">
+    <header class="site">
+        <div class="frame">
+            <a class="wordmark" href="">
+                <svg viewBox="0 0 32 32" aria-hidden="true">
+                    <polygon points="16,5 27,25 5,25" fill="none" stroke="currentColor" stroke-width="1.8" />
+                    <line x1="2" y1="17" x2="11" y2="15" stroke="currentColor" stroke-width="1.8" />
+                    <line x1="21" y1="15" x2="30" y2="19" stroke="var(--chart-2)" stroke-width="1.6" />
+                    <line x1="21" y1="15" x2="30" y2="21.5" stroke="var(--chart-3)" stroke-width="1.6" />
+                    <line x1="21" y1="15" x2="30" y2="24" stroke="var(--chart-1)" stroke-width="1.6" />
+                </svg>
+                Caustikon
+            </a>
+            <nav class="primary">
+                <NavLink href="catalog">@L["nav.catalog"]</NavLink>
+                <NavLink href="playground">@L["nav.playground"]</NavLink>
+                <NavLink href="render">@L["nav.render"]</NavLink>
+                <NavLink href="use">@L["nav.use"]</NavLink>
+                <NavLink href="formulas">@L["nav.formulas"]</NavLink>
+                <NavLink href="about">@L["nav.about"]</NavLink>
+                <a href="https://github.com/levvs-one/caustikon" rel="noopener">GitHub</a>
+            </nav>
+            <LanguageMenu />
+        </div>
+    </header>
 
-<main>
-    <div class="frame">
-        @Body
-    </div>
-</main>
+    <main>
+        <div class="frame">
+            @Body
+        </div>
+    </main>
 
-<footer class="site">
-    <div class="frame">
-        <span>Caustikon @SiteInfo.Version · MIT</span>
-        <span>Glass data: RefractiveIndex.INFO, CC0 1.0 · @SiteInfo.GlassCount glasses, @SiteInfo.VendorCount manufacturers</span>
-        <span>Colour: CIE 1931 2°, D65</span>
-    </div>
-</footer>
+    <footer class="site">
+        <div class="frame">
+            <span>Caustikon @SiteInfo.Version · MIT</span>
+            <span>@L["footer.data"] · @SiteInfo.GlassCount @L["footer.glasses"], @SiteInfo.VendorCount @L["footer.vendors"]</span>
+            <span>@L["footer.colour"]</span>
+        </div>
+    </footer>
+</CascadingValue>
+
+@code {
+    protected override void OnInitialized() => L.Changed += StateHasChanged;
+
+    public void Dispose() => L.Changed -= StateHasChanged;
+}
