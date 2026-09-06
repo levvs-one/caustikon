@@ -1,6 +1,7 @@
 @page "/"
 @using System.Numerics
 @using Caustikon.Site.Services
+@inject NavigationManager Navigation
 @inherits LocalizedComponent
 
 <PageTitle>@L["home.title"]</PageTitle>
@@ -384,6 +385,12 @@ string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</c
 
     protected override void OnInitialized()
     {
+        string wanted = SiteInfo.ReadGlassQuery(Navigation, "");
+        if (wanted.Length > 0)
+        {
+            prismKey = wanted;
+        }
+
         withExtinction = GlassCatalog.All.Count(g => g.Extinction is not null);
         withThermal = GlassCatalog.All.Count(g => g.Thermal is not null);
         Schott.NBK7.EvaluateNanometers(587.5618d, out nd);

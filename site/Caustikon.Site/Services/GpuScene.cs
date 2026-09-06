@@ -22,7 +22,8 @@ public sealed record GpuScene(
     int Backdrop,
     float[] KeyPosition,
     float KeyIntensity,
-    float Ambient)
+    float Ambient,
+    float Exposure)
 {
     public static GpuScene Build(
         Glass glass,
@@ -32,7 +33,8 @@ public sealed record GpuScene(
         double lightAzimuthDegrees,
         double lightElevationDegrees,
         double lightIntensity,
-        double ambient)
+        double ambient,
+        double exposure = 1)
     {
         shape.Describe(out bool sphere, out Vector3 centre, out float extent, out IReadOnlyList<(Vector3 Normal, float Distance)> planes);
         float[] flat = new float[planes.Count * 4];
@@ -68,6 +70,7 @@ public sealed record GpuScene(
             (int)backdrop,
             [key.X, key.Y, key.Z],
             (float)Math.Clamp(lightIntensity, 0d, 4d),
-            (float)Math.Clamp(ambient, 0d, 2d));
+            (float)Math.Clamp(ambient, 0d, 2d),
+            (float)Math.Clamp(exposure, 0.1d, 8d));
     }
 }

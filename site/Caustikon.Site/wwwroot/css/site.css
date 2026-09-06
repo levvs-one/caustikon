@@ -254,8 +254,29 @@ footer.site {
 
 footer.site .frame {
     display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.footer-row {
+    display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem 1.5rem;
+    justify-content: space-between;
+    gap: 0.3rem 1.5rem;
+}
+
+.footer-links {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+footer.site a {
+    color: var(--muted);
+}
+
+footer.site a:hover {
+    color: var(--fg);
 }
 
 /* Text blocks */
@@ -1409,10 +1430,6 @@ details.more > .bench-controls {
     margin-top: 0.4rem;
 }
 
-.footer-links {
-    display: inline-flex;
-    gap: 1rem;
-}
 
 .render-canvas.ui {
     aspect-ratio: 16 / 9;
@@ -1429,7 +1446,8 @@ details.more > .bench-controls {
     vertical-align: -0.1em;
 }
 
-/* Give Me! and the GitHub mark */
+
+/* Give Me! menu and the GitHub mark, in the header's own idiom */
 
 .give {
     position: relative;
@@ -1438,14 +1456,14 @@ details.more > .bench-controls {
 .give-button {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.3rem 0.8rem;
-    border-radius: 999px;
-    background: var(--accent);
-    border: 1px solid var(--accent);
-    color: #fff;
+    gap: 0.3rem;
+    padding: 0.2rem 0;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: var(--muted);
     font: inherit;
-    font-weight: 600;
     cursor: pointer;
 }
 
@@ -1456,7 +1474,7 @@ details.more > .bench-controls {
 
 .give-button:hover,
 .give.open .give-button {
-    filter: brightness(1.08);
+    color: var(--fg);
 }
 
 .give-list {
@@ -1466,21 +1484,22 @@ details.more > .bench-controls {
     margin: 0;
     padding: 0.35rem;
     list-style: none;
-    min-width: 260px;
+    min-width: 250px;
     background: var(--panel);
     border: 1px solid var(--line-strong);
-    border-radius: 10px;
-    box-shadow: 0 12px 32px rgb(0 0 0 / 0.16);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(29, 38, 43, 0.14);
     z-index: 30;
 }
 
 .give-list li {
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
-    padding: 0.5rem 0.65rem;
-    border-radius: 6px;
+    gap: 0.05rem;
+    padding: 0.45rem 0.65rem;
+    border-radius: 4px;
     cursor: pointer;
+    font-size: 0.92rem;
 }
 
 .give-list li:hover {
@@ -1488,48 +1507,54 @@ details.more > .bench-controls {
 }
 
 .give-list li span {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: var(--muted);
 }
 
 a.github {
     display: inline-flex;
     align-items: center;
-    color: var(--fg);
+    color: var(--muted);
     margin-left: 0.9rem;
+    border-bottom: none;
 }
 
 a.github:hover {
-    color: var(--accent);
-}
-
-.give-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin: 0 0 1.2rem;
-}
-
-.give-tabs a {
-    padding: 0.3rem 0.8rem;
-    border-radius: 999px;
-    border: 1px solid var(--line);
     color: var(--fg);
 }
 
-.give-tabs a.active {
-    background: var(--fg);
-    color: var(--bg);
-    border-color: var(--fg);
+/* Sub-navigation inside a section: the same underline the header uses */
+
+.subnav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 1.1rem;
+    margin: 0 0 1.2rem;
+    border-bottom: 1px solid var(--line);
 }
 
-ul.advice {
-    padding-left: 1.2rem;
-    max-width: 72ch;
+.subnav a,
+.subnav button {
+    padding: 0.35rem 0;
+    margin-bottom: -1px;
+    color: var(--muted);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    font: inherit;
+    cursor: pointer;
 }
 
-ul.advice li {
-    margin: 0 0 0.6rem;
+.subnav a:hover,
+.subnav button:hover {
+    color: var(--fg);
+}
+
+.subnav a.active,
+.subnav button.active {
+    color: var(--fg);
+    border-bottom-color: var(--accent);
 }
 
 @media (max-width: 720px) {
@@ -1537,4 +1562,36 @@ ul.advice li {
         left: auto;
         right: 0;
     }
+}
+
+/* Glass page: where to take it, thickness strips */
+
+.glass-use {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 1rem;
+    align-items: baseline;
+    margin: 0 0 1.2rem;
+}
+
+.glass-use span {
+    color: var(--muted);
+}
+
+.strips {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 0.6rem;
+    margin: 1rem 0 0.4rem;
+}
+
+.strip .swatch-block {
+    height: 48px;
+}
+
+.strip .label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 0.25rem;
+    font-variant-numeric: tabular-nums;
 }

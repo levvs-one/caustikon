@@ -38,10 +38,19 @@
 
     <footer class="site">
         <div class="frame">
-            <span>Caustikon @SiteInfo.Version, MIT. @L["footer.by"] <a href="https://github.com/levvs-one" rel="noopener">levvs-one</a></span>
-            <span>@L["footer.data"]: @SiteInfo.GlassCount @L["footer.glasses"], @SiteInfo.VendorCount @L["footer.vendors"]</span>
-            <span>@L["footer.colour"]</span>
-            <span class="footer-links"><a href="formulas">@L["nav.formulas"]</a><a href="about">@L["nav.about"]</a><a href="playground">@L["nav.playground"]</a></span>
+            <div class="footer-row">
+                <span>Caustikon @SiteInfo.Version, MIT. @L["footer.by"] <a href="https://github.com/levvs-one" rel="noopener">levvs-one</a></span>
+                <nav class="footer-links" aria-label="More">
+                    <a href="formulas">@L["nav.formulas"]</a>
+                    <a href="about">@L["nav.about"]</a>
+                    <a href="playground">@L["nav.playground"]</a>
+                    <a href="https://github.com/levvs-one/caustikon" rel="noopener">GitHub</a>
+                </nav>
+            </div>
+            <div class="footer-row">
+                <span>@L["footer.data"]: @SiteInfo.GlassCount @L["footer.glasses"], @SiteInfo.VendorCount @L["footer.vendors"]</span>
+                <span>@L["footer.colour"]</span>
+            </div>
         </div>
     </footer>
 </CascadingValue>

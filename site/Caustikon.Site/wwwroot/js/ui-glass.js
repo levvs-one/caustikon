@@ -26,6 +26,7 @@ uniform float uFrost;          // blur radius, px
 uniform float uRadius;         // corner radius, px
 uniform vec2 uHalf;            // panel half size, px
 uniform vec2 uLight;           // where the room light is, unit vector in the screen plane
+uniform float uLightStrength;  // 1 is the default lamp
 
 float sdRoundRect(vec2 p, vec2 b, float r) {
     vec2 q = abs(p) - b + r;
@@ -66,7 +67,7 @@ vec3 room(vec3 direction) {
     vec3 base = mix(vec3(0.62, 0.64, 0.68), vec3(0.96, 0.97, 1.0), up);
     vec3 lamp = normalize(vec3(uLight, 0.55));
     float key = max(0.0, dot(direction, lamp));
-    return base * 0.55 + vec3(1.0, 0.98, 0.94) * (2.6 * pow(key, 48.0) + 0.35 * pow(key, 6.0));
+    return base * 0.55 + vec3(1.0, 0.98, 0.94) * uLightStrength * (2.6 * pow(key, 48.0) + 0.35 * pow(key, 6.0));
 }
 
 void main() {
@@ -148,7 +149,7 @@ void main() {
             loc: {
                 resolution: u("uResolution"), backdrop: u("uBackdrop"), ior: u("uIor"), alpha: u("uAlpha"), pxPerMm: u("uPxPerMm"),
                 thickness: u("uThickness"), bevel: u("uBevel"), dome: u("uDome"), frost: u("uFrost"), radius: u("uRadius"),
-                half: u("uHalf"), light: u("uLight"),
+                half: u("uHalf"), light: u("uLight"), lightStrength: u("uLightStrength"),
             },
             frame: 0, fallback: 0,
         };
@@ -166,12 +167,41 @@ void main() {
         scratch.height = h;
         const ctx = scratch.getContext("2d");
         const s = w / 1000;
+        const preset = spec.backdrop || "interface";
+        const dark = preset === "dark";
         const sky = ctx.createLinearGradient(0, 0, 0, h);
-        sky.addColorStop(0, "#f4f1ea");
-        sky.addColorStop(1, "#dfe6ee");
+        sky.addColorStop(0, dark ? "#1b2024" : "#f4f1ea");
+        sky.addColorStop(1, dark ? "#0f1417" : "#dfe6ee");
         ctx.fillStyle = sky;
         ctx.fillRect(0, 0, w, h);
+        if (preset === "photo") {
+            // A photograph-like ground: large soft colour fields and a horizon, nothing to read.
+            const bands = ["#d9a066", "#c96f3a", "#7a9cc6", "#4d6a8a", "#e8d8b8"];
+            bands.forEach((colour, i) => {
+                const grad = ctx.createRadialGradient(w * (0.15 + i * 0.18), h * (0.3 + (i % 2) * 0.4), 0, w * (0.15 + i * 0.18), h * (0.3 + (i % 2) * 0.4), w * 0.28);
+                grad.addColorStop(0, colour + "e6");
+                grad.addColorStop(1, colour + "00");
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, w, h);
+            });
+            ctx.fillStyle = "rgba(30, 40, 50, 0.55)";
+            ctx.fillRect(0, h * 0.72, w, 2 * s);
+            finish();
+            return;
+        }
+        if (preset === "text") {
+            ctx.fillStyle = dark ? "#e6e2d8" : "#1d262b";
+            ctx.font = `${17 * s}px "IBM Plex Sans", "Segoe UI", sans-serif`;
+            const words = (spec.lines || []).join("   ");
+            for (let i = 0; i < 14; i++) {
+                ctx.fillText(words.slice(i * 7) + "   " + words, w * 0.04, h * 0.08 + i * 32 * s);
+            }
+            finish();
+            return;
+        }
         const glow = ctx.createRadialGradient(w * 0.78, h * 0.25, 0, w * 0.78, h * 0.25, w * 0.45);
+        const ink = dark ? "#e6e2d8" : "#1d262b";
+        const inkSoft = dark ? "rgba(230, 226, 216, 0.7)" : "rgba(29, 38, 43, 0.7)";
         glow.addColorStop(0, "rgba(255, 176, 92, 0.85)");
         glow.addColorStop(0.5, "rgba(255, 120, 90, 0.35)");
         glow.addColorStop(1, "rgba(255, 120, 90, 0)");
@@ -184,7 +214,7 @@ void main() {
         ctx.fillRect(0, 0, w, h);
 
         // Fine rules: refraction and frost show on them first.
-        ctx.strokeStyle = "rgba(30, 40, 50, 0.28)";
+        ctx.strokeStyle = dark ? "rgba(230, 226, 216, 0.22)" : "rgba(30, 40, 50, 0.28)";
         ctx.lineWidth = Math.max(1, 1 * s);
         for (let y = h * 0.12; y < h; y += 34 * s) {
             ctx.beginPath();
@@ -199,17 +229,20 @@ void main() {
             ctx.fillRect(w * 0.08 + i * 62 * s, h * 0.18, 44 * s, 44 * s);
         });
         // Text: the glasses and their indices, in the page's own font.
-        ctx.fillStyle = "#1d262b";
+        ctx.fillStyle = ink;
         ctx.font = `600 ${30 * s}px "IBM Plex Sans", "Segoe UI", sans-serif`;
         ctx.fillText(spec.title, w * 0.08, h * 0.12);
         ctx.font = `${17 * s}px "IBM Plex Sans", "Segoe UI", sans-serif`;
         const lines = spec.lines || [];
         lines.forEach((line, i) => ctx.fillText(line, w * 0.08, h * 0.36 + i * 34 * s));
         ctx.font = `${13 * s}px "IBM Plex Sans", "Segoe UI", sans-serif`;
-        ctx.fillStyle = "rgba(29, 38, 43, 0.7)";
+        ctx.fillStyle = inkSoft;
         for (let i = 0; i < 6; i++) {
             ctx.fillText("RefractiveIndex.INFO  CC0 1.0  " + ["n_d", "ν_d", "k(λ)", "dn/dT", "P_g,F", "τ_i"][i], w * 0.55, h * 0.4 + i * 34 * s);
         }
+        finish();
+
+        function finish() {
         const { gl } = view;
         gl.bindTexture(gl.TEXTURE_2D, view.texture);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -219,7 +252,12 @@ void main() {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        view.backdropKey = w + "x" + h + ":" + spec.title + ":" + lines.join("|");
+        view.backdropKey = backdropKey(w, h, spec);
+        }
+    }
+
+    function backdropKey(w, h, spec) {
+        return w + "x" + h + ":" + (spec.backdrop || "interface") + ":" + spec.title + ":" + (spec.lines || []).join("|");
     }
 
     function request(view) {
@@ -246,8 +284,7 @@ void main() {
             canvas.width = w;
             canvas.height = h;
         }
-        const key = w + "x" + h + ":" + spec.title + ":" + (spec.lines || []).join("|");
-        if (view.backdropKey !== key) drawBackdrop(view, w, h, spec);
+        if (view.backdropKey !== backdropKey(w, h, spec)) drawBackdrop(view, w, h, spec);
         const s = w / 1000;
         gl.viewport(0, 0, w, h);
         gl.useProgram(view.program);
@@ -263,9 +300,14 @@ void main() {
         gl.uniform1f(loc.dome, spec.dome);
         gl.uniform1f(loc.frost, spec.frostPx * s);
         gl.uniform1f(loc.radius, spec.radiusPx * s);
-        gl.uniform2f(loc.half, w * spec.widthFraction * 0.5, h * spec.heightFraction * 0.5);
+        let halfW = w * spec.widthFraction * 0.5, halfH = h * spec.heightFraction * 0.5, radius = spec.radiusPx * s;
+        if (spec.shape === "pill") radius = Math.min(halfW, halfH);
+        if (spec.shape === "circle") { halfW = halfH = Math.min(halfW, halfH); radius = halfW; }
+        gl.uniform1f(loc.radius, radius);
+        gl.uniform2f(loc.half, halfW, halfH);
         const a = spec.lightDegrees * Math.PI / 180;
         gl.uniform2f(loc.light, Math.cos(a), Math.sin(a));
+        gl.uniform1f(loc.lightStrength, spec.lightStrength == null ? 1 : spec.lightStrength);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
 
@@ -292,6 +334,21 @@ void main() {
         },
         shaderSource() {
             return FRAGMENT;
+        },
+        // Saves the canvas as a PNG through a normal download.
+        download(id, filename) {
+            const canvas = document.getElementById(id);
+            if (!canvas) return;
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename || "glass.png";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }, "image/png");
         },
     };
 })();

@@ -33,8 +33,22 @@ uniform vec3 uKeyPosition;
 uniform vec3 uKeyDirection;
 uniform float uKeyIntensity;
 uniform float uAmbient;
+uniform float uExtent;     // half the solid's extent, for the contact shadow on the table
+uniform float uExposure;
 
 const vec3 RIM = normalize(vec3(2.4, 1.2, 2.0));
+
+// A softbox: a bright rectangle of the sky seen in direction d, soft-edged, as a studio lamp reflects in glass.
+float softbox(vec3 d, vec3 centre, float halfAngle) {
+    float a = acos(clamp(dot(d, centre), -1.0, 1.0));
+    return 1.0 - smoothstep(halfAngle * 0.7, halfAngle, a);
+}
+
+// ACES filmic curve (Narkowicz fit): keeps the lamps from clipping to flat white while the glass stays bright.
+vec3 tonemap(vec3 c) {
+    c *= uExposure;
+    return clamp((c * (2.51 * c + 0.03)) / (c * (2.43 * c + 0.59) + 0.14), 0.0, 1.0);
+}
 
 // First hit of a ray starting outside the solid; false on a miss.
 bool enter(vec3 origin, vec3 direction, out float t, out vec3 normal) {
@@ -126,15 +140,16 @@ vec3 ground(float x, float z) {
     return dark ? vec3(0.08, 0.085, 0.09) : vec3(0.86, 0.80, 0.68);
 }
 
+// The studio: a gradient dome, a key softbox where the lamp stands, a cooler fill opposite, a thin rim from behind.
 vec3 sky(vec3 direction) {
     float t = clamp(direction.y * 0.5 + 0.5, 0.0, 1.0);
-    vec3 horizon = (uBackdrop == 4 ? vec3(0.05, 0.06, 0.08) : vec3(0.30, 0.33, 0.36)) * uAmbient;
-    vec3 zenith = vec3(0.035, 0.045, 0.06) * uAmbient;
+    vec3 horizon = (uBackdrop == 4 ? vec3(0.05, 0.06, 0.08) : vec3(0.34, 0.36, 0.39)) * uAmbient;
+    vec3 zenith = (uBackdrop == 4 ? vec3(0.02, 0.025, 0.035) : vec3(0.10, 0.12, 0.15)) * uAmbient;
     vec3 s = horizon * (1.0 - t) + zenith * t;
-    float key = max(0.0, dot(direction, uKeyDirection));
-    s += vec3(1.0, 0.97, 0.92) * uKeyIntensity * (40.0 * pow(key, 220.0) + 0.6 * pow(key, 8.0));
-    float rim = max(0.0, dot(direction, RIM));
-    s += vec3(0.55, 0.65, 0.80) * (8.0 * pow(rim, 140.0));
+    s += vec3(1.0, 0.97, 0.92) * uKeyIntensity * (5.0 * softbox(direction, uKeyDirection, 0.28) + 12.0 * softbox(direction, uKeyDirection, 0.06));
+    vec3 fill = normalize(vec3(-uKeyDirection.x, max(0.25, uKeyDirection.y * 0.6), -uKeyDirection.z));
+    s += vec3(0.80, 0.86, 1.0) * uAmbient * 1.6 * softbox(direction, fill, 0.5);
+    s += vec3(0.55, 0.65, 0.80) * 3.0 * softbox(direction, RIM, 0.12);
     return s;
 }
 
@@ -146,8 +161,10 @@ vec3 environment(vec3 origin, vec3 direction) {
         float distance = length(hit.xz);
         vec3 tile = ground(hit.x, hit.z);
         float lit = uAmbient + uKeyIntensity * 0.12 * max(0.0, normalize(uKeyPosition - hit).y);
+        // Contact shadow: the table darkens under and around the solid, most where they touch.
+        float contact = 1.0 - 0.62 * (1.0 - smoothstep(0.1 * uExtent, 1.7 * uExtent, distance));
         float fade = exp(-distance * 0.18);
-        return tile * lit * fade + sky(direction) * (1.0 - fade);
+        return tile * lit * contact * fade + sky(direction) * (1.0 - fade);
     }
     return sky(direction);
 }
@@ -212,7 +229,9 @@ void main() {
     } else {
         colour = shade(gl_FragCoord.xy + uJitter);
     }
-    outColour = uLinear ? vec4(colour, 1.0) : vec4(compand(colour.r), compand(colour.g), compand(colour.b), 1.0);
+    if (uLinear) { outColour = vec4(colour, 1.0); return; }
+    colour = tonemap(colour);
+    outColour = vec4(compand(colour.r), compand(colour.g), compand(colour.b), 1.0);
 }`;
 
     // Shows the running average of the accumulated samples, companded to sRGB.
@@ -221,12 +240,14 @@ precision highp float;
 out vec4 outColour;
 uniform sampler2D uAccum;
 uniform float uCount;
+uniform float uExposure;
 float compand(float c) {
     c = clamp(c, 0.0, 1.0);
     return c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1.0 / 2.4) - 0.055;
 }
 void main() {
-    vec3 c = texelFetch(uAccum, ivec2(gl_FragCoord.xy), 0).rgb / uCount;
+    vec3 c = texelFetch(uAccum, ivec2(gl_FragCoord.xy), 0).rgb / uCount * uExposure;
+    c = clamp((c * (2.51 * c + 0.03)) / (c * (2.43 * c + 0.59) + 0.14), 0.0, 1.0);
     outColour = vec4(compand(c.r), compand(c.g), compand(c.b), 1.0);
 }`;
 
@@ -279,7 +300,7 @@ void main() {
                 sphere: u("uSphere"), centre: u("uCentre"), planeCount: u("uPlaneCount"), planes: u("uPlanes"),
                 index: u("uIndex"), weight: u("uWeight"), alpha: u("uAlpha"), mmPerUnit: u("uMmPerUnit"),
                 tile: u("uTile"), backdrop: u("uBackdrop"), keyPosition: u("uKeyPosition"), keyDirection: u("uKeyDirection"),
-                keyIntensity: u("uKeyIntensity"), ambient: u("uAmbient"),
+                keyIntensity: u("uKeyIntensity"), ambient: u("uAmbient"), extent: u("uExtent"), exposure: u("uExposure"),
             },
             scene: null,
             accum: null, fbo: null, accumWidth: 0, accumHeight: 0, count: 0,
@@ -290,7 +311,7 @@ void main() {
             frame: 0, fallback: 0, lastMs: 0, mode: "still",
         };
         if (view.resolve) {
-            view.resolveLoc = { accum: gl.getUniformLocation(view.resolve, "uAccum"), count: gl.getUniformLocation(view.resolve, "uCount") };
+            view.resolveLoc = { accum: gl.getUniformLocation(view.resolve, "uAccum"), count: gl.getUniformLocation(view.resolve, "uCount"), exposure: gl.getUniformLocation(view.resolve, "uExposure") };
         }
         attach(view);
         return view;
@@ -487,6 +508,7 @@ void main() {
         gl.bindTexture(gl.TEXTURE_2D, view.accum);
         gl.uniform1i(view.resolveLoc.accum, 0);
         gl.uniform1f(view.resolveLoc.count, view.count);
+        gl.uniform1f(view.resolveLoc.exposure, view.scene.exposure);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         gl.useProgram(view.program);
         view.lastMs = performance.now() - started;
@@ -516,6 +538,8 @@ void main() {
         gl.uniform3fv(loc.keyDirection, normalize(scene.keyPosition));
         gl.uniform1f(loc.keyIntensity, scene.keyIntensity);
         gl.uniform1f(loc.ambient, scene.ambient);
+        gl.uniform1f(loc.extent, scene.extent);
+        gl.uniform1f(loc.exposure, scene.exposure);
     }
 
     function normalize(v) {

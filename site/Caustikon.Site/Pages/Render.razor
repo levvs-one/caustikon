@@ -3,6 +3,7 @@
 @using Caustikon.Site.Services
 @using System.Numerics
 @inject IJSRuntime Js
+@inject NavigationManager Navigation
 @implements IDisposable
 @inherits LocalizedComponent
 
@@ -86,6 +87,7 @@
             <RangeField Label="@L["render.light.el"]" @bind-Value="lightElevation" Min="5" Max="85" Step="1" Unit="°" />
             <RangeField Label="@L["render.lamp"]" @bind-Value="lightIntensity" Min="0" Max="4" Step="0.1" Unit="×" />
             <RangeField Label="@L["render.room"]" @bind-Value="ambient" Min="0" Max="2" Step="0.1" Unit="×" />
+            <RangeField Label="@L["render.exposure"]" @bind-Value="exposure" Min="0.25" Max="4" Step="0.05" Unit="×" />
         </div>
     </details>
     @if (glass is { } g0)
@@ -131,7 +133,8 @@
     private string backdropKeyValue = "checker";
     private int sidesValue = 6;
     private double sizeMmValue = 60;
-    private double lightAzimuthValue = 55, lightElevationValue = 50, lightIntensityValue = 1, ambientValue = 1;
+    private double lightAzimuthValue = 55, lightElevationValue = 50, lightIntensityValue = 1, ambientValue = 1, exposureValue = 1;
+    private double exposure { get => exposureValue; set { exposureValue = value; Push(); } }
     private bool gpu = true;
     private bool pushQueued;
 
@@ -184,7 +187,7 @@
             return;
         }
 
-        GpuScene scene = GpuScene.Build(glass, Shape, sizeMm / 2d, Scenery, lightAzimuth, lightElevation, lightIntensity, ambient);
+        GpuScene scene = GpuScene.Build(glass, Shape, sizeMm / 2d, Scenery, lightAzimuth, lightElevation, lightIntensity, ambient, exposure);
         bool ok = await Js.InvokeAsync<bool>("caustikonGl.render", "render-canvas", scene);
         if (!ok && gpu)
         {
@@ -195,7 +198,7 @@
         }
     }
 
-    protected override void OnInitialized() => selectedKey = selectedKeyValue;
+    protected override void OnInitialized() => selectedKey = SiteInfo.ReadGlassQuery(Navigation, selectedKeyValue);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -248,7 +251,7 @@
         StateHasChanged();
         await Task.Yield();
 
-        GlassRenderer renderer = new(glass, Shape, sizeMm / 2d, Scenery, lightAzimuth, lightElevation, lightIntensity, ambient);
+        GlassRenderer renderer = new(glass, Shape, sizeMm / 2d, Scenery, lightAzimuth, lightElevation, lightIntensity, ambient, exposure);
         System.Diagnostics.Stopwatch watch = new();
 
         // Pass 1: a quarter-size preview, drawn scaled, so the solid appears at once.

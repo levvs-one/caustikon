@@ -41,6 +41,7 @@ public sealed class GlassRenderer
     private readonly Vector3 keyDirection;
     private readonly float keyIntensity;
     private readonly float ambient;
+    private readonly float exposure;
     private static readonly Vector3 RimDirection = Vector3.Normalize(new Vector3(2.4f, 1.2f, 2.0f));
 
     /// <param name="glass">The glass to render; its model and extinction table are sampled at nine wavelengths.</param>
@@ -59,8 +60,10 @@ public sealed class GlassRenderer
         double lightAzimuthDegrees = 55,
         double lightElevationDegrees = 50,
         double lightIntensity = 1,
-        double ambient = 1)
+        double ambient = 1,
+        double exposure = 1)
     {
+        this.exposure = (float)Math.Clamp(exposure, 0.1d, 8d);
         this.shape = shape;
         this.radiusMillimeters = radiusMillimeters;
         this.backdrop = backdrop;
@@ -198,12 +201,12 @@ public sealed class GlassRenderer
         return colour;
     }
 
-    private static void Store(byte[] rgba, int index, Vector3 colour)
+    private void Store(byte[] rgba, int index, Vector3 colour)
     {
         int offset = index * 4;
-        rgba[offset] = ToByte(colour.X);
-        rgba[offset + 1] = ToByte(colour.Y);
-        rgba[offset + 2] = ToByte(colour.Z);
+        rgba[offset] = ToByte(Tone(colour.X));
+        rgba[offset + 1] = ToByte(Tone(colour.Y));
+        rgba[offset + 2] = ToByte(Tone(colour.Z));
         rgba[offset + 3] = 255;
     }
 
@@ -267,8 +270,10 @@ public sealed class GlassRenderer
             float distance = MathF.Sqrt(hit.X * hit.X + hit.Z * hit.Z);
             Vector3 tile = Ground(hit.X, hit.Z);
             float lit = ambient + keyIntensity * 0.12f * MathF.Max(0f, Vector3.Dot(Vector3.Normalize(keyPosition - hit), Vector3.UnitY));
+            // Contact shadow: the table darkens under and around the solid, most where they touch.
+            float contact = 1f - 0.62f * (1f - SmoothStep(0.1f * shape.Extent, 1.7f * shape.Extent, distance));
             float fade = MathF.Exp(-distance * 0.18f);
-            return tile * lit * fade + Sky(direction) * (1f - fade);
+            return tile * lit * contact * fade + Sky(direction) * (1f - fade);
         }
 
         return Sky(direction);
@@ -318,19 +323,37 @@ public sealed class GlassRenderer
         }
     }
 
+    // The studio: a gradient dome, a key softbox where the lamp stands, a cooler fill opposite, a thin rim from behind.
     private Vector3 Sky(Vector3 direction)
     {
         float t = Math.Clamp(direction.Y * 0.5f + 0.5f, 0f, 1f);
-        Vector3 horizon = (backdrop == Backdrop.Night ? new Vector3(0.05f, 0.06f, 0.08f) : new Vector3(0.30f, 0.33f, 0.36f)) * ambient;
-        Vector3 zenith = new Vector3(0.035f, 0.045f, 0.06f) * ambient;
+        Vector3 horizon = (backdrop == Backdrop.Night ? new Vector3(0.05f, 0.06f, 0.08f) : new Vector3(0.34f, 0.36f, 0.39f)) * ambient;
+        Vector3 zenith = (backdrop == Backdrop.Night ? new Vector3(0.02f, 0.025f, 0.035f) : new Vector3(0.10f, 0.12f, 0.15f)) * ambient;
         Vector3 sky = horizon * (1f - t) + zenith * t;
-
-        // A lamp is far brighter than the room: after a few per cent of Fresnel reflection it must still read as white.
-        float key = MathF.Max(0f, Vector3.Dot(direction, keyDirection));
-        sky += new Vector3(1.0f, 0.97f, 0.92f) * keyIntensity * (40f * MathF.Pow(key, 220f) + 0.6f * MathF.Pow(key, 8f));
-        float rim = MathF.Max(0f, Vector3.Dot(direction, RimDirection));
-        sky += new Vector3(0.55f, 0.65f, 0.80f) * (8f * MathF.Pow(rim, 140f));
+        sky += new Vector3(1.0f, 0.97f, 0.92f) * keyIntensity * (5f * Softbox(direction, keyDirection, 0.28f) + 12f * Softbox(direction, keyDirection, 0.06f));
+        Vector3 fill = Vector3.Normalize(new Vector3(-keyDirection.X, MathF.Max(0.25f, keyDirection.Y * 0.6f), -keyDirection.Z));
+        sky += new Vector3(0.80f, 0.86f, 1.0f) * ambient * 1.6f * Softbox(direction, fill, 0.5f);
+        sky += new Vector3(0.55f, 0.65f, 0.80f) * 3f * Softbox(direction, RimDirection, 0.12f);
         return sky;
+    }
+
+    private static float Softbox(Vector3 d, Vector3 centre, float halfAngle)
+    {
+        float a = MathF.Acos(Math.Clamp(Vector3.Dot(d, centre), -1f, 1f));
+        return 1f - SmoothStep(halfAngle * 0.7f, halfAngle, a);
+    }
+
+    private static float SmoothStep(float edge0, float edge1, float x)
+    {
+        float t = Math.Clamp((x - edge0) / (edge1 - edge0), 0f, 1f);
+        return t * t * (3f - 2f * t);
+    }
+
+    // ACES filmic curve (Narkowicz fit), applied after exposure and before companding.
+    private float Tone(float c)
+    {
+        c *= exposure;
+        return Math.Clamp((c * (2.51f * c + 0.03f)) / (c * (2.43f * c + 0.59f) + 0.14f), 0f, 1f);
     }
 
     private static Vector3[] BuildWeights()

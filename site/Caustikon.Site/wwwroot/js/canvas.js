@@ -91,3 +91,15 @@ window.caustikonLang = {
         document.documentElement.lang = code;
     }
 };
+
+// Closes the header menus when a click lands outside them; the menus themselves stop propagation by being the target.
+window.caustikonMenus = {
+    watch() {
+        if (document.body.dataset.menuWatch) return;
+        document.body.dataset.menuWatch = "1";
+        document.addEventListener("pointerdown", e => {
+            if (e.target.closest && e.target.closest(".lang, .give")) return;
+            DotNet.invokeMethodAsync("Caustikon.Site", "CloseMenus");
+        });
+    }
+};

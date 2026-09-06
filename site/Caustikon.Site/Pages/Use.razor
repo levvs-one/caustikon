@@ -1,6 +1,7 @@
 @page "/design"
 @page "/use"
 @inject IJSRuntime Js
+@inject NavigationManager Navigation
 @inherits LocalizedComponent
 
 <PageTitle>@L["use.title"]</PageTitle>
@@ -39,6 +40,23 @@
         <RangeField Label="@L["use.bevel"]" @bind-Value="bevel" Min="0" Max="160" Step="1" Unit="px" />
         <RangeField Label="@L["use.dome"]" @bind-Value="dome" Min="0" Max="1" Step="0.02" />
         <RangeField Label="@L["use.frost"]" @bind-Value="blur" Min="0" Max="40" Step="1" Unit="px" />
+        <label class="control">
+            <span>@L["use.shape"]</span>
+            <select @bind="shape">
+                <option value="rect">@L["use.shape.rect"]</option>
+                <option value="pill">@L["use.shape.pill"]</option>
+                <option value="circle">@L["use.shape.circle"]</option>
+            </select>
+        </label>
+        <label class="control">
+            <span>@L["use.backdrop"]</span>
+            <select @bind="backdrop">
+                <option value="interface">@L["use.backdrop.interface"]</option>
+                <option value="text">@L["use.backdrop.text"]</option>
+                <option value="photo">@L["use.backdrop.photo"]</option>
+                <option value="dark">@L["use.backdrop.dark"]</option>
+            </select>
+        </label>
     </div>
     <details class="more">
         <summary>@L["ui.more"]</summary>
@@ -48,8 +66,29 @@
             <RangeField Label="@L["use.scale"]" @bind-Value="pxPerMm" Min="1" Max="12" Step="0.5" Unit="px/mm" />
             <RangeField Label="@L["use.width"]" @bind-Value="widthFraction" Min="0.2" Max="0.95" Step="0.01" Scale="100" Unit="%" Decimals="0" />
             <RangeField Label="@L["use.height"]" @bind-Value="heightFraction" Min="0.2" Max="0.95" Step="0.01" Scale="100" Unit="%" Decimals="0" />
+            <RangeField Label="@L["use.lightstrength"]" @bind-Value="lightStrength" Min="0" Max="3" Step="0.05" Unit="×" />
+            <label class="control">
+                <span>@L["use.compare"]</span>
+                <select @bind="compareKey">
+                    <option value="">@L["use.compare.none"]</option>
+                    @foreach ((string key, string label) in Featured)
+                    {
+                        <option value="@key">@(L.IsRussian ? label.Split('|')[1] : label.Split('|')[0])</option>
+                    }
+                </select>
+            </label>
+            <div class="control">
+                <div class="button-row">
+                    <button @onclick="Download">@L["use.download"]</button>
+                </div>
+            </div>
         </div>
     </details>
+    @if (compareGlass is { } cg)
+    {
+        <p class="bench-hint">@T("use.compare.hint", cg.VendorDisplayName + " " + cg.Name)</p>
+        <canvas id="ui-compare" class="render-canvas ui"></canvas>
+    }
 
     @if (glass is { } g0 && tint is { } c)
     {
@@ -71,36 +110,47 @@
 
 @if (glass is { } g1)
 {
-    <h2>@L["use.glsl.h"]</h2>
-    <p>@L["use.glsl.p"]</p>
-    <div class="snippet">
-        <div class="snippet-bar"><span>GLSL ES 3.00, @g1.VendorDisplayName @g1.Name</span><button @onclick="() => Copy(glslSnippet)">@L["use.copy"]</button></div>
-        <pre><code>@glslSnippet</code></pre>
-    </div>
-
-    <h2>@L["use.css.h"]</h2>
-    <p>@H("use.css.p")</p>
-    <div class="use-demo">
-        <div class="use-backdrop">
-            <span style="background:#e4572e"></span><span style="background:#17bebb"></span><span style="background:#ffc914"></span><span style="background:#2e282a"></span><span style="background:#76b041"></span>
-            <p>@L["use.demo.text"]</p>
+    <h2>@L["use.code.h"]</h2>
+    <nav class="subnav" aria-label="@L["use.code.h"]">
+        <button class="@(tab == "glsl" ? "active" : "")" @onclick="@(() => tab = "glsl")">GLSL</button>
+        <button class="@(tab == "css" ? "active" : "")" @onclick="@(() => tab = "css")">CSS</button>
+        <button class="@(tab == "cs" ? "active" : "")" @onclick="@(() => tab = "cs")">C#</button>
+    </nav>
+    @if (tab == "glsl")
+    {
+        <p>@L["use.glsl.p"]</p>
+        <div class="snippet">
+            <div class="snippet-bar"><span>GLSL ES 3.00, @g1.VendorDisplayName @g1.Name</span><button @onclick="() => Copy(glslSnippet)">@L["use.copy"]</button></div>
+            <pre><code>@glslSnippet</code></pre>
         </div>
-        <div class="glass-panel" style="@PanelStyle">
-            <strong>@g1.Name</strong>
-            <span>@SiteInfo.Number(thickness, 1) mm, n<sub>d</sub> @SiteInfo.Number(g1.IndexD, 4)</span>
+    }
+    else if (tab == "css")
+    {
+        <p>@H("use.css.p")</p>
+        <div class="use-demo">
+            <div class="use-backdrop">
+                <span style="background:#e4572e"></span><span style="background:#17bebb"></span><span style="background:#ffc914"></span><span style="background:#2e282a"></span><span style="background:#76b041"></span>
+                <p>@L["use.demo.text"]</p>
+            </div>
+            <div class="glass-panel" style="@PanelStyle">
+                <strong>@g1.Name</strong>
+                <span>@SiteInfo.Number(thickness, 1) mm, n<sub>d</sub> @SiteInfo.Number(g1.IndexD, 4)</span>
+            </div>
         </div>
-    </div>
-    <div class="snippet">
-        <div class="snippet-bar"><span>CSS</span><button @onclick="() => Copy(cssSnippet)">@L["use.copy"]</button></div>
-        <pre><code>@cssSnippet</code></pre>
-    </div>
-
-    <h2>@L["use.cs.h"]</h2>
-    <p>@L["use.cs.p"]</p>
-    <div class="snippet">
-        <div class="snippet-bar"><span>C#</span><button @onclick="() => Copy(csharpSnippet)">@L["use.copy"]</button></div>
-        <pre><code>@csharpSnippet</code></pre>
-    </div>
+        <div class="snippet">
+            <div class="snippet-bar"><span>CSS</span><button @onclick="() => Copy(cssSnippet)">@L["use.copy"]</button></div>
+            <pre><code>@cssSnippet</code></pre>
+        </div>
+    }
+    else
+    {
+        <p>@L["use.cs.p"]</p>
+        <div class="snippet">
+            <div class="snippet-bar"><span>C#</span><button @onclick="() => Copy(csharpSnippet)">@L["use.copy"]</button></div>
+            <pre><code>@csharpSnippet</code></pre>
+        </div>
+    }
+    <p><a href="@("give/design?glass=" + Uri.EscapeDataString(selectedKeyValue) + "&mm=" + thickness.ToString("0.#", CultureInfo.InvariantCulture))">@L["use.more.formats"]</a></p>
 }
 
 <h2>@L["use.pick.h"]</h2>
@@ -140,6 +190,13 @@
     ];
 
     private string selectedKeyValue = "schott/N-BK7";
+    private string shapeValue = "rect", backdropValue = "interface", compareValue = "", tab = "glsl";
+    private double lightStrengthValue = 1;
+    private Glass? compareGlass;
+    private string shape { get => shapeValue; set { shapeValue = value; Recompute(); } }
+    private string backdrop { get => backdropValue; set { backdropValue = value; Recompute(); } }
+    private double lightStrength { get => lightStrengthValue; set { lightStrengthValue = value; Recompute(); } }
+    private string compareKey { get => compareValue; set { compareValue = value; Recompute(); } }
     private double thicknessValue = 6, bevelValue = 36, domeValue = 0.25, blurValue = 2, radiusValue = 28, lightValue = 120, pxPerMmValue = 4, widthValue = 0.62, heightValue = 0.6;
     private Glass? glass;
     private TransmittedColour? tint;
@@ -160,7 +217,11 @@
     private double widthFraction { get => widthValue; set { widthValue = value; Recompute(); } }
     private double heightFraction { get => heightValue; set { heightValue = value; Recompute(); } }
 
-    protected override void OnInitialized() => Recompute();
+    protected override void OnInitialized()
+    {
+        selectedKeyValue = SiteInfo.ReadGlassQuery(Navigation, selectedKeyValue);
+        Recompute();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -213,6 +274,9 @@
             widthFraction = widthValue,
             heightFraction = heightValue,
             lightDegrees = lightValue,
+            lightStrength = lightStrengthValue,
+            shape = shapeValue,
+            backdrop = backdropValue,
             title = L["use.backdrop.title"],
             lines = Featured.Take(5).Select(f =>
             {
@@ -226,6 +290,22 @@
         {
             gpu = false;
             StateHasChanged();
+            return;
+        }
+
+        if (compareGlass is { } other)
+        {
+            Glass keep = glass;
+            glass = other;
+            var otherSpec = new
+            {
+                spec.thicknessMm, spec.bevelPx, spec.dome, spec.frostPx, spec.radiusPx, spec.pxPerMm, spec.widthFraction, spec.heightFraction,
+                spec.lightDegrees, spec.lightStrength, spec.shape, spec.backdrop, spec.title, spec.lines,
+                ior = new[] { IndexAt(610d), IndexAt(550d), IndexAt(465d) },
+                alpha = new[] { Absorb(610d), Absorb(550d), Absorb(465d) },
+            };
+            glass = keep;
+            await Js.InvokeAsync<bool>("caustikonUi.render", "ui-compare", otherSpec);
         }
     }
 
@@ -233,6 +313,8 @@
     {
         int slash = selectedKeyValue.IndexOf('/');
         glass = slash > 0 ? GlassCatalog.Find(selectedKeyValue[..slash], selectedKeyValue[(slash + 1)..]) : null;
+        int slash2 = compareValue.IndexOf('/');
+        compareGlass = slash2 > 0 ? GlassCatalog.Find(compareValue[..slash2], compareValue[(slash2 + 1)..]) : null;
         if (glass is null)
         {
             tint = null;
@@ -361,4 +443,6 @@
     private static string F(double value, int decimals) => double.IsNaN(value) ? "NaN" : value.ToString("F" + decimals, CultureInfo.InvariantCulture);
 
     private async Task Copy(string text) => await Js.InvokeVoidAsync("caustikonClipboard.copy", text);
+
+    private async Task Download() => await Js.InvokeVoidAsync("caustikonUi.download", "ui-canvas", (glass?.Name ?? "glass") + "-" + thicknessValue.ToString("0.#", CultureInfo.InvariantCulture) + "mm.png");
 }

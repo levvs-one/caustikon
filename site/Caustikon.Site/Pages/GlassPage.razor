@@ -24,6 +24,57 @@ else
         <div class="figure"><div class="value">@Printed(glass.ReferenceTemperatureKelvin, 0)</div><div class="label">@L["glass.temperature"]</div></div>
     </div>
 
+    <p class="glass-use">
+        <span>@L["glass.use.h"]</span>
+        <a href="@("design?glass=" + Key)">@L["nav.design"]</a>
+        <a href="@("render?glass=" + Key)">@L["nav.render"]</a>
+        <a href="@("?glass=" + Key)">@L["nav.bench"]</a>
+        <a href="@("give/games?glass=" + Key)">@L["give.games.name"]</a>
+        <a href="@("give/blender?glass=" + Key)">@L["give.blender.name"]</a>
+        <a href="@("give/web?glass=" + Key)">@L["give.web.name"]</a>
+        <a href="@("give/dotnet?glass=" + Key)">.NET</a>
+    </p>
+
+    <h2>@L["glass.derived.h"]</h2>
+    <p>@L["glass.derived.p"]</p>
+    <div class="columns">
+        <dl class="kv">
+            <dt>n<sub>e</sub>, ν<sub>e</sub></dt><dd>@IndexAt(FraunhoferLines.ENanometers), @SiteInfo.Number(AbbeE, 2)</dd>
+            <dt>P<sub>g,F</sub></dt><dd>@SiteInfo.Number(PartialGF, 4)</dd>
+            @if (glass.PartialDispersionDeviationGF is { } dp0)
+            {
+                <dt>ΔP<sub>g,F</sub></dt><dd>@SiteInfo.Number(dp0, 4)</dd>
+            }
+            <dt>dn/dλ @L["glass.derived.atd"]</dt><dd>@SiteInfo.Number(SlopeAtD * 1e6, 2) × 10⁻⁶ /nm</dd>
+            <dt>n<sub>g</sub> @L["glass.derived.group"]</dt><dd>@SiteInfo.Number(GroupIndexD, 5)</dd>
+            <dt>@L["glass.derived.vsbk7"]</dt><dd>Δn<sub>d</sub> @SiteInfo.Number(glass.IndexD - Reference.IndexD, "+0.0000;-0.0000"), Δν<sub>d</sub> @SiteInfo.Number(glass.AbbeD - Reference.AbbeD, "+0.0;-0.0")</dd>
+        </dl>
+        <dl class="kv">
+            <dt>R<sub>0</sub> @L["glass.derived.r0"]</dt><dd>@SiteInfo.Number(R0 * 100, 2)%</dd>
+            <dt>R @L["glass.derived.r60"]</dt><dd>@SiteInfo.Number(R60 * 100, 2)%</dd>
+            <dt>@L["glass.derived.brewster"]</dt><dd>@SiteInfo.Number(Brewster, 2)°</dd>
+            <dt>@L["glass.derived.critical"]</dt><dd>@SiteInfo.Number(Critical, 2)°</dd>
+            <dt>n @L["glass.derived.rgb"]</dt><dd>@IndexAt(610), @IndexAt(550), @IndexAt(465)</dd>
+            <dt>20/ν<sub>d</sub> (glTF)</dt><dd>@SiteInfo.Number(20 / glass.AbbeD, 4)</dd>
+            @if (glass.Extinction is not null)
+            {
+                <dt>α @L["glass.derived.rgb"]</dt><dd>@SiteInfo.Number(Absorb(610), 3), @SiteInfo.Number(Absorb(550), 3), @SiteInfo.Number(Absorb(465), 3) 1/m</dd>
+            }
+        </dl>
+    </div>
+
+    @if (glass.Extinction is not null)
+    {
+        <div class="strips">
+            @foreach (double mm in StripThicknesses)
+            {
+                TransmittedColour sc = GlassColour.Transmitted(glass, mm) ?? default;
+                <div class="strip"><div class="swatch-block" style="background:@sc.Hex"></div><div class="label">@SiteInfo.Number(mm, 0) mm, @SiteInfo.Number(sc.Y * 100, 0)%</div></div>
+            }
+        </div>
+        <p class="muted">@L["glass.strips.p"]</p>
+    }
+
     <h2>@L["glass.index.h"]</h2>
     <div class="panel">
         <LineChart Series="indexSeries" Title="@L["glass.index.h"]" XLabel="@L["chart.wavelength"]" YLabel="n" Band="(380, 780)" Markers="lineMarkers" />
@@ -40,6 +91,17 @@ else
                 }
             </tbody>
         </table>
+    </div>
+
+    <h2>@L["glass.fresnel.h"]</h2>
+    <p>@H("glass.fresnel.p", SiteInfo.Number(Brewster, 1), SiteInfo.Number(Critical, 1))</p>
+    <div class="columns">
+        <div class="panel">
+            <LineChart Series="fresnelIn" Title="@L["glass.fresnel.in"]" XLabel="θ, °" YLabel="R" YMin="0" YMax="1" Markers="brewsterMarker" />
+        </div>
+        <div class="panel">
+            <LineChart Series="fresnelOut" Title="@L["glass.fresnel.out"]" XLabel="θ, °" YLabel="R" YMin="0" YMax="1" Markers="criticalMarker" />
+        </div>
     </div>
 
     @if (glass.Extinction is { } extinction)
@@ -159,6 +221,34 @@ else
     private static readonly double[] lineMarkers = [FraunhoferLines.FNanometers, FraunhoferLines.DNanometers, FraunhoferLines.CNanometers];
 
     private Glass? glass;
+    private List<ChartSeries> fresnelIn = [], fresnelOut = [];
+    private double[] brewsterMarker = [], criticalMarker = [];
+    private static readonly double[] StripThicknesses = [1, 2, 5, 10, 25, 50, 100];
+    private static readonly Glass Reference = GlassCatalog.Find("schott", "N-BK7")!;
+    private string Key => glass is null ? "" : Uri.EscapeDataString(glass.Vendor + "/" + glass.Name);
+    private double R0 => glass is null ? 0 : Dielectric.NormalReflectance(1f, (float)glass.IndexD);
+    private double R60 => glass is null ? 0 : Dielectric.Fresnel(0.5f, 1f, (float)glass.IndexD).Unpolarized;
+    private double Brewster => glass is null ? 0 : Math.Atan(glass.IndexD) * 180 / Math.PI;
+    private double Critical => glass is null ? 0 : Math.Asin(1 / glass.IndexD) * 180 / Math.PI;
+    private double AbbeE
+    {
+        get
+        {
+            if (glass is null) return double.NaN;
+            double ne = Value(FraunhoferLines.ENanometers), nFp = Value(479.9914), nCp = Value(643.8469);
+            return (ne - 1) / (nFp - nCp);
+        }
+    }
+    private double PartialGF => glass is null ? double.NaN : (Value(FraunhoferLines.GNanometers) - Value(FraunhoferLines.FNanometers)) / (Value(FraunhoferLines.FNanometers) - Value(FraunhoferLines.CNanometers));
+    private double SlopeAtD => glass is null ? double.NaN : (Value(FraunhoferLines.DNanometers + 0.5) - Value(FraunhoferLines.DNanometers - 0.5));
+    private double GroupIndexD => glass is null ? double.NaN : glass.IndexD - FraunhoferLines.DNanometers * SlopeAtD;
+    private double Value(double wavelength) => glass!.IndexAt(Math.Clamp(wavelength, glass.Model.MinimumWavelengthNanometers, glass.Model.MaximumWavelengthNanometers), out double n) == DispersionStatus.Success ? n : double.NaN;
+    private double Absorb(double wavelength)
+    {
+        if (glass?.Extinction is not { } extinction) return 0;
+        extinction.AbsorptionCoefficient(Math.Clamp(wavelength, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers), out double perMetre);
+        return perMetre;
+    }
     private List<ChartSeries> indexSeries = [];
     private List<ChartSeries> transmittanceSeries = [];
     private string[] coefficientHeaders = [];
@@ -199,6 +289,7 @@ else
         }
 
         indexSeries = [new ChartSeries("n", points)];
+        BuildFresnel(glass);
         BuildCoefficientTable(glass);
         UpdateTransmittance();
     }
@@ -242,6 +333,27 @@ else
 
         transmittanceSeries = [new ChartSeries($"τi, {thicknessValue} mm", points)];
         colour = GlassColour.Transmitted(glass, thicknessValue, surfacesValue);
+    }
+
+    // Reflectance against angle of incidence, both ways across the surface, from the exact Fresnel equations.
+    private void BuildFresnel(Glass glass)
+    {
+        float n = (float)glass.IndexD;
+        List<(double, double)> sIn = [], pIn = [], uIn = [], sOut = [], pOut = [], uOut = [];
+        for (int i = 0; i <= 180; i++)
+        {
+            double degrees = i * 0.5;
+            float cos = (float)Math.Cos(degrees * Math.PI / 180);
+            FresnelPower a = Dielectric.Fresnel(cos, 1f, n);
+            FresnelPower b = Dielectric.Fresnel(cos, n, 1f);
+            sIn.Add((degrees, a.S)); pIn.Add((degrees, a.P)); uIn.Add((degrees, a.Unpolarized));
+            sOut.Add((degrees, b.S)); pOut.Add((degrees, b.P)); uOut.Add((degrees, b.Unpolarized));
+        }
+
+        fresnelIn = [new ChartSeries("R", uIn), new ChartSeries("Rs", sIn), new ChartSeries("Rp", pIn)];
+        fresnelOut = [new ChartSeries("R", uOut), new ChartSeries("Rs", sOut), new ChartSeries("Rp", pOut)];
+        brewsterMarker = [Brewster];
+        criticalMarker = [Critical];
     }
 
     private void BuildCoefficientTable(Glass glass)
