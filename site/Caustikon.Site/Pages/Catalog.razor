@@ -1,0 +1,166 @@
+@page "/catalog"
+@inherits LocalizedComponent
+
+<PageTitle>@L["catalog.title"]</PageTitle>
+<HeadContent>
+    <meta name="description" content="@L["catalog.meta"]" />
+</HeadContent>
+
+<h1>@L["catalog.h1"]</h1>
+<p class="lede">@H("catalog.lede", GlassCatalog.All.Count, GlassCatalog.Vendors.Count)</p>
+
+<div class="controls">
+    <label class="control">
+        <span>@L["catalog.search"]</span>
+        <input type="search" placeholder="@L["catalog.search.hint"]" @bind="search" @bind:event="oninput" />
+    </label>
+    <label class="control">
+        <span>@L["catalog.vendor"]</span>
+        <select @bind="vendor">
+            <option value="">@L["catalog.all"]</option>
+            @foreach (string key in GlassCatalog.Vendors)
+            {
+                <option value="@key">@DisplayName(key) (@GlassCatalog.ByVendor(key).Count())</option>
+            }
+        </select>
+    </label>
+    <label class="control">
+        <span>@L["catalog.status"]</span>
+        <select @bind="status">
+            <option value="">@L["catalog.any"]</option>
+            <option value="Preferred">@L["catalog.status.preferred"]</option>
+            <option value="Standard">@L["catalog.status.standard"]</option>
+            <option value="Special">@L["catalog.status.special"]</option>
+            <option value="Obsolete">@L["catalog.status.obsolete"]</option>
+            <option value="Unspecified">@L["catalog.status.none"]</option>
+        </select>
+    </label>
+    <label class="control">
+        <span>n<sub>d</sub> @L["catalog.from"]</span>
+        <input type="number" step="0.01" min="1" max="3" @bind="ndMin" />
+    </label>
+    <label class="control">
+        <span>n<sub>d</sub> @L["catalog.to"]</span>
+        <input type="number" step="0.01" min="1" max="3" @bind="ndMax" />
+    </label>
+    <label class="control">
+        <span>ν<sub>d</sub> @L["catalog.from"]</span>
+        <input type="number" step="1" min="10" max="100" @bind="vdMin" />
+    </label>
+    <label class="control">
+        <span>ν<sub>d</sub> @L["catalog.to"]</span>
+        <input type="number" step="1" min="10" max="100" @bind="vdMax" />
+    </label>
+</div>
+
+<AbbeDiagram Highlighted="filtered" />
+
+<p class="muted">@filtered.Count @L["catalog.shown"]</p>
+
+<table class="catalog">
+    <thead>
+        <tr>
+            <th class="sortable @(Active("vendor"))" @onclick="@(() => SortBy("vendor"))">@L["catalog.vendor"]</th>
+            <th class="sortable @(Active("name"))" @onclick="@(() => SortBy("name"))">@L["catalog.col.glass"]</th>
+            <th class="num sortable @(Active("nd"))" @onclick="@(() => SortBy("nd"))">n<sub>d</sub></th>
+            <th class="num sortable @(Active("vd"))" @onclick="@(() => SortBy("vd"))">ν<sub>d</sub></th>
+            <th class="num sortable @(Active("density"))" @onclick="@(() => SortBy("density"))">@L["catalog.col.density"]</th>
+            <th>@L["catalog.col.code"]</th>
+            <th>@L["catalog.status"]</th>
+            <th>@L["catalog.col.model"]</th>
+            <th class="num">@L["catalog.col.range"]</th>
+            <th>@L["catalog.col.data"]</th>
+        </tr>
+    </thead>
+    <tbody>
+        <Virtualize Items="filtered" Context="glass" ItemSize="31">
+            <tr>
+                <td>@glass.VendorDisplayName</td>
+                <td><a href="@GlassLink(glass)">@glass.Name</a> @if (glass.Category != "optical") { <span class="badge">@glass.Category</span> }</td>
+                <td class="num">@(glass.CatalogIndexD is { } nd ? SiteInfo.Number(nd, 5) : "—")</td>
+                <td class="num">@(glass.CatalogAbbeD is { } vd ? SiteInfo.Number(vd, 2) : "—")</td>
+                <td class="num">@(glass.DensityKgPerM3 is { } rho ? SiteInfo.Number(rho, 0) : "—")</td>
+                <td>@(glass.GlassCode ?? "—")</td>
+                <td>@StatusText(L, glass.Status)</td>
+                <td>@glass.Formula</td>
+                <td class="num">@SiteInfo.Compact(glass.Model.MinimumWavelengthNanometers)–@SiteInfo.Compact(glass.Model.MaximumWavelengthNanometers)</td>
+                <td class="muted nowrap">@(glass.Extinction is not null ? "k" : "")@(glass.Thermal is not null ? " dn/dT" : "")</td>
+            </tr>
+        </Virtualize>
+    </tbody>
+</table>
+
+@code {
+    private string searchValue = "", vendorValue = "", statusValue = "";
+    private double? ndMinValue, ndMaxValue, vdMinValue, vdMaxValue;
+    private string sortKey = "vendor";
+    private bool descending;
+
+    private string search { get => searchValue; set { searchValue = value; Refilter(); } }
+    private string vendor { get => vendorValue; set { vendorValue = value; Refilter(); } }
+    private string status { get => statusValue; set { statusValue = value; Refilter(); } }
+    private double? ndMin { get => ndMinValue; set { ndMinValue = value; Refilter(); } }
+    private double? ndMax { get => ndMaxValue; set { ndMaxValue = value; Refilter(); } }
+    private double? vdMin { get => vdMinValue; set { vdMinValue = value; Refilter(); } }
+    private double? vdMax { get => vdMaxValue; set { vdMaxValue = value; Refilter(); } }
+
+    private List<Glass> filtered = [];
+
+    protected override void OnParametersSet() => filtered = Filtered;
+
+    private void Refilter() => filtered = Filtered;
+
+    private List<Glass> Filtered
+    {
+        get
+        {
+            string needle = GlassCatalog.NormalizeName(searchValue);
+            IEnumerable<Glass> query = GlassCatalog.All;
+            if (vendorValue.Length > 0) query = query.Where(g => g.Vendor == vendorValue);
+            if (statusValue.Length > 0 && Enum.TryParse(statusValue, out GlassStatus s)) query = query.Where(g => g.Status == s);
+            if (needle.Length > 0)
+            {
+                query = query.Where(g =>
+                    GlassCatalog.NormalizeName(g.Name).Contains(needle, StringComparison.Ordinal) ||
+                    (g.GlassCode?.Contains(searchValue, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    g.VendorDisplayName.Contains(searchValue, StringComparison.OrdinalIgnoreCase));
+            }
+            if (ndMinValue is { } a) query = query.Where(g => g.CatalogIndexD >= a);
+            if (ndMaxValue is { } b) query = query.Where(g => g.CatalogIndexD <= b);
+            if (vdMinValue is { } c) query = query.Where(g => g.CatalogAbbeD >= c);
+            if (vdMaxValue is { } d) query = query.Where(g => g.CatalogAbbeD <= d);
+
+            IOrderedEnumerable<Glass> ordered = sortKey switch
+            {
+                "name" => query.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase),
+                "nd" => query.OrderBy(g => g.CatalogIndexD ?? double.MaxValue),
+                "vd" => query.OrderBy(g => g.CatalogAbbeD ?? double.MaxValue),
+                "density" => query.OrderBy(g => g.DensityKgPerM3 ?? double.MaxValue),
+                _ => query.OrderBy(g => g.VendorDisplayName).ThenBy(g => g.Name, StringComparer.OrdinalIgnoreCase),
+            };
+            return descending ? ordered.Reverse().ToList() : ordered.ToList();
+        }
+    }
+
+    private void SortBy(string key)
+    {
+        if (sortKey == key) descending = !descending;
+        else { sortKey = key; descending = false; }
+        Refilter();
+    }
+
+    private string Active(string key) => sortKey == key ? "active" : "";
+
+    private static string DisplayName(string vendorKey) => GlassCatalog.ByVendor(vendorKey).FirstOrDefault()?.VendorDisplayName ?? vendorKey;
+
+    public static string GlassLink(Glass glass) => $"glass/{glass.Vendor}/{Uri.EscapeDataString(glass.Name)}";
+
+    public static string StatusText(Locale locale, GlassStatus status) => status switch
+    {
+        GlassStatus.Preferred => locale["catalog.status.preferred"],
+        GlassStatus.Standard => locale["catalog.status.standard"],
+        GlassStatus.Special => locale["catalog.status.special"],
+        GlassStatus.Obsolete => locale["catalog.status.obsolete"],
+        _ => "—",
+    };
+}

@@ -1,0 +1,101 @@
+@page "/about"
+@using System.Numerics
+@inherits LocalizedComponent
+
+<PageTitle>@L["about.title"]</PageTitle>
+<HeadContent>
+    <meta name="description" content="@L["about.meta"]" />
+</HeadContent>
+
+<h1>@L["about.h1"]</h1>
+<p class="lede">@L["about.lede"]</p>
+
+<h2>@L["home.what.h"]</h2>
+<p>@H("home.what.p1", SiteInfo.GlassCount, SiteInfo.VendorCount, withExtinction, withThermal)</p>
+<p>@H("home.what.p2")</p>
+
+<h2>@L["home.map.h"]</h2>
+<dl class="kv map">
+    <dt><a href="catalog">@L["nav.catalog"]</a></dt><dd>@T("home.map.catalog", SiteInfo.GlassCount)</dd>
+    <dt><a href="design">@L["nav.design"]</a></dt><dd>@L["home.map.design"]</dd>
+    <dt><a href="render">@L["nav.render"]</a></dt><dd>@L["home.map.render"]</dd>
+    <dt><a href="">@L["nav.bench"]</a></dt><dd>@L["home.map.bench"]</dd>
+    <dt><a href="give/design">@L["nav.give"]</a></dt><dd>@L["home.map.give"]</dd>
+    <dt><a href="playground">@L["nav.playground"]</a></dt><dd>@L["home.map.playground"]</dd>
+    <dt><a href="formulas">@L["nav.formulas"]</a></dt><dd>@L["home.map.formulas"]</dd>
+</dl>
+
+<h2>@L["home.install.h"]</h2>
+<pre><code>dotnet add package Caustikon
+dotnet add package Caustikon.Glasses</code></pre>
+<p>@L["home.install.p"]</p>
+
+<h2>@L["home.use.h"]</h2>
+<pre><code>using Caustikon;
+using Caustikon.Glasses;
+
+// The concrete model is a value type: no allocation on the ray path.
+Sellmeier bk7 = Schott.NBK7;
+bk7.EvaluateNanometers(587.5618, out double nd);          // @SiteInfo.Number(nd, 5)
+
+// Refraction and exact reflectance at an air–glass interface.
+Vector3 incident = Vector3.Normalize(new Vector3(0.5f, -0.866f, 0f));
+RefractionKind kind = Dielectric.RefractUnit(incident, Vector3.UnitY, 1f, (float)nd, out Vector3 transmitted);
+FresnelPower r = Dielectric.Fresnel(0.866f, 1f, (float)nd);   // s @SiteInfo.Number(rs, 4), p @SiteInfo.Number(rp, 4)
+
+// By name, with everything the catalog knows about it.
+Glass glass = GlassCatalog.Find("ohara", "S-BSL7")!;
+glass.Extinction!.InternalTransmittance(400, 10, out double t);   // @SiteInfo.Number(tau, 4)
+string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</code></pre>
+<p>@L["home.use.p"]</p>
+
+<h2>@L["about.data.h"]</h2>
+<p>@H("about.data.p1", manifestCommit, retrieved)</p>
+<p>@H("about.data.p2", totalEntries, SiteInfo.GlassCount)</p>
+<p>@H("about.data.p3")</p>
+
+<h2>@L["about.check.h"]</h2>
+<p>@H("about.check.p1", SiteInfo.GlassCount)</p>
+<p>@H("about.check.p2")</p>
+
+<h2>@L["about.limits.h"]</h2>
+<p>@L["about.limits.p"]</p>
+
+<h2>@L["about.packages.h"]</h2>
+<p>@H("about.packages.p")</p>
+
+<h2>@L["about.cite.h"]</h2>
+<p>@H("about.cite.p")</p>
+
+<h2>@L["about.author.h"]</h2>
+<p>@H("about.author.p")</p>
+
+@code {
+    private string manifestCommit = "c5c2f18";
+    private string retrieved = "2026-09-05";
+    private int totalEntries = 1784;
+    private int withExtinction, withThermal;
+    private double nd, rs, rp, tau;
+    private string tintHex = "";
+
+    protected override void OnInitialized()
+    {
+        GlassProvenance provenance = GlassCatalog.All[0].Provenance;
+        int at = provenance.Source.IndexOf("commit ", StringComparison.Ordinal);
+        if (at >= 0)
+        {
+            manifestCommit = provenance.Source[(at + 7)..].Split(',')[0];
+        }
+
+        retrieved = provenance.RetrievedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        withExtinction = GlassCatalog.All.Count(g => g.Extinction is not null);
+        withThermal = GlassCatalog.All.Count(g => g.Thermal is not null);
+        Schott.NBK7.EvaluateNanometers(587.5618d, out nd);
+        FresnelPower r = Dielectric.Fresnel(0.866f, 1f, (float)nd);
+        rs = r.S;
+        rp = r.P;
+        Glass sample = GlassCatalog.Find("ohara", "S-BSL7")!;
+        sample.Extinction!.InternalTransmittance(400, 10, out tau);
+        tintHex = GlassColour.Transmitted(sample, 25)!.Value.Hex;
+    }
+}

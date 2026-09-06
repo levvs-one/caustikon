@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net10.0": {
+      "caustikon": {
+        "type": "Project"
+      },
+      "caustikon.glasses": {
+        "type": "Project",
+        "dependencies": {
+          "Caustikon": "[0.1.0, )"
+        }
+      }
+    }
+  }
+}

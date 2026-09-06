@@ -1,0 +1,101 @@
+[
+  {
+    "identifier": "AMTIR2",
+    "vendor": "ami",
+    "name": "AMTIR-2",
+    "category": "infrared",
+    "form": 0,
+    "sourceFormula": "formula 1",
+    "minimumWavelengthNanometers": 1000,
+    "maximumWavelengthNanometers": 13000,
+    "offset": 0,
+    "firstCoefficients": [
+      4.9948719,
+      0.1207152,
+      1.7123685
+    ],
+    "secondCoefficients": [
+      0.058389889599999995,
+      361,
+      0.23355955839999998
+    ],
+    "status": "",
+    "extinction": {
+      "wavelengthsNanometers": [
+        1000,
+        1064,
+        1250,
+        1500,
+        1750,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000
+      ],
+      "extinctions": [
+        4.4563E-07,
+        3.3868E-07,
+        2.2879E-07,
+        1.9099E-07,
+        2.0889E-07,
+        2.3873E-07,
+        2.3873E-07,
+        3.1831E-07,
+        7.9577E-07,
+        4.7746E-07,
+        5.5704E-07,
+        6.3662E-07,
+        7.162E-07,
+        7.9577E-07,
+        1.4006E-06,
+        2.9603E-06,
+        2.2759E-05
+      ]
+    },
+    "provenance": {
+      "source": "RefractiveIndex.INFO database, commit c5c2f18, CC0 1.0",
+      "citation": "Amorphous Materials AMTIR-2 Information (2013) - downloaded 2014-01-11",
+      "url": "https://refractiveindex.info/download/data/2013/AMTIR-2 Information.pdf",
+      "path": "data/specs/ami/infrared/AMTIR-2.yml",
+      "retrievedOn": "2026-09-05",
+      "notes": "Sellmeier-1 source: each resonance wavelength was squared to the micrometer-squared form."
+    },
+    "check": {}
+  },
+  {
+    "identifier": "AMTIR3",
+    "vendor": "ami",
+    "name": "AMTIR-3",
+    "category": "infrared",
+    "form": 0,
+    "sourceFormula": "formula 1",
+    "minimumWavelengthNanometers": 3000,
+    "maximumWavelengthNanometers": 14000,
+    "offset": 0,
+    "firstCoefficients": [
+      5.8505,
+      1.4536
+    ],
+    "secondCoefficients": [
+      0.08521728640000001,
+      1824.485796
+    ],
+    "status": "",
+    "provenance": {
+      "source": "RefractiveIndex.INFO database, commit c5c2f18, CC0 1.0",
+      "citation": "Handbook of Optics, Vol. 2, 2nd edition. McGraw-Hill 1994",
+      "path": "data/specs/ami/infrared/AMTIR-3.yml",
+      "retrievedOn": "2026-09-05",
+      "notes": "Sellmeier-1 source: each resonance wavelength was squared to the micrometer-squared form."
+    },
+    "check": {}
+  }
+]

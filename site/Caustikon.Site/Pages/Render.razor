@@ -1,0 +1,334 @@
+@page "/render"
+@page "/3d"
+@using Caustikon.Site.Services
+@using System.Numerics
+@inject IJSRuntime Js
+@inject NavigationManager Navigation
+@implements IDisposable
+@inherits LocalizedComponent
+
+<PageTitle>@L["render.title"]</PageTitle>
+<HeadContent>
+    <meta name="description" content="@L["render.meta"]" />
+</HeadContent>
+
+<h1>@L["render.h1"]</h1>
+<p class="lede">@L["render.lede"]</p>
+
+<div class="bench-block">
+    <div class="stage">
+        <canvas id="render-canvas" class="render-canvas gl"></canvas>
+        <div class="zoom-buttons" aria-label="@L["render.zoom"]">
+            <button type="button" @onclick="@(() => Dolly(0.8))" title="@L["render.zoom.in"]" aria-label="@L["render.zoom.in"]">+</button>
+            <button type="button" @onclick="@(() => Dolly(1.25))" title="@L["render.zoom.out"]" aria-label="@L["render.zoom.out"]">−</button>
+        </div>
+    </div>
+    <p class="bench-hint">@(gpu ? L["render.orbit"] : L["render.cpu"])</p>
+    <div class="bench-controls">
+        <label class="control">
+            <span>@L["render.glass"]</span>
+            <select @bind="selectedKey">
+                <optgroup label="@L["render.common"]">
+                    @foreach ((string key, string label) in Featured)
+                    {
+                        <option value="@key">@(L.IsRussian ? label.Split('|')[1] : label.Split('|')[0])</option>
+                    }
+                </optgroup>
+                @foreach (string vendor in GlassCatalog.Vendors)
+                {
+                    <optgroup label="@(GlassCatalog.ByVendor(vendor).First().VendorDisplayName)">
+                        @foreach (Glass g in GlassCatalog.ByVendor(vendor).Where(g => g.CatalogIndexD is not null))
+                        {
+                            <option value="@(g.Vendor + "/" + g.Name)">@g.Name (@SiteInfo.Number(g.CatalogIndexD!.Value, 4) / @SiteInfo.Number(g.CatalogAbbeD ?? double.NaN, 1))</option>
+                        }
+                    </optgroup>
+                }
+            </select>
+        </label>
+        <label class="control">
+            <span>@L["render.solid"]</span>
+            <select @bind="shapeKey">
+                <option value="sphere">@L["render.solid.sphere"]</option>
+                <option value="cube">@L["render.solid.cube"]</option>
+                <option value="prism">@L["render.solid.prism"]</option>
+                <option value="octahedron">@L["render.solid.octahedron"]</option>
+                <option value="dodecahedron">@L["render.solid.dodecahedron"]</option>
+                <option value="icosahedron">@L["render.solid.icosahedron"]</option>
+            </select>
+        </label>
+        @if (shapeKey == "prism")
+        {
+            <RangeField Label="@L["render.faces"]" @bind-Value="sidesAsDouble" Min="3" Max="12" Step="1" />
+        }
+        <RangeField Label="@L["render.size"]" @bind-Value="sizeMm" Min="2" Max="400" Step="1" Unit="mm" />
+        <label class="control">
+            <span>@L["render.backdrop"]</span>
+            <select @bind="backdropKey">
+                <option value="checker">@L["render.backdrop.checker"]</option>
+                <option value="stripes">@L["render.backdrop.stripes"]</option>
+                <option value="grid">@L["render.backdrop.grid"]</option>
+                <option value="paper">@L["render.backdrop.paper"]</option>
+                <option value="night">@L["render.backdrop.night"]</option>
+            </select>
+        </label>
+        @if (!gpu)
+        {
+            <label class="control">
+                <span>@L["render.resolution"]</span>
+                <select @bind="size">
+                    <option value="320">320 px</option>
+                    <option value="480">480 px</option>
+                    <option value="720">720 px</option>
+                </select>
+            </label>
+            <div class="control">
+                <button class="primary" @onclick="Start" disabled="@rendering">@(rendering ? T("render.rendering", progress) : L["render.button"])</button>
+            </div>
+        }
+    </div>
+    <details class="more">
+        <summary>@L["ui.more"]</summary>
+        <div class="bench-controls">
+            <RangeField Label="@L["render.light.az"]" @bind-Value="lightAzimuth" Min="-180" Max="180" Step="1" Unit="°" />
+            <RangeField Label="@L["render.light.el"]" @bind-Value="lightElevation" Min="5" Max="85" Step="1" Unit="°" />
+            <RangeField Label="@L["render.lamp"]" @bind-Value="lightIntensity" Min="0" Max="4" Step="0.1" Unit="×" />
+            <RangeField Label="@L["render.room"]" @bind-Value="ambient" Min="0" Max="2" Step="0.1" Unit="×" />
+            <RangeField Label="@L["render.exposure"]" @bind-Value="exposure" Min="0.25" Max="4" Step="0.05" Unit="×" />
+        </div>
+    </details>
+    @if (glass is { } g0)
+    {
+        <div class="render-facts">
+            <dl class="kv">
+                <dt>@L["render.fact.glass"]</dt><dd>@g0.VendorDisplayName <a href="@Catalog.GlassLink(g0)">@g0.Name</a>, n<sub>d</sub> @SiteInfo.Number(g0.IndexD, 5), ν<sub>d</sub> @SiteInfo.Number(g0.AbbeD, 2)</dd>
+                <dt>@L["render.fact.n"]</dt><dd>@IndexAt(g0, 400), @IndexAt(g0, 700)</dd>
+                <dt>@H("render.fact.tau", sizeMm)</dt><dd>@Tau(g0, 450) / @Tau(g0, 650)</dd>
+                <dt>@L["render.fact.ground"]</dt><dd>@L["render.fact.ground.v"]</dd>
+                <dt>@L["render.fact.samples"]</dt><dd>@string.Join(", ", GlassRenderer.SampledWavelengths.Select(w => w.ToString("0", CultureInfo.InvariantCulture))) nm</dd>
+                @if (gpu)
+                {
+                    <dt>@L["render.fact.gpu"]</dt><dd>@L["render.fact.gpu.v"]</dd>
+                }
+                else if (lastMilliseconds > 0)
+                {
+                    <dt>@L["render.fact.time"]</dt><dd>@T("render.fact.time.v", lastSize, SiteInfo.Number(lastMilliseconds / 1000.0, 1), refinedPixels)</dd>
+                }
+            </dl>
+            <p class="bench-note">@L["render.note"]</p>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly (string Key, string Label)[] Featured =
+    [
+        ("schott/N-BK7", "SCHOTT N-BK7, the crown everything is measured against|SCHOTT N-BK7, крон, с которым сравнивают всё"),
+        ("schott/N-SF11", "SCHOTT N-SF11, dense flint, strong fringes|SCHOTT N-SF11, плотный флинт, сильные каймы"),
+        ("schott/SF57", "SCHOTT SF57, very dense flint, warm when thick|SCHOTT SF57, очень плотный флинт, теплеет в толщине"),
+        ("schott/N-SF66", "SCHOTT N-SF66, the highest dispersion in the catalog|SCHOTT N-SF66, самая сильная дисперсия в каталоге"),
+        ("schott/N-LASF9", "SCHOTT N-LASF9, high index, tight refraction|SCHOTT N-LASF9, высокий показатель, крутой излом"),
+        ("schott/N-FK58", "SCHOTT N-FK58, fluor crown, almost no fringes|SCHOTT N-FK58, фторкрон, кайм почти нет"),
+        ("ohara/S-FPL53", "OHARA S-FPL53, extra-low dispersion|OHARA S-FPL53, сверхнизкая дисперсия"),
+        ("ohara/S-LAH79", "OHARA S-LAH79, index above two|OHARA S-LAH79, показатель выше двух"),
+        ("hoya/TAFD55", "HOYA TAFD55, high-index lanthanum flint|HOYA TAFD55, высокоиндексный лантановый флинт"),
+        ("cdgm/H-ZF88", "CDGM H-ZF88, dense flint|CDGM H-ZF88, плотный флинт"),
+    ];
+
+    private string selectedKeyValue = "schott/N-SF11";
+    private string shapeKeyValue = "sphere";
+    private string backdropKeyValue = "checker";
+    private int sidesValue = 6;
+    private double sizeMmValue = 60;
+    private double lightAzimuthValue = 55, lightElevationValue = 50, lightIntensityValue = 1, ambientValue = 1, exposureValue = 1;
+    private double exposure { get => exposureValue; set { exposureValue = value; Push(); } }
+    private bool gpu = true;
+    private bool pushQueued;
+
+    private string shapeKey { get => shapeKeyValue; set { shapeKeyValue = value; Push(); } }
+    private string backdropKey { get => backdropKeyValue; set { backdropKeyValue = value; Push(); } }
+    private int sides { get => sidesValue; set { sidesValue = value; Push(); } }
+    private double sidesAsDouble { get => sidesValue; set => sides = (int)Math.Round(value); }
+    private double sizeMm { get => sizeMmValue; set { sizeMmValue = value; Push(); } }
+    private double lightAzimuth { get => lightAzimuthValue; set { lightAzimuthValue = value; Push(); } }
+    private double lightElevation { get => lightElevationValue; set { lightElevationValue = value; Push(); } }
+    private double lightIntensity { get => lightIntensityValue; set { lightIntensityValue = value; Push(); } }
+    private double ambient { get => ambientValue; set { ambientValue = value; Push(); } }
+    private int size = 480;
+    private int lastSize = 480;
+    private bool rendering;
+    private int progress;
+    private long lastMilliseconds;
+    private int refinedPixels;
+    private Glass? glass;
+    private CancellationTokenSource? cancel;
+    private bool rendered;
+
+    private string selectedKey
+    {
+        get => selectedKeyValue;
+        set
+        {
+            selectedKeyValue = value;
+            int slash = value.IndexOf('/');
+            glass = GlassCatalog.Find(value[..slash], value[(slash + 1)..]);
+            Push();
+        }
+    }
+
+    // Sends the scene to the shader after this render; one push per batch of changes.
+    private void Push()
+    {
+        if (!rendered || !gpu)
+        {
+            return;
+        }
+
+        pushQueued = true;
+    }
+
+    private async Task Dolly(double factor) => await Js.InvokeVoidAsync("caustikonGl.dolly", "render-canvas", factor);
+
+    private async Task PushNowAsync()
+    {
+        if (glass is null)
+        {
+            return;
+        }
+
+        GpuScene scene = GpuScene.Build(glass, Shape, sizeMm / 2d, Scenery, lightAzimuth, lightElevation, lightIntensity, ambient, exposure);
+        bool ok = await Js.InvokeAsync<bool>("caustikonGl.render", "render-canvas", scene);
+        if (!ok && gpu)
+        {
+            // No WebGL2 here: draw on the CPU instead, with the old resolution choice and button.
+            gpu = false;
+            StateHasChanged();
+            await Start();
+        }
+    }
+
+    protected override void OnInitialized() => selectedKey = SiteInfo.ReadGlassQuery(Navigation, selectedKeyValue);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !rendered)
+        {
+            rendered = true;
+            await PushNowAsync();
+            return;
+        }
+
+        if (pushQueued)
+        {
+            pushQueued = false;
+            await PushNowAsync();
+        }
+    }
+
+    private RenderShape Shape => shapeKey switch
+    {
+        "cube" => RenderShape.Cube(),
+        "prism" => RenderShape.Prism(sides),
+        "octahedron" => RenderShape.Octahedron(),
+        "dodecahedron" => RenderShape.Dodecahedron(),
+        "icosahedron" => RenderShape.Icosahedron(),
+        _ => RenderShape.Sphere(),
+    };
+
+    private Backdrop Scenery => backdropKey switch
+    {
+        "stripes" => Backdrop.Stripes,
+        "grid" => Backdrop.Grid,
+        "paper" => Backdrop.Paper,
+        "night" => Backdrop.Night,
+        _ => Backdrop.Checker,
+    };
+
+    private async Task Start()
+    {
+        if (glass is null || rendering)
+        {
+            return;
+        }
+
+        cancel?.Cancel();
+        cancel = new CancellationTokenSource();
+        CancellationToken token = cancel.Token;
+        rendering = true;
+        progress = 0;
+        lastSize = size;
+        StateHasChanged();
+        await Task.Yield();
+
+        GlassRenderer renderer = new(glass, Shape, sizeMm / 2d, Scenery, lightAzimuth, lightElevation, lightIntensity, ambient, exposure);
+        System.Diagnostics.Stopwatch watch = new();
+
+        // Pass 1: a quarter-size preview, drawn scaled, so the solid appears at once.
+        int previewSize = Math.Max(80, size / 4);
+        Vector3[] previewLinear = new Vector3[previewSize * previewSize];
+        byte[] previewRgba = new byte[previewSize * previewSize * 4];
+        watch.Start();
+        renderer.RenderRows(previewLinear, previewRgba, previewSize, 0, previewSize);
+        watch.Stop();
+        await Js.InvokeVoidAsync("caustikonCanvas.put", "render-canvas", previewSize, previewSize, previewRgba, size, size);
+        await Task.Yield();
+
+        // Pass 2: every pixel at full size, in bands.
+        Vector3[] linear = new Vector3[size * size];
+        byte[] rgba = new byte[size * size * 4];
+        const int band = 24;
+        for (int row = 0; row < size && !token.IsCancellationRequested; row += band)
+        {
+            int end = Math.Min(size, row + band);
+            watch.Start();
+            renderer.RenderRows(linear, rgba, size, row, end);
+            watch.Stop();
+            progress = end * 90 / size;
+            StateHasChanged();
+            await Task.Yield();
+        }
+
+        if (!token.IsCancellationRequested)
+        {
+            await Js.InvokeVoidAsync("caustikonCanvas.put", "render-canvas", size, size, rgba, size, size);
+        }
+
+        // Pass 3: four samples per pixel where neighbours disagree; the rest already converged with one.
+        int refined = 0;
+        for (int row = 0; row < size && !token.IsCancellationRequested; row += band * 2)
+        {
+            int end = Math.Min(size, row + band * 2);
+            watch.Start();
+            refined += renderer.RefineEdges(linear, rgba, size, row, end);
+            watch.Stop();
+            progress = 90 + end * 10 / size;
+            StateHasChanged();
+            await Task.Yield();
+        }
+
+        if (!token.IsCancellationRequested)
+        {
+            await Js.InvokeVoidAsync("caustikonCanvas.put", "render-canvas", size, size, rgba, size, size);
+            lastMilliseconds = watch.ElapsedMilliseconds;
+            refinedPixels = refined;
+        }
+
+        rendering = false;
+        StateHasChanged();
+    }
+
+    private static string IndexAt(Glass g, double wavelength) =>
+        g.IndexAt(Math.Clamp(wavelength, g.Model.MinimumWavelengthNanometers, g.Model.MaximumWavelengthNanometers), out double n) == DispersionStatus.Success ? SiteInfo.Number(n, 4) : "—";
+
+    private string Tau(Glass g, double wavelength)
+    {
+        if (g.Extinction is not { } extinction)
+        {
+            return L["render.nok"];
+        }
+
+        extinction.InternalTransmittance(Math.Clamp(wavelength, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers), sizeMm, out double t);
+        return SiteInfo.Number(t, 3);
+    }
+
+    public void Dispose() => cancel?.Cancel();
+}

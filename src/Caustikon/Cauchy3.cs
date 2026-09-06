@@ -11,7 +11,7 @@ namespace Caustikon;
 /// convention. No conversion of the reference medium or measurement conditions is performed.
 /// The default value is uninitialized and evaluations return <see cref="DispersionStatus.InvalidInput"/>.
 /// </remarks>
-public readonly record struct Cauchy3
+public readonly record struct Cauchy3 : IDispersionModel
 {
     /// <summary>Creates a Cauchy model with an explicit inclusive wavelength interval.</summary>
     /// <param name="a">Finite, dimensionless constant coefficient.</param>

@@ -1,117 +1,89 @@
 # Caustikon
 
-Allocation-free geometric optics primitives for .NET.
+Real optical glass for design, games, 3D and .NET.
 
-Caustikon handles what happens when a ray meets a dielectric boundary: its transmitted direction, reflected power, and the change in refractive index with wavelength. It provides vector refraction, exact Fresnel power reflectance, Schlick's approximation, and three-term Cauchy and Sellmeier dispersion models.
+[![verify](https://github.com/levvs-one/caustikon/actions/workflows/verify.yml/badge.svg)](https://github.com/levvs-one/caustikon/actions/workflows/verify.yml)
+[![MIT](https://img.shields.io/badge/license-MIT-1d5f74)](LICENSE)
+[![data CC0](https://img.shields.io/badge/data-CC0%201.0-1d5f74)](DATA-LICENSE.md)
 
-Scalar and span APIs use caller-owned storage. The library targets .NET 8 and .NET 10, with no external runtime dependencies. The API is pre-1.0 and may change between releases.
+`Caustikon` is the mathematics: vector refraction, exact Fresnel power reflectance, Schlick's
+approximation, and dispersion models as allocation-free value types. `Caustikon.Glasses` is a
+catalog of 1646 manufacturer glasses from SCHOTT, OHARA, HOYA, CDGM, HIKARI, SUMITA and others, plus nine
+liquids (water, ethanol, glycerol, benzene and more) from published measurements, each with its
+dispersion fit, tabulated absorption, temperature coefficients where published, and a citation for
+every number. Both target .NET 8 and .NET 10 with no dependencies outside the base class library.
+
+The site at <https://caustikon.levvs.cc> runs the same code in the browser.
+
+| | |
+| --- | --- |
+| ![N-SF11 sphere on a checkered table](docs/gallery/sphere-n-sf11.png) | ![N-SF66 octahedron](docs/gallery/octahedron-n-sf66.png) |
+| ![N-BK7 hexagonal prism on millimetre paper](docs/gallery/prism-n-bk7.png) | ![SF57 cube on colour bands](docs/gallery/cube-sf57.png) |
+
+Every picture above is traced by `tools/Caustikon.Gallery` with the packages' own refraction,
+Fresnel split and absorption at nine wavelengths, a photon pass from the lamp for the shadow and
+the caustic, and chamfered edges. Nothing in them is painted. The [3D page](https://caustikon.levvs.cc/render)
+does the same on the GPU for any catalog glass, with a stochastic spectrum and up to 48 samples per pixel.
+
+## What the site gives you
+
+- [Catalog](https://caustikon.levvs.cc/catalog): every glass on the Abbe diagram and in a filterable table; each glass
+  page has its curve, the Fraunhofer lines, reflectance against angle, absorption and the colour of daylight after any
+  thickness, temperature coefficients, the model's coefficients and the source of every number.
+- [Design](https://caustikon.levvs.cc/design): a panel of a real glass over an interface, traced in a WebGL2 shader
+  (bevel and dome refraction per colour channel, Fresnel sheen, tint from the k table), with the shader, CSS and .NET to copy.
+- [3D](https://caustikon.levvs.cc/render): a solid of any glass on a table, traced on the GPU; drag to orbit.
+- [Optic](https://caustikon.levvs.cc/): an optical bench: white light through any lens, prism, plate or a shape you draw,
+  in any medium at any temperature, with the full refraction calculator beneath.
+- Give Me!: one page per craft. Pick a glass and a thickness and get the numbers in every format, each value explained:
+  [design](https://caustikon.levvs.cc/give/design) (CSS, Tailwind, Figma, GLSL),
+  [games](https://caustikon.levvs.cc/give/games) (Unity HDRP, Unreal, Godot 4, HLSL/GLSL),
+  [3D and Blender](https://caustikon.levvs.cc/give/blender) (Principled BSDF, glTF, USD),
+  [web](https://caustikon.levvs.cc/give/web) (three.js, glTF, CSS) and [.NET](https://caustikon.levvs.cc/give/dotnet).
 
 ![Six wavelengths refracted through an N-BK7 prism](examples/Prism/prism.svg)
 
-[The prism example](examples/Prism) calculates the ray paths and prints the numerical results. The spectral spread is to scale; colors identify wavelengths, not transmitted power.
+## Install
 
-## Use from source
-
-Caustikon is not published to NuGet.org. With Git and .NET SDK 10.0.400 installed, run the prism example from a new checkout:
-
-```powershell
-git clone https://github.com/levvs-one/caustikon.git
-cd caustikon
-New-Item -ItemType Directory -Force artifacts
-dotnet run --project examples/Prism --configuration Release -- artifacts/prism.svg
+```
+dotnet add package Caustikon
+dotnet add package Caustikon.Glasses
 ```
 
-This prints six wavelength/index/deviation rows and writes `artifacts/prism.svg`, which you can open in a browser. It does not replace the checked-in diagram.
-
-The repository selects .NET SDK 10.0.400 and permits later patches in the same 10.0.4xx feature band. The examples need only the .NET 10 runtime included with that SDK. Running the tests for both targets also requires the .NET 8 runtime; a second SDK is not necessary.
-
-## Refract a ray
-
-To use the library in your own application, create a sibling console project from the repository root:
-
-```powershell
-dotnet new console --output ../RayDemo --framework net10.0
-dotnet reference add src/Caustikon/Caustikon.csproj --project ../RayDemo/RayDemo.csproj
-```
-
-Replace `../RayDemo/Program.cs` with:
+## Use
 
 ```csharp
 using System.Numerics;
 using Caustikon;
+using Caustikon.Glasses;
 
+// The concrete model is a value type: nothing allocates on the ray path.
+Sellmeier bk7 = Schott.NBK7;
+bk7.EvaluateNanometers(587.5618, out double nd);          // 1.51680
+
+// A ray at 30° to the normal enters the glass from air.
 Vector3 incident = Vector3.Normalize(new Vector3(0.5f, -0.8660254f, 0f));
-Vector3 normal = Vector3.UnitY;
+RefractionKind kind = Dielectric.RefractUnit(incident, Vector3.UnitY, 1f, (float)nd, out Vector3 transmitted);
+FresnelPower r = Dielectric.Fresnel(0.8660254f, 1f, (float)nd);   // r.S, r.P, r.Unpolarized
 
-RefractionKind kind = Dielectric.RefractUnit(
-    incident,
-    normal,
-    nIncident: 1f,
-    nTransmitted: 1.5f,
-    out Vector3 transmitted);
-
-switch (kind)
-{
-    case RefractionKind.Refracted:
-    case RefractionKind.CriticalAngle:
-        float cosIncident = -Vector3.Dot(incident, normal);
-        FresnelPower power = Dielectric.Fresnel(cosIncident, 1f, 1.5f);
-        Console.WriteLine($"{kind}: T = {transmitted}, R = {power.Unpolarized}");
-        break;
-    case RefractionKind.TotalInternalReflection:
-        Console.WriteLine("No transmitted ray; all incident power is reflected.");
-        break;
-    case RefractionKind.InvalidInput:
-        throw new ArgumentException("Check unit vectors, normal orientation, and positive finite indices.");
-}
+// By name, with everything the catalog knows about the glass.
+Glass glass = GlassCatalog.Find("ohara", "S-BSL7")!;
+double abbe = glass.AbbeD;                                          // from the fit; glass.CatalogAbbeD is the printed value
+glass.Extinction!.InternalTransmittance(400, 10, out double t);     // τi of a 10 mm path at 400 nm
+string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;        // what a 25 mm slab does to D65, as sRGB
 ```
 
-Run `dotnet run --project ../RayDemo --configuration Release` from the repository root. For these inputs the result is `Refracted`, with a transmitted direction near `(0.3333333, -0.9428090, 0)` and unpolarized reflectance near `0.04152`.
-
-The direction and normal convention is strict:
-
-- `incident` points along ray travel, toward the interface.
-- `normal` points back into the incident medium.
-- Their dot product must be nonpositive. A positive dot product is invalid.
-- `transmitted` points away from the interface into the transmitted medium.
-- `nIncident` and `nTransmitted` are positive phase refractive indices measured under comparable conditions.
-
-`RefractUnit` returns a status instead of hiding the critical-angle boundary. `Refracted` and `CriticalAngle` return a unit direction. `TotalInternalReflection` and `InvalidInput` return `Vector3.Zero`.
-
-## Evaluate a dispersion model
-
-The public wavelength unit is the nanometer. Use the wavelength convention of the coefficient source, including its air or vacuum reference. Coefficient names state the micrometer powers used by the equations.
+A caller's own glass has the same standing as a catalogued one:
 
 ```csharp
-using Caustikon;
-
-var glass = new Sellmeier3(
-    b1: 1.03961212,
-    c1Um2: 0.006000699,
-    b2: 0.231792344,
-    c2Um2: 0.0200179144,
-    b3: 1.01046945,
-    c3Um2: 103.560653,
-    minimumWavelengthNanometers: 365d,
-    maximumWavelengthNanometers: 2325.4d);
-
-DispersionStatus status = glass.EvaluateNanometers(
-    wavelengthNanometers: 587.6d,
-    out double refractiveIndex);
-
-if (status is DispersionStatus.Success)
-{
-    Console.WriteLine(refractiveIndex);
-}
-else
-{
-    Console.Error.WriteLine($"The model cannot evaluate this wavelength: {status}");
-}
+Sellmeier melt = new(0, [1.0396, 0.2318, 1.0105], [0.0060, 0.0200, 103.56], 300, 2500);
+Glass mine = Glass.Define("melt 42", in melt, "in-house measurement, 2026-09", new DateOnly(2026, 9, 5));
 ```
 
-The coefficients come from the [SCHOTT N-BK7 datasheet](https://media.schott.com/api/public/content/41e799d0bf874807a0bb8e702fbb75b5?v=54856406). At 587.6 nm, the result is approximately `1.51679844`, consistent with the datasheet's rounded `1.51680`. SCHOTT's catalogue relation gives refractive index relative to air at room temperature; see [TIE-29, section 2.3](https://media.schott.com/api/public/content/aaa572afd854434fb7b3faa4bc46103f?v=c0f4fa52) for its conventions.
-
-The example chooses a 365-2325.4 nm interval within the tabulated values. This is a caller-selected range. Every model carries an inclusive wavelength interval and reports `OutsideModelRange` beyond it.
+Batch overloads write into caller-owned spans; the rules are in
+[the buffer contract](docs/conventions.md#batch-buffer-rules). [CriticalBoundary](examples/CriticalBoundary)
+is a complete batch example across a glass-to-air interface, and [Prism](examples/Prism) traces six
+wavelengths through an N-BK7 prism with polarized power tracked across both faces.
 
 ## API map
 
@@ -121,52 +93,81 @@ The example chooses a 365-2325.4 nm interval within the tabulated values. This i
 | Exact dielectric reflectance | `Dielectric.Fresnel` | Shared or per-lane refractive indices |
 | Normal-incidence reflectance | `Dielectric.NormalReflectance` | Per-lane refractive indices |
 | Schlick reflectance | `Dielectric.Schlick` | Shared `R0` or shared refractive indices |
-| Cauchy dispersion | `Cauchy3.EvaluateNanometers` | Wavelength, result, and status spans |
-| Sellmeier dispersion | `Sellmeier3.EvaluateNanometers` | Wavelength, result, and status spans |
+| Dispersion, any model | `IDispersionModel.EvaluateNanometers` | `Dispersion.EvaluateNanometers<T>` |
+| Sellmeier, up to eight terms | `Sellmeier` | same |
+| Power series in `n²` or `n` | `Polynomial`, `Cauchy` | same |
+| Fixed three-term forms | `Sellmeier3`, `Cauchy3` | same |
+| Catalog lookup | `GlassCatalog.Find`, `GlassCatalog.All`, vendor classes such as `Schott` | — |
+| Absorption | `TabulatedExtinction.InternalTransmittance` | — |
+| Temperature | `ThermalDispersion.AbsoluteIndexShift` | — |
+| Colour | `GlassColour.Transmitted`, `GlassColour.FromTransmittance` | — |
 
-Batch overloads write into spans supplied by the caller. Span lengths must match. Permitted in-place operations and overlap restrictions are specified in [the buffer contract](docs/conventions.md#batch-buffer-rules).
+Generic code constrains a model as `where T : struct, IDispersionModel`; the runtime specializes
+per model type and nothing boxes. `GlassCatalog` boxes each model once when a glass is resolved
+by name, which is why the vendor classes expose the concrete struct for hot paths.
 
-[CriticalBoundary](examples/CriticalBoundary) is a complete batch example: six wavelengths reach a glass-to-air interface at the same angle, with both refraction and total internal reflection in the result. It shows buffer setup, status handling and per-wavelength indices, and checks every batch result against the scalar API.
+## What is verified
+
+Every catalogued glass is evaluated in CI at the exact d, F and C lines and compared with the
+manufacturer's *printed* `nd` and `νd`, which are independent of the fit. The bound is five
+units in the fifth decimal of index plus the rounding of the printed value, and the bound on
+`νd` follows from that by propagation. `data/glasses/manifest.json` records the deviation of
+each fit and names the largest.
+
+N-BK7 is pinned to its SCHOTT datasheet of 1 December 2023: seven internal-transmittance rows
+at 10 mm and 25 mm, and nine `dn/dT` values across three temperature ranges and three spectral
+lines, each within the datasheet's printed precision. D65 through a perfect transmitter
+reproduces the D65 white point. The refraction benchmark reports zero managed allocations in
+all sixteen scalar and span cases; [the report](docs/performance.md) has the method and numbers.
 
 ## Numerical contracts
 
-- `FresnelPower.S` and `P` store power reflectances, not field amplitudes. `Unpolarized` computes their arithmetic mean.
-- `Dielectric.Fresnel` takes `cosIncident` in `[0, 1]`. It returns unit reflectance at and beyond the critical boundary.
-- `Dielectric.Schlick(cosIncident, normalReflectance)` evaluates the approximation only. It cannot infer total internal reflection from `R0` and the cosine.
-- `Cauchy3` evaluates `n = A + B / wavelength^2 + C / wavelength^4` with wavelength in micrometers.
-- `Sellmeier3` evaluates `n^2 = 1 + sum(Bi * wavelength^2 / (wavelength^2 - Ci))` with wavelength in micrometers.
-- A non-successful dispersion evaluation writes `double.NaN`.
-- Constructors reject nonfinite coefficients and invalid wavelength intervals. `Sellmeier3` also rejects negative resonance coefficients and intervals containing an active positive resonance pole. A term with `Bi = 0` is inactive.
-
-The full status and boundary rules are in [docs/conventions.md](docs/conventions.md).
-
-## Measured cost
-
-The refraction benchmark reported zero managed allocations in all 16 scalar and span cases. On an Intel i5-4670 with .NET 10, a million air-to-glass interactions took 27.70 ms in a caller-written scalar loop and 31.64 ms through the span API. These are single-machine measurements, with inputs and buffers prepared before timing. [The full report](docs/performance.md) records the method, uncertainty, limitations, and reproduction command.
+[docs/conventions.md](docs/conventions.md) states the direction and index conventions, the
+critical-angle tolerance, dispersion statuses and units, batch buffer rules, and constructor
+signatures. They are part of the public API.
 
 ## Scope
 
-Caustikon models homogeneous, isotropic, nonabsorbing dielectric media and phase refractive index. It does not model absorption, complex refractive index, birefringence, polarization state propagation, thin-film interference, diffraction, surface roughness, lens geometry, ray-scene intersection, or rendering. It is intended to be embedded in systems that own those concerns.
+Caustikon models homogeneous, isotropic dielectric media: a real phase index for refraction and
+reflection, bulk absorption from tabulated extinction, and the temperature dependence of the
+absolute index in the manufacturers' published form. It does not model birefringence,
+polarization state beyond s and p power fractions at an interface, thin-film interference,
+diffraction, scattering, surface roughness, coatings, the temperature or pressure dependence of
+air, lens geometry, ray–scene intersection, or rendering. It is intended to be embedded in
+systems that own those concerns.
+
+## Data
+
+The glass catalog is generated from the RefractiveIndex.INFO database, released under CC0 1.0,
+by `tools/Caustikon.Glasses.Generator`; the normalized rows and the provenance record of every
+glass are committed under `data/glasses/`. Colour uses the CIE 1931 2° observer and illuminant
+D65. [DATA-LICENSE.md](DATA-LICENSE.md) has the licences and citations.
 
 ## Build and test
 
 ```powershell
 dotnet restore Caustikon.sln --locked-mode
 dotnet build Caustikon.sln -c Release --no-restore
-dotnet test --project tests/Caustikon.Tests/Caustikon.Tests.csproj -c Release -f net8.0 --no-build
 dotnet test --project tests/Caustikon.Tests/Caustikon.Tests.csproj -c Release -f net10.0 --no-build
+dotnet test --project tests/Caustikon.Glasses.Tests/Caustikon.Glasses.Tests.csproj -c Release -f net10.0 --no-build
 dotnet pack src/Caustikon/Caustikon.csproj -c Release --no-build --output artifacts/package
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the acceptance rules used for numerical changes and benchmarks.
+The repository selects .NET SDK 10.0.400 and permits later patches in the same feature band;
+running the `net8.0` tests also needs the .NET 8 runtime. The site needs the `wasm-tools`
+workload. See [CONTRIBUTING.md](CONTRIBUTING.md) for the acceptance rules used for numerical
+changes and benchmarks.
 
 ## References
 
 - W. Sellmeier, [Zur Erklarung der abnormen Farbenfolge im Spectrum einiger Substanzen](https://onlinelibrary.wiley.com/doi/10.1002/andp.18722231105), 1872 - the original dispersion relation.
 - Christophe Schlick, [An Inexpensive BRDF Model for Physically-based Rendering](https://onlinelibrary.wiley.com/doi/10.1111/1467-8659.1330233), 1994 - the reflectance approximation used by `Dielectric.Schlick`.
 - Matt Pharr, Wenzel Jakob, and Greg Humphreys, [Physically Based Rendering, fourth edition - Specular Reflection and Transmission](https://www.pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission) - equations and a reference implementation for dielectric reflection and refraction.
-- SCHOTT, [N-BK7 optical glass datasheet](https://media.schott.com/api/public/content/41e799d0bf874807a0bb8e702fbb75b5?v=54856406) - the dispersion coefficients and tabulated refractive indices used in the example and regression tests.
+- M. N. Polyanskiy, [Refractiveindex.info database of optical constants](https://doi.org/10.1038/s41597-023-02898-2), Scientific Data 11, 94 (2024) - the source of the glass catalog.
+- SCHOTT, [N-BK7 optical glass datasheet](https://media.schott.com/api/public/content/41e799d0bf874807a0bb8e702fbb75b5?v=54856406) - the tabulated indices, internal transmittance and temperature coefficients the tests pin N-BK7 to.
+- SCHOTT, [TIE-19: Temperature Coefficient of the Refractive Index](https://www.schott.com/en-us/products/optical-glass-p1000267/technical-details) - the form of `ThermalDispersion`.
+- CIE 015:2018, Colorimetry - the 1931 2° observer and illuminant D65 used by `GlassColour`.
 
 ## License
 
-[MIT](LICENSE) - Copyright (c) 2026 levvs-one.
+[MIT](LICENSE) - Copyright (c) 2026 levvs-one. Data licences are listed in [DATA-LICENSE.md](DATA-LICENSE.md).

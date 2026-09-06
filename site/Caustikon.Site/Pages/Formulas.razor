@@ -1,0 +1,49 @@
+@page "/formulas"
+@inherits LocalizedComponent
+
+<PageTitle>@L["formulas.title"]</PageTitle>
+
+<h1>@L["formulas.h1"]</h1>
+<p class="lede">@L["formulas.lede"]</p>
+
+<h2>@L["formulas.refraction.h"]</h2>
+<div class="equation">n<sub>i</sub> sin θ<sub>i</sub> = n<sub>t</sub> sin θ<sub>t</sub></div>
+<p>@H("formulas.refraction.p")</p>
+
+<h2>@L["formulas.fresnel.h"]</h2>
+<div class="equation">
+    R<sub>s</sub> = ((n<sub>i</sub> cos θ<sub>i</sub> − n<sub>t</sub> cos θ<sub>t</sub>) / (n<sub>i</sub> cos θ<sub>i</sub> + n<sub>t</sub> cos θ<sub>t</sub>))²<br />
+    R<sub>p</sub> = ((n<sub>t</sub> cos θ<sub>i</sub> − n<sub>i</sub> cos θ<sub>t</sub>) / (n<sub>t</sub> cos θ<sub>i</sub> + n<sub>i</sub> cos θ<sub>t</sub>))²
+</div>
+<p>@H("formulas.fresnel.p")</p>
+
+<h2>@L["formulas.dispersion.h"]</h2>
+<p>@L["formulas.dispersion.p"]</p>
+<h3>@H("formulas.sellmeier.h")</h3>
+<div class="equation">n² − 1 = offset + Σ<sub>i</sub> B<sub>i</sub> λ² / (λ² − C<sub>i</sub>)</div>
+<p>@H("formulas.sellmeier.p")</p>
+<h3>@H("formulas.polynomial.h")</h3>
+<div class="equation">n² = a₀ + Σ<sub>i</sub> a<sub>i</sub> λ<sup>p<sub>i</sub></sup></div>
+<p>@H("formulas.polynomial.p")</p>
+<h3>@H("formulas.cauchy.h")</h3>
+<div class="equation">n = a₀ + Σ<sub>i</sub> a<sub>i</sub> λ<sup>p<sub>i</sub></sup></div>
+<p>@L["formulas.cauchy.p"]</p>
+
+<h2>@L["formulas.abbe.h"]</h2>
+<div class="equation">ν<sub>d</sub> = (n<sub>d</sub> − 1) / (n<sub>F</sub> − n<sub>C</sub>)</div>
+<p>@H("formulas.abbe.p")</p>
+
+<h2>@L["formulas.absorption.h"]</h2>
+<div class="equation">α = 4πk / λ &nbsp;&nbsp;&nbsp; τ<sub>i</sub>(d) = exp(−α d)</div>
+<p>@H("formulas.absorption.p")</p>
+
+<h2>@L["formulas.thermal.h"]</h2>
+<div class="equation">Δn<sub>abs</sub>(λ, T) = (n² − 1)/(2n) · [D₀ΔT + D₁ΔT² + D₂ΔT³ + (E₀ΔT + E₁ΔT²)/(λ² − λ<sub>TK</sub>²)]</div>
+<p>@H("formulas.thermal.p")</p>
+
+<h2>@L["formulas.colour.h"]</h2>
+<div class="equation">
+    X = Σ S(λ) T(λ) x̄(λ) / Σ S(λ) ȳ(λ), &nbsp; @L["formulas.colour.eq1"]<br />
+    [R G B]<sub>linear</sub> = M<sub>sRGB</sub> · [X Y Z], @L["formulas.colour.eq2"]
+</div>
+<p>@H("formulas.colour.p")</p>

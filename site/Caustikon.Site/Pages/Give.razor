@@ -1,0 +1,693 @@
+@page "/give"
+@page "/give/{Topic}"
+@inject IJSRuntime Js
+@inject NavigationManager Navigation
+@inherits LocalizedComponent
+
+@* One page per craft. Pick a glass and a thickness; every format tab below writes the numbers for that exact glass,
+   explains each parameter and where it comes from, and the examples use the same numbers. *@
+
+<PageTitle>@L["give." + Key + ".name"] — Caustikon</PageTitle>
+<HeadContent>
+    <meta name="description" content="@L["give." + Key + ".tag"]" />
+</HeadContent>
+
+<h1>@L["give." + Key + ".h1"]</h1>
+<p class="lede">@L["give." + Key + ".lede"]</p>
+
+<div class="controls">
+    <label class="control">
+        <span>@L["use.glass"]</span>
+        <select @bind="selectedKey">
+            <optgroup label="@L["render.common"]">
+                @foreach ((string key, string label) in Featured)
+                {
+                    <option value="@key">@(L.IsRussian ? label.Split('|')[1] : label.Split('|')[0])</option>
+                }
+            </optgroup>
+            @foreach (string vendor in GlassCatalog.Vendors)
+            {
+                <optgroup label="@(GlassCatalog.ByVendor(vendor).First().VendorDisplayName)">
+                    @foreach (Glass g in GlassCatalog.ByVendor(vendor).Where(g => g.CatalogIndexD is not null))
+                    {
+                        <option value="@(g.Vendor + "/" + g.Name)">@g.Name (@SiteInfo.Number(g.CatalogIndexD!.Value, 4) / @SiteInfo.Number(g.CatalogAbbeD ?? double.NaN, 1))</option>
+                    }
+                </optgroup>
+            }
+        </select>
+    </label>
+    <RangeField Label="@L["use.thickness"]" @bind-Value="thickness" Min="0.5" Max="100" Step="0.5" Unit="mm" />
+    @if (Key is "blender" or "web" or "games")
+    {
+        <label class="control">
+            <span>@L["give.unit"]</span>
+            <select @bind="unit">
+                <option value="mm">@L["give.unit.mm"]</option>
+                <option value="cm">@L["give.unit.cm"]</option>
+                <option value="m">@L["give.unit.m"]</option>
+            </select>
+        </label>
+    }
+</div>
+
+@if (glass is { } g0)
+{
+    <div class="figures">
+        <div class="figure"><div class="value">@SiteInfo.Number(g0.IndexD, 4)</div><div class="label">n<sub>d</sub></div></div>
+        <div class="figure"><div class="value">@SiteInfo.Number(g0.AbbeD, 1)</div><div class="label">ν<sub>d</sub></div></div>
+        <div class="figure"><div class="value">@SiteInfo.Number(rgb[0], 4), @SiteInfo.Number(rgb[1], 4), @SiteInfo.Number(rgb[2], 4)</div><div class="label">@L["give.fig.rgb"]</div></div>
+        <div class="figure"><div class="value">@SiteInfo.Number(face * 100, 1)%</div><div class="label">@L["give.fig.face"]</div></div>
+        <div class="figure"><div class="value"><span class="swatch" style="background:@tint.Hex"></span> @tint.Hex</div><div class="label">@T("give.fig.tint", SiteInfo.Number(thickness, 1))</div></div>
+        <div class="figure"><div class="value">@SiteInfo.Number(tint.Y * 100, 1)%</div><div class="label">@L["give.fig.y"]</div></div>
+    </div>
+
+    <h2>@L["give.sec.code"]</h2>
+    <nav class="subnav" aria-label="@L["give.sec.code"]">
+        @foreach (string f in Formats)
+        {
+            <button class="@(f == format ? "active" : "")" @onclick="() => format = f">@FormatName(f)</button>
+        }
+    </nav>
+    <p>@H("give.fmt." + format + ".p")</p>
+    <div class="snippet">
+        <div class="snippet-bar"><span>@FormatName(format), @g0.VendorDisplayName @g0.Name, @SiteInfo.Number(thickness, 1) mm</span><button @onclick="() => Copy(Code())">@L["use.copy"]</button></div>
+        <pre><code>@Code()</code></pre>
+    </div>
+
+    <h3>@L["give.sec.params"]</h3>
+    <dl class="kv">
+        @foreach ((string name, string value, string explain) in Parameters())
+        {
+            <dt>@name</dt><dd><strong>@value</strong> — @H(explain)</dd>
+        }
+    </dl>
+
+    <h2>@L["give.sec.examples"]</h2>
+    @foreach (string p in Paragraphs("examples"))
+    {
+        <p>@H(p, Args)</p>
+    }
+
+    <h2>@L["give.sec.methods"]</h2>
+    @foreach (string p in Paragraphs("methods"))
+    {
+        <p>@H(p)</p>
+    }
+
+    <h2>@L["give.sec.advice"]</h2>
+    <ul>
+        @foreach (string p in Paragraphs("advice"))
+        {
+            <li>@H(p)</li>
+        }
+    </ul>
+
+    <h2>@L["give.sec.next"]</h2>
+    <dl class="kv">
+        @foreach ((string href, string key) in Links)
+        {
+            <dt><a href="@(href + (href.Contains('?') ? "" : Query))">@L[key]</a></dt><dd>@L[key + ".give"]</dd>
+        }
+    </dl>
+}
+
+@code {
+    public static readonly (string Slug, string Key)[] Topics =
+    [
+        ("design", "design"),
+        ("games", "games"),
+        ("blender", "blender"),
+        ("web", "web"),
+        ("dotnet", "dotnet"),
+    ];
+
+    private static readonly (string Key, string Label)[] Featured =
+    [
+        ("schott/N-BK7", "SCHOTT N-BK7, the neutral window glass|SCHOTT N-BK7, нейтральное оконное"),
+        ("schott/N-FK58", "SCHOTT N-FK58, the cleanest edges|SCHOTT N-FK58, самые чистые края"),
+        ("schott/N-SF11", "SCHOTT N-SF11, rainbow edges|SCHOTT N-SF11, радужные края"),
+        ("schott/SF57", "SCHOTT SF57, warm when thick|SCHOTT SF57, теплеет в толщине"),
+        ("schott/N-SF66", "SCHOTT N-SF66, the strongest fringes|SCHOTT N-SF66, самые сильные каймы"),
+        ("schott/N-LASF9", "SCHOTT N-LASF9, glossy face, tight bend|SCHOTT N-LASF9, глянцевое лицо, крутой излом"),
+        ("ohara/S-FPL53", "OHARA S-FPL53, almost no colour at all|OHARA S-FPL53, почти без цвета"),
+        ("ohara/S-LAH79", "OHARA S-LAH79, index above two|OHARA S-LAH79, показатель выше двух"),
+    ];
+
+    [Parameter] public string? Topic { get; set; }
+
+    private string Key => Topics.FirstOrDefault(t => t.Slug == (Topic ?? "design")).Key ?? "design";
+
+    private string[] Formats => Key switch
+    {
+        "design" => ["css", "tailwind", "figma", "glsl"],
+        "games" => ["unity", "unreal", "godot", "hlsl"],
+        "blender" => ["blender", "gltf", "usd"],
+        "web" => ["threejs", "gltf", "css"],
+        _ => ["csray", "cscolour", "csthermal", "cscatalog"],
+    };
+
+    private string selectedKeyValue = "schott/N-BK7";
+    private double thicknessValue = 6;
+    private string unitValue = "mm";
+    private string formatValue = "";
+    private Glass? glass;
+    private double[] rgb = [1.5, 1.5, 1.5];
+    private double[] alpha = [0, 0, 0];
+    private double face, edge;
+    private TransmittedColour tint;
+
+    private string selectedKey { get => selectedKeyValue; set { selectedKeyValue = value; Compute(); } }
+    private double thickness { get => thicknessValue; set { thicknessValue = value; Compute(); } }
+    private string unit { get => unitValue; set => unitValue = value; }
+    private string format { get => Formats.Contains(formatValue) ? formatValue : Formats[0]; set => formatValue = value; }
+
+    private string Query => "?glass=" + Uri.EscapeDataString(selectedKeyValue) + "&mm=" + thicknessValue.ToString("0.#", CultureInfo.InvariantCulture);
+
+    private object[] Args => glass is null ? [] : new object[]
+    {
+        SiteInfo.Number(glass.IndexD, 4), SiteInfo.Number(glass.AbbeD, 1), SiteInfo.Number(face * 100, 1),
+        SiteInfo.Number(edge * 100, 1), SiteInfo.Number(thickness, 1), tint.Hex, SiteInfo.Number(tint.Y * 100, 1),
+        SiteInfo.Number(CriticalDegrees(glass.IndexD), 1), SiteInfo.Number(20 / glass.AbbeD, 3), SiteInfo.Number(FringePx(), 2),
+    };
+
+    private (string Href, string Key)[] Links => Key switch
+    {
+        "design" => [("design", "nav.design"), ("give/web", "give.web.name"), ("catalog", "nav.catalog")],
+        "games" => [("render", "nav.render"), ("give/blender", "give.blender.name"), ("catalog", "nav.catalog")],
+        "blender" => [("render", "nav.render"), ("give/games", "give.games.name"), ("catalog", "nav.catalog")],
+        "web" => [("design", "nav.design"), ("give/design", "give.design.name"), ("catalog", "nav.catalog")],
+        _ => [("", "nav.bench"), ("formulas", "nav.formulas"), ("catalog", "nav.catalog")],
+    };
+
+    private IEnumerable<string> Paragraphs(string section)
+    {
+        for (int i = 1; i <= 8; i++)
+        {
+            string key = $"give.{Key}.{section}.{i}";
+            if (L[key] == key)
+            {
+                yield break;
+            }
+
+            yield return key;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        ReadQuery();
+        Compute();
+    }
+
+    protected override void OnParametersSet()
+    {
+        ReadQuery();
+        Compute();
+    }
+
+    private void ReadQuery()
+    {
+        Uri uri = new(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        string? g = query["glass"];
+        if (!string.IsNullOrEmpty(g) && g.Contains('/'))
+        {
+            selectedKeyValue = g;
+        }
+
+        if (double.TryParse(query["mm"], NumberStyles.Float, CultureInfo.InvariantCulture, out double mm) && mm > 0)
+        {
+            thicknessValue = Math.Clamp(mm, 0.5, 100);
+        }
+    }
+
+    private void Compute()
+    {
+        int slash = selectedKeyValue.IndexOf('/');
+        glass = slash > 0 ? GlassCatalog.Find(selectedKeyValue[..slash], selectedKeyValue[(slash + 1)..]) : null;
+        if (glass is null)
+        {
+            return;
+        }
+
+        rgb = [IndexAt(610), IndexAt(550), IndexAt(465)];
+        alpha = [Absorb(610), Absorb(550), Absorb(465)];
+        face = Dielectric.NormalReflectance(1f, (float)glass.IndexD);
+        edge = Dielectric.Fresnel(0.5f, 1f, (float)glass.IndexD).Unpolarized;
+        tint = GlassColour.Transmitted(glass, thicknessValue) ?? default;
+    }
+
+    private double IndexAt(double wavelength)
+    {
+        double clamped = Math.Clamp(wavelength, glass!.Model.MinimumWavelengthNanometers, glass.Model.MaximumWavelengthNanometers);
+        return glass.Model.EvaluateNanometers(clamped, out double n) == DispersionStatus.Success ? n : double.NaN;
+    }
+
+    private double Absorb(double wavelength)
+    {
+        if (glass!.Extinction is not { } extinction)
+        {
+            return 0;
+        }
+
+        double clamped = Math.Clamp(wavelength, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers);
+        extinction.AbsorptionCoefficient(clamped, out double perMeter);
+        return perMeter * 1e-3;
+    }
+
+    private static double CriticalDegrees(double n) => Math.Asin(1 / n) * 180 / Math.PI;
+
+    // Colour fringe on a 45° bevel of the chosen thickness at 4 px/mm: how far blue and red land apart.
+    private double FringePx()
+    {
+        double s = Math.Sin(Math.PI / 4);
+        double Shift(double n) => Math.Tan(Math.PI / 4 - Math.Asin(s / n));
+        return Math.Abs(Shift(rgb[2]) - Shift(rgb[0])) * thicknessValue * 4 * 0.5;
+    }
+
+    private double UnitScale => unitValue switch { "cm" => 0.1, "m" => 0.001, _ => 1 };
+
+    private string UnitLabel => unitValue;
+
+    private string T3(double v) => Math.Exp(-v * thicknessValue).ToString("F4", CultureInfo.InvariantCulture);
+
+    private static string C(double v, int decimals) => v.ToString("F" + decimals, CultureInfo.InvariantCulture);
+
+    private static string G(double v) => v.ToString("G7", CultureInfo.InvariantCulture);
+
+    private string FormatName(string f) => f switch
+    {
+        "css" => "CSS", "tailwind" => "Tailwind", "figma" => "Figma", "glsl" => "GLSL", "hlsl" => "HLSL / GLSL",
+        "unity" => "Unity", "unreal" => "Unreal", "godot" => "Godot", "blender" => "Blender", "gltf" => "glTF", "usd" => "USD",
+        "threejs" => "three.js", "csray" => L["give.fmt.csray.name"], "cscolour" => L["give.fmt.cscolour.name"],
+        "csthermal" => L["give.fmt.csthermal.name"], "cscatalog" => L["give.fmt.cscatalog.name"], _ => f,
+    };
+
+    private string Cite => $"{glass!.VendorDisplayName} {glass.Name}, Caustikon.Glasses, {glass.Provenance.Citation}";
+
+    private string Code()
+    {
+        if (glass is null)
+        {
+            return "";
+        }
+
+        Glass g = glass;
+        double d = thicknessValue;
+        string ds = C(d * UnitScale, unitValue == "m" ? 4 : 2);
+        string att = $"{T3(alpha[0])}, {T3(alpha[1])}, {T3(alpha[2])}";
+        switch (format)
+        {
+            case "css":
+                return $$"""
+                /* {{Cite}}. Panel {{C(d, 1)}} mm thick. */
+                .glass {
+                  --glass-tint: {{tint.Hex}};              /* daylight after {{C(d, 1)}} mm, sRGB */
+                  --glass-luminance: {{C(tint.Y, 4)}};        /* share of light that gets through */
+                  --glass-face: {{C(face, 4)}};           /* reflectance looking straight at it */
+                  --glass-edge: {{C(edge, 4)}};           /* reflectance at 60°, on a bevel */
+                  background: color-mix(in srgb, var(--glass-tint) {{C((1 - tint.Y) * 100 + 8, 0)}}%, transparent);
+                  -webkit-backdrop-filter: blur(8px);
+                  backdrop-filter: blur(8px);                 /* frost is a design choice, not the glass */
+                  border: 1px solid rgb(255 255 255 / {{C(edge * 1.5, 3)}});
+                  box-shadow: inset 0 1px 0 rgb(255 255 255 / {{C(face * 4, 3)}}),
+                              inset 0 -1px 0 rgb(0 0 0 / {{C(face * 2, 3)}}),
+                              0 18px 40px rgb(0 0 0 / 0.18);
+                }
+                """;
+            case "tailwind":
+                return $$"""
+                <!-- {{Cite}}. Panel {{C(d, 1)}} mm thick. -->
+                <div class="rounded-2xl backdrop-blur-[8px]
+                            bg-[{{tint.Hex}}]/[{{C((1 - tint.Y) + 0.08, 2)}}]
+                            border border-white/[{{C(edge * 1.5, 3)}}]
+                            shadow-[inset_0_1px_0_rgb(255_255_255/{{C(face * 4, 3)}}),inset_0_-1px_0_rgb(0_0_0/{{C(face * 2, 3)}}),0_18px_40px_rgb(0_0_0/0.18)]">
+                </div>
+                """;
+            case "figma":
+                return $$"""
+                {{Cite}}. Panel {{C(d, 1)}} mm thick.
+                Fill:            {{tint.Hex}} at {{C(((1 - tint.Y) + 0.08) * 100, 0)}}% opacity
+                Effect:          Background blur 8   (frost, a design choice)
+                Stroke:          #FFFFFF at {{C(edge * 150, 1)}}%, 1 px inside   (Fresnel at 60°, the bevel)
+                Effect:          Inner shadow #FFFFFF at {{C(face * 400, 1)}}%, Y 1, blur 0   (Fresnel head-on, the face)
+                Effect:          Inner shadow #000000 at {{C(face * 200, 1)}}%, Y -1, blur 0
+                Effect:          Drop shadow #000000 at 18%, Y 18, blur 40
+                """;
+            case "glsl":
+                return $$"""
+                // {{Cite}}. Constants for a UI glass shader; the full panel shader is on the Design page.
+                const vec3 uIor   = vec3({{C(rgb[0], 5)}}, {{C(rgb[1], 5)}}, {{C(rgb[2], 5)}});   // n at 610, 550, 465 nm
+                const vec3 uAlpha = vec3({{G(alpha[0])}}, {{G(alpha[1])}}, {{G(alpha[2])}}); // absorption per millimetre
+                const float uThickness = {{C(d, 2)}};                            // mm
+                const float uFace = {{C(face, 5)}};                             // reflectance head-on
+                """;
+            case "hlsl":
+                return $$"""
+                // {{Cite}}
+                // Three-channel glass: index and absorption at 610, 550 and 465 nm. Same code compiles as HLSL and GLSL.
+                static const float3 GLASS_IOR = float3({{C(rgb[0], 5)}}, {{C(rgb[1], 5)}}, {{C(rgb[2], 5)}});
+                static const float3 GLASS_ABSORB_PER_MM = float3({{G(alpha[0])}}, {{G(alpha[1])}}, {{G(alpha[2])}});
+                static const float GLASS_THICKNESS_MM = {{C(d, 2)}};
+
+                // Exact unpolarized Fresnel power reflectance from n1 into n2; 1 past the critical angle.
+                float FresnelExact(float cosI, float n1, float n2)
+                {
+                    float eta = n1 / n2;
+                    float sinT2 = eta * eta * (1.0 - cosI * cosI);
+                    if (sinT2 >= 1.0) return 1.0;
+                    float cosT = sqrt(1.0 - sinT2);
+                    float rs = (n1 * cosI - n2 * cosT) / (n1 * cosI + n2 * cosT);
+                    float rp = (n2 * cosI - n1 * cosT) / (n2 * cosI + n1 * cosT);
+                    return 0.5 * (rs * rs + rp * rp);
+                }
+
+                // One channel through a slab: the weight of what comes out and where the ray leaves (offset in mm).
+                float SlabChannel(float3 view, float3 normal, float n, float alphaPerMm, float thicknessMm, out float2 offsetMm)
+                {
+                    float cosI = saturate(dot(-view, normal));
+                    float r = FresnelExact(cosI, 1.0, n);
+                    float3 inside = refract(view, normal, 1.0 / n);
+                    float cosInside = saturate(dot(-inside, normal));
+                    float path = thicknessMm / max(cosInside, 1e-3);
+                    offsetMm = inside.xy * path;
+                    float t = exp(-alphaPerMm * path);
+                    return (1.0 - r) * t * (1.0 - FresnelExact(cosInside, n, 1.0));
+                }
+
+                // Per channel c: w = SlabChannel(view, normal, GLASS_IOR[c], GLASS_ABSORB_PER_MM[c], GLASS_THICKNESS_MM, offset);
+                // colour[c] = sceneColour(uv + offset * pixelsPerMm)[c] * w + reflectionProbe[c] * FresnelExact(cosI, 1, GLASS_IOR[c]);
+                """;
+            case "unity":
+                return $$"""
+                // {{Cite}}. Unity, HDRP Lit material with refraction, values to enter:
+                //   Refraction Model      Sphere or Thin (Thin for panes)
+                //   Index of Refraction   {{C(g.IndexD, 4)}}
+                //   Transmittance Color   RGB({{att}})   (linear; what white becomes after Absorption Distance)
+                //   Absorption Distance   {{ds}} {{UnitLabel}}   (= the slab thickness, so the colour above is exact for it)
+                //   Smoothness            1.0 (polished), Specular is set by IOR in HDRP
+                //
+                // URP or a custom Shader Graph: paste the HLSL tab into a Custom Function node (file mode),
+                // outputs per channel. Dispersion is the three IOR values below; HDRP has a single IOR.
+                static const float3 GLASS_IOR = float3({{C(rgb[0], 5)}}, {{C(rgb[1], 5)}}, {{C(rgb[2], 5)}});
+                static const float3 GLASS_ABSORB_PER_MM = float3({{G(alpha[0])}}, {{G(alpha[1])}}, {{G(alpha[2])}});
+                """;
+            case "unreal":
+                return $$"""
+                // {{Cite}}. Unreal Engine, Translucent material with Lit Translucency and Refraction:
+                //   Refraction Method          Index of Refraction
+                //   Refraction (pin)           {{C(g.IndexD, 4)}}
+                //   Specular (pin)             {{C(face / 0.08, 3)}}   (Specular 0.5 = 4% head-on; here F0 = {{C(face, 4)}})
+                //   Roughness                  0 (polished)
+                //   Opacity                    {{C(1 - tint.Y, 3)}} as a starting point; true absorption needs the Custom node below
+                //
+                // Custom node (HLSL), inputs View, Normal, SceneColour, Thickness in mm, outputs float3.
+                // Paste the HLSL tab's functions into the node's Additional Outputs or a .ush include and call:
+                float3 ior = float3({{C(rgb[0], 5)}}, {{C(rgb[1], 5)}}, {{C(rgb[2], 5)}});
+                float3 absorbPerMm = float3({{G(alpha[0])}}, {{G(alpha[1])}}, {{G(alpha[2])}});
+                float thicknessMm = {{C(d, 2)}};
+                """;
+            case "godot":
+                return $$"""
+                // {{Cite}}. Godot 4 spatial shader: per-channel refraction of the screen behind, Fresnel and absorption.
+                shader_type spatial;
+                render_mode cull_back, depth_draw_opaque;
+
+                uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
+                const vec3 IOR = vec3({{C(rgb[0], 5)}}, {{C(rgb[1], 5)}}, {{C(rgb[2], 5)}});
+                const vec3 ABSORB_PER_MM = vec3({{G(alpha[0])}}, {{G(alpha[1])}}, {{G(alpha[2])}});
+                uniform float thickness_mm = {{C(d, 2)}};
+                uniform float pixels_per_mm = 4.0;
+
+                float fresnel_exact(float cos_i, float n1, float n2) {
+                    float eta = n1 / n2;
+                    float sin_t2 = eta * eta * (1.0 - cos_i * cos_i);
+                    if (sin_t2 >= 1.0) return 1.0;
+                    float cos_t = sqrt(1.0 - sin_t2);
+                    float rs = (n1 * cos_i - n2 * cos_t) / (n1 * cos_i + n2 * cos_t);
+                    float rp = (n2 * cos_i - n1 * cos_t) / (n2 * cos_i + n1 * cos_t);
+                    return 0.5 * (rs * rs + rp * rp);
+                }
+
+                void fragment() {
+                    vec3 view = -VIEW;                       // toward the surface, view space
+                    vec3 n = normalize(NORMAL);
+                    float cos_i = clamp(dot(-view, n), 0.0, 1.0);
+                    vec3 colour = vec3(0.0);
+                    vec3 reflectance = vec3(0.0);
+                    for (int c = 0; c < 3; c++) {
+                        float r = fresnel_exact(cos_i, 1.0, IOR[c]);
+                        reflectance[c] = r;
+                        vec3 inside = refract(view, n, 1.0 / IOR[c]);
+                        float cos_inside = clamp(dot(-inside, n), 1e-3, 1.0);
+                        float path = thickness_mm / cos_inside;
+                        vec2 uv = SCREEN_UV + inside.xy * path * pixels_per_mm / VIEWPORT_SIZE;
+                        float t = exp(-ABSORB_PER_MM[c] * path);
+                        colour[c] = texture(screen_texture, uv)[c] * t * (1.0 - r);
+                    }
+                    ALBEDO = colour;
+                    SPECULAR = {{C(face / 0.08 * 0.5, 3)}};    // Godot's SPECULAR 0.5 = 4% head-on
+                    ROUGHNESS = 0.0;
+                    METALLIC = 0.0;
+                }
+                """;
+            case "blender":
+            {
+                double dens = Math.Max(alpha[0], Math.Max(alpha[1], alpha[2])) * 1000 / (unitValue == "mm" ? 1000 : unitValue == "cm" ? 100 : 1);
+                double densityPerMetre = Math.Max(alpha[0], Math.Max(alpha[1], alpha[2])) * 1000;
+                string col = densityPerMetre > 0
+                    ? $"({C(1 - alpha[0] * 1000 / densityPerMetre, 4)}, {C(1 - alpha[1] * 1000 / densityPerMetre, 4)}, {C(1 - alpha[2] * 1000 / densityPerMetre, 4)})"
+                    : "(1, 1, 1)";
+                return $$"""
+                {{Cite}}
+                Principled BSDF
+                  IOR                      {{C(g.IndexD, 4)}}
+                  Transmission Weight      1.0
+                  Roughness                0.0 (polished)
+                  Dispersion Scale         1.0            (Cycles only)
+                  Dispersion Abbe Number   {{C(g.AbbeD, 1)}}
+
+                Volume Absorption (into the Volume socket of the Material Output)
+                  Density                  {{C(densityPerMetre, 4)}}   per metre, for an object modelled in metres
+                                           {{C(densityPerMetre / 100, 6)}}   per unit, if 1 unit = 1 cm
+                                           {{C(densityPerMetre / 1000, 7)}}   per unit, if 1 unit = 1 mm
+                  Color                    {{col}}
+                  (Cycles absorbs at Density × (1 − Color) per channel; these two reproduce α exactly:
+                   {{G(alpha[0] * 1000)}}, {{G(alpha[1] * 1000)}}, {{G(alpha[2] * 1000)}} per metre at 610, 550, 465 nm)
+
+                Check: {{C(d, 1)}} mm of this glass should pass ({{att}}) of white light.
+                """;
+            }
+            case "gltf":
+                return $$"""
+                {
+                  "materials": [{
+                    "name": "{{g.VendorDisplayName}} {{g.Name}}",
+                    "pbrMetallicRoughness": { "baseColorFactor": [1, 1, 1, 1], "metallicFactor": 0, "roughnessFactor": 0 },
+                    "extensions": {
+                      "KHR_materials_transmission": { "transmissionFactor": 1 },
+                      "KHR_materials_ior": { "ior": {{C(g.IndexD, 4)}} },
+                      "KHR_materials_dispersion": { "dispersion": {{C(20 / g.AbbeD, 4)}} },
+                      "KHR_materials_volume": {
+                        "thicknessFactor": {{ds}},
+                        "attenuationDistance": {{ds}},
+                        "attenuationColor": [{{att}}]
+                      }
+                    }
+                  }]
+                }
+                """;
+            case "usd":
+                return $$"""
+                # {{Cite}}. UsdPreviewSurface carries the index only; absorption and dispersion need a render-specific schema.
+                def Material "{{new string(g.Name.Where(char.IsAsciiLetterOrDigit).ToArray())}}"
+                {
+                    token outputs:surface.connect = </{{new string(g.Name.Where(char.IsAsciiLetterOrDigit).ToArray())}}/Surface.outputs:surface>
+                    def Shader "Surface"
+                    {
+                        uniform token info:id = "UsdPreviewSurface"
+                        color3f inputs:diffuseColor = (0, 0, 0)
+                        float inputs:metallic = 0
+                        float inputs:roughness = 0
+                        float inputs:opacity = 1
+                        float inputs:ior = {{C(g.IndexD, 4)}}
+                        int inputs:useSpecularWorkflow = 0
+                        token outputs:surface
+                    }
+                }
+                """;
+            case "threejs":
+                return $$"""
+                // {{Cite}}. three.js MeshPhysicalMaterial; the mesh is modelled in {{UnitLabel}} and the wall is {{ds}} {{UnitLabel}} thick.
+                const glass = new THREE.MeshPhysicalMaterial({
+                  transmission: 1,
+                  ior: {{C(Math.Min(g.IndexD, 2.333), 4)}},               // n_d = {{C(g.IndexD, 4)}}; three.js clamps ior to 2.333
+                  dispersion: {{C(20 / g.AbbeD, 4)}},            // 20 / ν_d (KHR_materials_dispersion), ν_d = {{C(g.AbbeD, 1)}}
+                  thickness: {{ds}},
+                  attenuationDistance: {{ds}},
+                  attenuationColor: new THREE.Color({{att}}),   // exp(−α · thickness) per channel
+                  roughness: 0,
+                  metalness: 0,
+                });
+                """;
+            case "csray":
+                return $$"""
+                // {{Cite}}
+                using System.Numerics;
+                using Caustikon;
+                using Caustikon.Glasses;
+
+                Glass glass = GlassCatalog.Find("{{g.Vendor}}", "{{g.Name}}")!;
+                {{ModelType(g)}} model = {{VendorClass(g)}}.{{Identifier(g)}};          // value type: nothing allocates on the ray path
+
+                // One ray at three wavelengths through a flat face: exact Fresnel split and the refracted direction.
+                Vector3 incident = Vector3.Normalize(new Vector3(0.5f, -1f, 0f));
+                Vector3 normal = Vector3.UnitY;
+                float cosI = -Vector3.Dot(incident, normal);
+                foreach (double wavelength in new[] { 610d, 550d, 465d })
+                {
+                    model.EvaluateNanometers(wavelength, out double n);       // {{C(rgb[0], 5)}}, {{C(rgb[1], 5)}}, {{C(rgb[2], 5)}}
+                    FresnelPower r = Dielectric.Fresnel(cosI, 1f, (float)n);    // r.S, r.P, r.Unpolarized
+                    RefractionKind kind = Dielectric.RefractUnit(incident, normal, 1f, (float)n, out Vector3 inside);
+                    // kind is TotalInternalReflection past {{C(CriticalDegrees(g.IndexD), 1)}}° when leaving the glass
+                }
+                """;
+            case "cscolour":
+                return $$"""
+                // {{Cite}}
+                using Caustikon.Glasses;
+
+                Glass glass = GlassCatalog.Find("{{g.Vendor}}", "{{g.Name}}")!;
+
+                // Daylight through {{C(d, 1)}} mm: {{tint.Hex}}, luminous transmittance {{C(tint.Y, 4)}}
+                TransmittedColour tint = GlassColour.Transmitted(glass, {{C(d, 1)}})!.Value;
+                Console.WriteLine($"{tint.Hex}  Y={tint.Y:F4}  linear=({tint.LinearRed:F4}, {tint.LinearGreen:F4}, {tint.LinearBlue:F4})");
+
+                // Internal transmittance at one wavelength, and the absorption coefficient the renderers take.
+                TabulatedExtinction k = glass.Extinction!;
+                k.InternalTransmittance(450, {{C(d, 1)}}, out double t450);
+                k.AbsorptionCoefficient(550, out double perMetre);          // {{G(alpha[1] * 1000)}} 1/m
+                """;
+            case "csthermal":
+            {
+                double shift = g.Thermal?.AbsoluteIndexShift(g.IndexD, FraunhoferLines.DNanometers, 60) ?? double.NaN;
+                return $$"""
+                // {{Cite}}
+                using Caustikon.Glasses;
+
+                Glass glass = GlassCatalog.Find("{{g.Vendor}}", "{{g.Name}}")!;
+                {{(g.Thermal is null ? "// This glass has no dn/dT data in the catalog; glass.Thermal is null." : "ThermalDispersion thermal = glass.Thermal!;")}}
+                {{(g.Thermal is null ? "" : $"double shift = thermal.AbsoluteIndexShift(glass.IndexD, 587.5618, 60);   // {C(shift * 1e6, 1)} × 10⁻⁶ at 60 °C")}}
+                {{(g.Thermal is null ? "" : "double slope = thermal.AbsoluteSlopeAtReference(glass.IndexD, 587.5618);  // dn/dT at the reference temperature")}}
+
+                // Catalog indices are relative to air at 20 °C; make them absolute before tracing in another medium.
+                double absolute = glass.IndexD * 1.000273;
+                double inWater = absolute / 1.3330;
+                """;
+            }
+            default:
+                return $$"""
+                using Caustikon.Glasses;
+
+                // Every glass, with its curves, absorption, thermal data and provenance.
+                foreach (Glass glass in GlassCatalog.All)
+                {
+                    // glass.Vendor, glass.Name, glass.IndexD, glass.AbbeD, glass.Extinction, glass.Thermal, glass.Provenance
+                }
+
+                // Crowns close to this one: index within 0.01 and Abbe number within 3.
+                var alike = GlassCatalog.All
+                    .Where(x => Math.Abs(x.IndexD - {{C(g.IndexD, 4)}}) < 0.01 && Math.Abs(x.AbbeD - {{C(g.AbbeD, 1)}}) < 3)
+                    .OrderBy(x => Math.Abs(x.IndexD - {{C(g.IndexD, 4)}}))
+                    .Select(x => $"{x.VendorDisplayName} {x.Name}: nd {x.IndexD:F4}, vd {x.AbbeD:F1}");
+
+                Glass byName = GlassCatalog.Find("{{g.Vendor}}", "{{g.Name}}")!;
+                bool exists = GlassCatalog.TryFind("{{g.Vendor}}", "{{g.Name.ToLowerInvariant()}}", out Glass? found);   // names normalize
+                """;
+        }
+    }
+
+    private IEnumerable<(string Name, string Value, string Explain)> Parameters()
+    {
+        if (glass is null)
+        {
+            yield break;
+        }
+
+        Glass g = glass;
+        string nd = SiteInfo.Number(g.IndexD, 4);
+        string vd = SiteInfo.Number(g.AbbeD, 1);
+        string rgbText = $"{SiteInfo.Number(rgb[0], 4)}, {SiteInfo.Number(rgb[1], 4)}, {SiteInfo.Number(rgb[2], 4)}";
+        string alphaText = $"{SiteInfo.Number(alpha[0] * 1000, 3)}, {SiteInfo.Number(alpha[1] * 1000, 3)}, {SiteInfo.Number(alpha[2] * 1000, 3)} 1/m";
+        string att = $"{SiteInfo.Number(Math.Exp(-alpha[0] * thicknessValue), 4)}, {SiteInfo.Number(Math.Exp(-alpha[1] * thicknessValue), 4)}, {SiteInfo.Number(Math.Exp(-alpha[2] * thicknessValue), 4)}";
+        switch (format)
+        {
+            case "css":
+            case "tailwind":
+            case "figma":
+                yield return (L["give.p.tint"], tint.Hex, "give.x.tint");
+                yield return (L["give.p.luminance"], SiteInfo.Number(tint.Y * 100, 1) + "%", "give.x.luminance");
+                yield return (L["give.p.face"], SiteInfo.Number(face * 100, 2) + "%", "give.x.face");
+                yield return (L["give.p.edge"], SiteInfo.Number(edge * 100, 2) + "%", "give.x.edge");
+                yield return (L["give.p.frost"], "8 px", "give.x.frost");
+                break;
+            case "glsl":
+            case "hlsl":
+            case "godot":
+                yield return ("n (R, G, B)", rgbText, "give.x.rgb");
+                yield return ("α", alphaText, "give.x.alpha");
+                yield return (L["give.p.thickness"], SiteInfo.Number(thicknessValue, 1) + " mm", "give.x.thickness");
+                yield return ("R₀", SiteInfo.Number(face * 100, 2) + "%", "give.x.face");
+                yield return (L["give.p.critical"], SiteInfo.Number(CriticalDegrees(g.IndexD), 1) + "°", "give.x.critical");
+                break;
+            case "unity":
+                yield return ("Index of Refraction", nd, "give.x.ior");
+                yield return ("Transmittance Color", att, "give.x.attcolour");
+                yield return ("Absorption Distance", SiteInfo.Number(thicknessValue * UnitScale, unitValue == "m" ? 4 : 2) + " " + unitValue, "give.x.attdistance");
+                yield return ("n (R, G, B)", rgbText, "give.x.rgb");
+                break;
+            case "unreal":
+                yield return ("Refraction", nd, "give.x.ior");
+                yield return ("Specular", SiteInfo.Number(face / 0.08, 3), "give.x.unrealspecular");
+                yield return ("n (R, G, B)", rgbText, "give.x.rgb");
+                yield return ("α", alphaText, "give.x.alpha");
+                break;
+            case "blender":
+                yield return ("IOR", nd, "give.x.ior");
+                yield return ("Dispersion Abbe Number", vd, "give.x.abbe");
+                yield return ("Density", SiteInfo.Number(Math.Max(alpha[0], Math.Max(alpha[1], alpha[2])) * 1000, 4) + " 1/m", "give.x.density");
+                yield return ("Color", "", "give.x.blendercolour");
+                break;
+            case "gltf":
+            case "threejs":
+                yield return ("ior", nd, "give.x.ior");
+                yield return ("dispersion", SiteInfo.Number(20 / g.AbbeD, 4), "give.x.dispersion20");
+                yield return ("attenuationDistance", SiteInfo.Number(thicknessValue * UnitScale, unitValue == "m" ? 4 : 2) + " " + unitValue, "give.x.attdistance");
+                yield return ("attenuationColor", att, "give.x.attcolour");
+                yield return ("thickness", SiteInfo.Number(thicknessValue * UnitScale, unitValue == "m" ? 4 : 2) + " " + unitValue, "give.x.thicknessunits");
+                break;
+            case "usd":
+                yield return ("ior", nd, "give.x.ior");
+                yield return ("roughness", "0", "give.x.roughness");
+                break;
+            default:
+                yield return ("IndexD, AbbeD", nd + ", " + vd, "give.x.nd");
+                yield return ("Extinction", g.Extinction is null ? L["render.nok"] : SiteInfo.Compact(g.Extinction.MinimumWavelengthNanometers) + "–" + SiteInfo.Compact(g.Extinction.MaximumWavelengthNanometers) + " nm", "give.x.extinction");
+                yield return ("Thermal", g.Thermal is null ? L["home.thermal.none"] : L["give.x.thermal.yes"], "give.x.thermal");
+                yield return ("Provenance", g.Provenance.Citation, "give.x.provenance");
+                break;
+        }
+    }
+
+    private static string ModelType(Glass g) => g.Model switch { Sellmeier => "Sellmeier", Polynomial => "Polynomial", Cauchy => "Cauchy", _ => "IDispersionModel" };
+
+    private static string VendorClass(Glass g) => char.ToUpperInvariant(g.Vendor[0]) + g.Vendor[1..];
+
+    private static string Identifier(Glass g)
+    {
+        string id = new(g.Name.Where(char.IsAsciiLetterOrDigit).ToArray());
+        return id.Length > 0 && char.IsAsciiDigit(id[0]) ? "G" + id : id;
+    }
+
+    private async Task Copy(string text) => await Js.InvokeVoidAsync("caustikonClipboard.copy", text);
+}
