@@ -18,6 +18,9 @@ public abstract class RenderShape
     /// <summary>Where a ray starting inside leaves, and the outward normal there.</summary>
     public abstract void Leave(Vector3 origin, Vector3 direction, out float t, out Vector3 normal);
 
+    /// <summary>The solid as numbers for a shader: a unit sphere at the origin, or a centre and the face planes in local space.</summary>
+    public abstract void Describe(out bool sphere, out Vector3 centre, out float extent, out IReadOnlyList<(Vector3 Normal, float Distance)> planes);
+
     public static RenderShape Sphere() => new SphereShape();
 
     public static RenderShape Cube() => ConvexShape.Prism(4, 0.62f, 0.62f, 45f);
@@ -120,6 +123,14 @@ public abstract class RenderShape
             t = -2f * Vector3.Dot(origin, direction);
             normal = Vector3.Normalize(origin + direction * t);
         }
+
+        public override void Describe(out bool sphere, out Vector3 centre, out float extent, out IReadOnlyList<(Vector3 Normal, float Distance)> planes)
+        {
+            sphere = true;
+            centre = Vector3.Zero;
+            extent = 1f;
+            planes = [];
+        }
     }
 
     private sealed class ConvexShape : RenderShape
@@ -151,6 +162,14 @@ public abstract class RenderShape
         }
 
         public override float Extent { get; }
+
+        public override void Describe(out bool sphere, out Vector3 centre, out float extent, out IReadOnlyList<(Vector3 Normal, float Distance)> planes)
+        {
+            sphere = false;
+            centre = this.centre;
+            extent = Extent;
+            planes = this.planes;
+        }
 
         /// <summary>A right prism with a regular <paramref name="sides"/>-gon cross-section standing on the ground.</summary>
         public static ConvexShape Prism(int sides, float apothem, float halfHeight, float yawDegrees)

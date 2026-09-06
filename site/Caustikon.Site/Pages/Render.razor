@@ -10,28 +10,10 @@
 <h1>@L["render.h1"]</h1>
 <p class="lede">@L["render.lede"]</p>
 
-<div class="render-stage">
-    <div class="render-main">
-        <canvas id="render-canvas" width="@lastSize" height="@lastSize" class="render-canvas"></canvas>
-        @if (glass is { } g0)
-        {
-            <div class="render-facts">
-                <dl class="kv">
-                    <dt>@L["render.fact.glass"]</dt><dd>@g0.VendorDisplayName <a href="@Catalog.GlassLink(g0)">@g0.Name</a> · n<sub>d</sub> @SiteInfo.Number(g0.IndexD, 5) · ν<sub>d</sub> @SiteInfo.Number(g0.AbbeD, 2)</dd>
-                    <dt>@L["render.fact.n"]</dt><dd>@IndexAt(g0, 400) · @IndexAt(g0, 700)</dd>
-                    <dt>@H("render.fact.tau", sizeMm)</dt><dd>@Tau(g0, 450) / @Tau(g0, 650)</dd>
-                    <dt>@L["render.fact.ground"]</dt><dd>@L["render.fact.ground.v"]</dd>
-                    <dt>@L["render.fact.samples"]</dt><dd>@string.Join(", ", GlassRenderer.SampledWavelengths.Select(w => w.ToString("0", CultureInfo.InvariantCulture))) nm</dd>
-                    @if (lastMilliseconds > 0)
-                    {
-                        <dt>@L["render.fact.time"]</dt><dd>@T("render.fact.time.v", lastSize, (lastMilliseconds / 1000.0).ToString("0.0", CultureInfo.InvariantCulture), refinedPixels)</dd>
-                    }
-                </dl>
-                <p class="muted">@L["render.note"]</p>
-            </div>
-        }
-    </div>
-    <aside class="render-aside panel">
+<div class="bench-block">
+    <canvas id="render-canvas" class="render-canvas gl"></canvas>
+    <p class="bench-hint">@(gpu ? L["render.orbit"] : L["render.cpu"])</p>
+    <div class="bench-controls">
         <label class="control">
             <span>@L["render.glass"]</span>
             <select @bind="selectedKey">
@@ -67,12 +49,12 @@
         {
             <label class="control">
                 <span class="range-label"><span>@L["render.faces"]</span><output>@sides</output></span>
-                <input type="range" min="3" max="12" step="1" @bind="sides" />
+                <input type="range" min="3" max="12" step="1" @bind="sides" @bind:event="oninput" />
             </label>
         }
         <label class="control">
             <span class="range-label"><span>@L["render.size"]</span><output>@sizeMm mm</output></span>
-            <input type="range" min="10" max="200" step="5" @bind="sizeMm" />
+            <input type="range" min="2" max="400" step="1" @bind="sizeMm" @bind:event="oninput" />
         </label>
         <label class="control">
             <span>@L["render.backdrop"]</span>
@@ -86,30 +68,56 @@
         </label>
         <label class="control">
             <span class="range-label"><span>@L["render.light.az"]</span><output>@lightAzimuth°</output></span>
-            <input type="range" min="-180" max="180" step="5" @bind="lightAzimuth" />
+            <input type="range" min="-180" max="180" step="1" @bind="lightAzimuth" @bind:event="oninput" />
         </label>
         <label class="control">
             <span class="range-label"><span>@L["render.light.el"]</span><output>@lightElevation°</output></span>
-            <input type="range" min="5" max="85" step="5" @bind="lightElevation" />
+            <input type="range" min="5" max="85" step="1" @bind="lightElevation" @bind:event="oninput" />
         </label>
         <label class="control">
             <span class="range-label"><span>@L["render.lamp"]</span><output>@lightIntensity.ToString("0.0", CultureInfo.InvariantCulture)×</output></span>
-            <input type="range" min="0" max="3" step="0.1" @bind="lightIntensity" />
+            <input type="range" min="0" max="4" step="0.1" @bind="lightIntensity" @bind:event="oninput" />
         </label>
         <label class="control">
             <span class="range-label"><span>@L["render.room"]</span><output>@ambient.ToString("0.0", CultureInfo.InvariantCulture)×</output></span>
-            <input type="range" min="0" max="2" step="0.1" @bind="ambient" />
+            <input type="range" min="0" max="2" step="0.1" @bind="ambient" @bind:event="oninput" />
         </label>
-        <label class="control">
-            <span>@L["render.resolution"]</span>
-            <select @bind="size">
-                <option value="320">320 px</option>
-                <option value="480">480 px</option>
-                <option value="720">720 px</option>
-            </select>
-        </label>
-        <button class="primary" @onclick="Start" disabled="@rendering">@(rendering ? T("render.rendering", progress) : L["render.button"])</button>
-    </aside>
+        @if (!gpu)
+        {
+            <label class="control">
+                <span>@L["render.resolution"]</span>
+                <select @bind="size">
+                    <option value="320">320 px</option>
+                    <option value="480">480 px</option>
+                    <option value="720">720 px</option>
+                </select>
+            </label>
+            <div class="control">
+                <button class="primary" @onclick="Start" disabled="@rendering">@(rendering ? T("render.rendering", progress) : L["render.button"])</button>
+            </div>
+        }
+    </div>
+    @if (glass is { } g0)
+    {
+        <div class="render-facts">
+            <dl class="kv">
+                <dt>@L["render.fact.glass"]</dt><dd>@g0.VendorDisplayName <a href="@Catalog.GlassLink(g0)">@g0.Name</a> · n<sub>d</sub> @SiteInfo.Number(g0.IndexD, 5) · ν<sub>d</sub> @SiteInfo.Number(g0.AbbeD, 2)</dd>
+                <dt>@L["render.fact.n"]</dt><dd>@IndexAt(g0, 400) · @IndexAt(g0, 700)</dd>
+                <dt>@H("render.fact.tau", sizeMm)</dt><dd>@Tau(g0, 450) / @Tau(g0, 650)</dd>
+                <dt>@L["render.fact.ground"]</dt><dd>@L["render.fact.ground.v"]</dd>
+                <dt>@L["render.fact.samples"]</dt><dd>@string.Join(", ", GlassRenderer.SampledWavelengths.Select(w => w.ToString("0", CultureInfo.InvariantCulture))) nm</dd>
+                @if (gpu)
+                {
+                    <dt>@L["render.fact.gpu"]</dt><dd>@L["render.fact.gpu.v"]</dd>
+                }
+                else if (lastMilliseconds > 0)
+                {
+                    <dt>@L["render.fact.time"]</dt><dd>@T("render.fact.time.v", lastSize, (lastMilliseconds / 1000.0).ToString("0.0", CultureInfo.InvariantCulture), refinedPixels)</dd>
+                }
+            </dl>
+            <p class="bench-note">@L["render.note"]</p>
+        </div>
+    }
 </div>
 
 @code {
@@ -128,17 +136,28 @@
     ];
 
     private string selectedKeyValue = "schott/N-SF11";
-    private string shapeKey = "sphere";
-    private string backdropKey = "checker";
-    private int sides = 6;
-    private double sizeMm = 60;
+    private string shapeKeyValue = "sphere";
+    private string backdropKeyValue = "checker";
+    private int sidesValue = 6;
+    private double sizeMmValue = 60;
+    private double lightAzimuthValue = 55, lightElevationValue = 50, lightIntensityValue = 1, ambientValue = 1;
+    private bool gpu = true;
+    private bool pushQueued;
+
+    private string shapeKey { get => shapeKeyValue; set { shapeKeyValue = value; Push(); } }
+    private string backdropKey { get => backdropKeyValue; set { backdropKeyValue = value; Push(); } }
+    private int sides { get => sidesValue; set { sidesValue = value; Push(); } }
+    private double sizeMm { get => sizeMmValue; set { sizeMmValue = value; Push(); } }
+    private double lightAzimuth { get => lightAzimuthValue; set { lightAzimuthValue = value; Push(); } }
+    private double lightElevation { get => lightElevationValue; set { lightElevationValue = value; Push(); } }
+    private double lightIntensity { get => lightIntensityValue; set { lightIntensityValue = value; Push(); } }
+    private double ambient { get => ambientValue; set { ambientValue = value; Push(); } }
     private int size = 480;
     private int lastSize = 480;
     private bool rendering;
     private int progress;
     private long lastMilliseconds;
     private int refinedPixels;
-    private double lightAzimuth = 55, lightElevation = 50, lightIntensity = 1, ambient = 1;
     private Glass? glass;
     private CancellationTokenSource? cancel;
     private bool rendered;
@@ -151,6 +170,36 @@
             selectedKeyValue = value;
             int slash = value.IndexOf('/');
             glass = GlassCatalog.Find(value[..slash], value[(slash + 1)..]);
+            Push();
+        }
+    }
+
+    // Sends the scene to the shader after this render; one push per batch of changes.
+    private void Push()
+    {
+        if (!rendered || !gpu)
+        {
+            return;
+        }
+
+        pushQueued = true;
+    }
+
+    private async Task PushNowAsync()
+    {
+        if (glass is null)
+        {
+            return;
+        }
+
+        GpuScene scene = GpuScene.Build(glass, Shape, sizeMm / 2d, Scenery, lightAzimuth, lightElevation, lightIntensity, ambient);
+        bool ok = await Js.InvokeAsync<bool>("caustikonGl.render", "render-canvas", scene);
+        if (!ok && gpu)
+        {
+            // No WebGL2 here: draw on the CPU instead, with the old resolution choice and button.
+            gpu = false;
+            StateHasChanged();
+            await Start();
         }
     }
 
@@ -161,7 +210,14 @@
         if (firstRender && !rendered)
         {
             rendered = true;
-            await Start();
+            await PushNowAsync();
+            return;
+        }
+
+        if (pushQueued)
+        {
+            pushQueued = false;
+            await PushNowAsync();
         }
     }
 

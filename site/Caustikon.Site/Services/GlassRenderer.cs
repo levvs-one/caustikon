@@ -31,7 +31,7 @@ public sealed class GlassRenderer
     private static readonly double[] Wavelengths = Enumerable.Range(0, SampleCount).Select(i => 400d + 300d * i / (SampleCount - 1)).ToArray();
     private static readonly Vector3[] SampleWeights = BuildWeights();
 
-    private readonly double[] indices = new double[SampleCount];
+    private readonly double[] indices;
     private readonly double radiusMillimeters;
     private readonly TabulatedExtinction? extinction;
     private readonly RenderShape shape;
@@ -67,21 +67,57 @@ public sealed class GlassRenderer
         extinction = glass.Extinction;
         // Ground pattern period: 16 mm tiles, so the same slab of checker is what a 10 mm marble and a 200 mm ball sit on.
         tileUnits = (float)(16d / radiusMillimeters * shape.Extent);
-        double az = lightAzimuthDegrees * Math.PI / 180d;
-        double el = Math.Clamp(lightElevationDegrees, 5d, 85d) * Math.PI / 180d;
-        keyPosition = new Vector3((float)(-Math.Sin(az) * Math.Cos(el)), (float)Math.Sin(el), (float)(-Math.Cos(az) * Math.Cos(el))) * 3.8f;
+        keyPosition = KeyLightPosition(lightAzimuthDegrees, lightElevationDegrees);
         keyDirection = Vector3.Normalize(keyPosition);
         keyIntensity = (float)Math.Clamp(lightIntensity, 0d, 4d);
         this.ambient = (float)Math.Clamp(ambient, 0d, 2d);
-        for (int i = 0; i < SampleCount; i++)
-        {
-            double wavelength = Wavelengths[i];
-            double clamped = Math.Clamp(wavelength, glass.Model.MinimumWavelengthNanometers, glass.Model.MaximumWavelengthNanometers);
-            indices[i] = glass.Model.EvaluateNanometers(clamped, out double n) == DispersionStatus.Success ? n : 1.5d;
-        }
+        indices = IndicesFor(glass);
     }
 
     public static IReadOnlyList<double> SampledWavelengths => Wavelengths;
+
+    /// <summary>Linear-RGB weight of each sampled wavelength; the nine sum to white.</summary>
+    public static IReadOnlyList<Vector3> SampleColourWeights => SampleWeights;
+
+    /// <summary>The glass's index at each sampled wavelength, clamped to the model's range.</summary>
+    public static double[] IndicesFor(Glass glass)
+    {
+        double[] result = new double[SampleCount];
+        for (int i = 0; i < SampleCount; i++)
+        {
+            double clamped = Math.Clamp(Wavelengths[i], glass.Model.MinimumWavelengthNanometers, glass.Model.MaximumWavelengthNanometers);
+            result[i] = glass.Model.EvaluateNanometers(clamped, out double n) == DispersionStatus.Success ? n : 1.5d;
+        }
+
+        return result;
+    }
+
+    /// <summary>Beer–Lambert coefficient per millimetre at each sampled wavelength, from the glass's k table; zeros without one.</summary>
+    public static double[] AbsorptionPerMillimetre(Glass glass)
+    {
+        double[] result = new double[SampleCount];
+        if (glass.Extinction is not { } extinction)
+        {
+            return result;
+        }
+
+        for (int i = 0; i < SampleCount; i++)
+        {
+            double clamped = Math.Clamp(Wavelengths[i], extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers);
+            extinction.InternalTransmittance(clamped, 1d, out double t);
+            result[i] = t > 0d ? -Math.Log(t) : 50d;
+        }
+
+        return result;
+    }
+
+    /// <summary>Where the key light stands, 3.8 units from the solid: azimuth 0 behind the camera, 90 to its left.</summary>
+    public static Vector3 KeyLightPosition(double azimuthDegrees, double elevationDegrees)
+    {
+        double az = azimuthDegrees * Math.PI / 180d;
+        double el = Math.Clamp(elevationDegrees, 5d, 85d) * Math.PI / 180d;
+        return new Vector3((float)(-Math.Sin(az) * Math.Cos(el)), (float)Math.Sin(el), (float)(-Math.Cos(az) * Math.Cos(el))) * 3.8f;
+    }
 
     /// <summary>Renders rows [<paramref name="firstRow"/>, <paramref name="lastRow"/>) of a <paramref name="size"/>×<paramref name="size"/> image: linear RGB into <paramref name="linear"/> and companded RGBA into <paramref name="rgba"/>.</summary>
     public void RenderRows(Vector3[] linear, byte[] rgba, int size, int firstRow, int lastRow)

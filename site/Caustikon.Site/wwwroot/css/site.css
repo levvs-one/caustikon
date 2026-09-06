@@ -1240,3 +1240,95 @@ table.datasheet td.num {
     font-size: 13px;
     font-family: inherit;
 }
+
+.prism .glass.crossing {
+    stroke: #e0836f;
+    stroke-dasharray: 6 4;
+}
+
+.prism .corner {
+    r: 7px;
+}
+
+/* Bench without a panel: full-width picture, controls in a fluid grid beneath */
+
+.bench-block {
+    margin: 0 0 2.5rem;
+}
+
+.bench.panning {
+    cursor: grabbing;
+}
+
+.bench:not(.editable) {
+    cursor: grab;
+    touch-action: pan-y;
+}
+
+.bench-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 0.55rem 1.6rem;
+    align-items: end;
+    margin: 0.9rem 0 1rem;
+}
+
+.bench-controls .control,
+.bench-controls label.check {
+    color: var(--fg);
+    font-size: 0.9rem;
+    width: 100%;
+    gap: 0.15rem;
+}
+
+.bench-controls select,
+.bench-controls input[type="range"] {
+    width: 100%;
+    min-width: 0;
+}
+
+.bench-controls .button-row {
+    margin-top: 0.35rem;
+}
+
+.readout.compact .label,
+.bench-hint,
+.bench-note {
+    color: var(--fg);
+}
+
+.bench-hint {
+    margin: 0.5rem 0 0;
+    font-size: 0.9rem;
+}
+
+.bench-note {
+    max-width: none;
+    font-size: 0.95rem;
+}
+
+.bench.drawing {
+    cursor: crosshair;
+}
+
+.prism .sketch {
+    fill: none;
+    stroke: #f4efe4;
+    stroke-width: 1.5;
+    stroke-dasharray: 6 4;
+}
+
+.render-canvas.gl {
+    aspect-ratio: 16 / 10;
+    height: auto;
+    cursor: grab;
+    touch-action: pan-y;
+}
+
+.render-canvas.gl:active {
+    cursor: grabbing;
+}
+
+.render-facts {
+    margin-top: 1rem;
+}

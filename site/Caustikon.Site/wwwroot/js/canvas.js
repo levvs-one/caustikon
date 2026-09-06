@@ -54,6 +54,14 @@ window.caustikonSvg = {
         const r = svg.getBoundingClientRect();
         return [r.left, r.top, r.width, r.height];
     },
+    // Blazor's wheel listener is passive, so the browser's own ctrl+wheel zoom has to be stopped here.
+    guardWheel(id) {
+        const box = document.getElementById(id);
+        if (box && !box.dataset.wheelGuard) {
+            box.dataset.wheelGuard = "1";
+            box.addEventListener("wheel", e => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { passive: false });
+        }
+    },
     toUser(id, clientX, clientY) {
         const svg = document.getElementById(id);
         if (!svg) {
@@ -67,13 +75,13 @@ window.caustikonSvg = {
     }
 };
 
-// Remembers the visitor's language; falls back to the browser's.
+// Remembers the language the visitor picked; English until they pick one.
 window.caustikonLang = {
     get() {
         let code = null;
         try { code = localStorage.getItem("caustikon.lang"); } catch { }
-        if (!code) {
-            code = (navigator.language || "en").toLowerCase().startsWith("ru") ? "ru" : "en";
+        if (code !== "ru" && code !== "en") {
+            code = "en";
         }
         document.documentElement.lang = code;
         return code;

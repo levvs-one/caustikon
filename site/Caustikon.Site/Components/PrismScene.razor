@@ -7,7 +7,8 @@
    inside, and both fade with the energy they carry; absorption over the path in millimetres comes from the glass's own
    k table, the temperature shift from its dn/dT, and the surrounding medium has an index of its own. *@
 
-<div class="bench @(Editable ? "editable" : "")" @onpointerdown="OnPointerDown" @onpointermove="OnPointerMove" @onpointerup="OnPointerUp" @onpointerleave="OnPointerUp">
+<div id="@BenchId" class="bench @(Editable ? "editable" : "") @(panning ? "panning" : "") @(Drawing ? "drawing" : "")" @onpointerdown="OnPointerDown" @onpointermove="OnPointerMove" @onpointerup="OnPointerUp" @onpointerleave="OnPointerUp"
+     @onwheel="OnWheel" @ondblclick="OnDoubleClick">
     @((MarkupString)svg)
 </div>
 
@@ -25,9 +26,20 @@
     [Parameter] public bool Editable { get; set; }
     [Parameter] public EventCallback<Vector2[]> VerticesChanged { get; set; }
     [Parameter] public EventCallback<PrismScene> Traced { get; set; }
+    [Parameter] public EventCallback<double> ZoomChanged { get; set; }
+    /// <summary>Each click puts a corner down; a double click finishes.</summary>
+    [Parameter] public bool Drawing { get; set; }
+    [Parameter] public EventCallback DrawingFinished { get; set; }
 
     private const double W = 1000, Hgt = 520, BaseScale = 300;
     private const string SvgId = "bench-svg";
+    private const string BenchId = "bench-box";
+    public const double MinZoom = 0.25, MaxZoom = 40;
+    // Where the view has been dragged to, in scene units; double-click puts it back.
+    private Vector2 pan;
+    private bool panning;
+    private Vector2 panStartPointer, panStartValue;
+    private (double X, double Y, Vector2 Scene)? zoomAnchor;
     private const double AirAtD = 1.000273;
     private Vector2 origin = new(300, 440);
     private double scale = BaseScale;
@@ -40,12 +52,17 @@
     public double EnergyOut { get; private set; }
     public double EnergyAbsorbed { get; private set; }
     public double EnergyReflectedAtEntry { get; private set; }
+    public bool SelfIntersecting { get; private set; }
+    /// <summary>n at the d line, relative to air, at the bench temperature.</summary>
+    public double IndexD { get; private set; } = double.NaN;
+    /// <summary>How far the temperature moved n_d from its 20 °C catalog value; NaN without dn/dT data.</summary>
+    public double IndexShiftD { get; private set; } = double.NaN;
 
-    private (double, double, int, double) reported = (double.NaN, double.NaN, -1, double.NaN);
+    private (double, double, int, double, double) reported = (double.NaN, double.NaN, -1, double.NaN, double.NaN);
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private async Task ReportAsync()
     {
-        (double, double, int, double) current = (MinimumDeviation, MaximumDeviation, RaysThatExit, EnergyOut);
+        (double, double, int, double, double) current = (MinimumDeviation, MaximumDeviation, RaysThatExit + (SelfIntersecting ? 100000 : 0), EnergyOut, IndexD);
         if (!Same(current, reported))
         {
             reported = current;
@@ -53,16 +70,33 @@
         }
     }
 
-    private static bool Same((double A, double B, int C, double D) x, (double A, double B, int C, double D) y) =>
-        x.C == y.C && Eq(x.A, y.A) && Eq(x.B, y.B) && Eq(x.D, y.D);
+    private static bool Same((double A, double B, int C, double D, double E) x, (double A, double B, int C, double D, double E) y) =>
+        x.C == y.C && Eq(x.A, y.A) && Eq(x.B, y.B) && Eq(x.D, y.D) && Eq(x.E, y.E);
 
     private static bool Eq(double a, double b) => a.Equals(b) || (double.IsNaN(a) && double.IsNaN(b));
 
-    protected override void OnParametersSet()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await ReportAsync();
+        if (firstRender)
+        {
+            await Js.InvokeVoidAsync("caustikonSvg.guardWheel", BenchId);
+        }
+    }
+
+    protected override void OnParametersSet() => Rebuild();
+
+    private void Rebuild()
     {
         Vector2[] vertices = [.. Vertices];
-        double zoom = Math.Clamp(Zoom, 0.25, 6);
+        double zoom = Math.Clamp(Zoom, MinZoom, MaxZoom);
         scale = BaseScale * zoom;
+        {
+            double absolute = IndexAt(FraunhoferLines.DNanometers);
+            IndexD = absolute / AirAtD;
+            IndexShiftD = Glass.Thermal is null ? double.NaN
+                : IndexD - (Glass.Model.EvaluateNanometers(Math.Clamp(FraunhoferLines.DNanometers, Glass.Model.MinimumWavelengthNanometers, Glass.Model.MaximumWavelengthNanometers), out double catalog) == DispersionStatus.Success ? catalog : double.NaN);
+        }
 
         // At 1× the bench shows source, shape and screen; zooming in closes on the shape's centroid.
         Vector2 centroid = Vector2.Zero;
@@ -79,7 +113,17 @@
         Vector2 wide = new((float)(300 - (1 - Math.Min(zoom, 1)) * 150), (float)(440 - (1 - Math.Min(zoom, 1)) * 100));
         Vector2 tight = new((float)(W / 2 - centroid.X * scale), (float)(Hgt / 2 + centroid.Y * scale));
         float blend = (float)Math.Clamp((zoom - 1) / 1.2, 0, 1);
-        origin = Vector2.Lerp(wide, tight, blend);
+        Vector2 baseOrigin = Vector2.Lerp(wide, tight, blend);
+        if (zoomAnchor is { } anchor && HasRect)
+        {
+            // Keep the scene point under the cursor where it was before the zoom step.
+            origin = baseOrigin + new Vector2(pan.X * (float)scale, -pan.Y * (float)scale);
+            Vector2 now = ToScene(anchor.X, anchor.Y);
+            pan += anchor.Scene - now;
+            zoomAnchor = null;
+        }
+
+        origin = baseOrigin + new Vector2(pan.X * (float)scale, -pan.Y * (float)scale);
 
         double angle = BeamAngleDegrees * Math.PI / 180;
         Vector2 incident = new((float)Math.Cos(angle), (float)Math.Sin(angle));
@@ -97,6 +141,7 @@
          .Append("\" x2=\"").Append(F(P(new Vector2((float)screenX, 4f)).X)).Append("\" y2=\"").Append(F(P(new Vector2((float)screenX, 4f)).Y)).Append("\"/>");
 
         bool hasShape = vertices.Length >= 3;
+        SelfIntersecting = hasShape && CrossesItself(vertices);
         (Vector2 entry, int entryEdge) = hasShape ? Intersect(source, incident, vertices, -1) : (source + incident * 3f, -1);
         bool hits = hasShape && entryEdge >= 0;
         Vector2 beamEnd = hits ? entry : source + incident * 4f;
@@ -208,7 +253,7 @@
 
         if (hasShape)
         {
-            s.Append("<polygon class=\"glass\" points=\"");
+            s.Append("<polygon class=\"glass").Append(SelfIntersecting ? " crossing" : "").Append("\" points=\"");
             foreach (Vector2 v in vertices)
             {
                 Vector2 p = P(v);
@@ -222,7 +267,19 @@
         s.Append("<line class=\"scalebar\" x1=\"").Append(F(W - 40 - barPx)).Append("\" x2=\"").Append(F(W - 40)).Append("\" y1=\"").Append(F(Hgt - 24)).Append("\" y2=\"").Append(F(Hgt - 24)).Append("\"/>");
         s.Append("<text class=\"scalelabel\" x=\"").Append(F(W - 40)).Append("\" y=\"").Append(F(Hgt - 31)).Append("\" text-anchor=\"end\">10 mm</text>");
 
-        if (Editable)
+        if (!hasShape && vertices.Length > 0)
+        {
+            s.Append("<polyline class=\"sketch\" points=\"");
+            foreach (Vector2 v in vertices)
+            {
+                Vector2 p = P(v);
+                s.Append(F(p.X)).Append(',').Append(F(p.Y)).Append(' ');
+            }
+
+            s.Append("\"/>");
+        }
+
+        if (Editable || Drawing)
         {
             foreach (Vector2 v in vertices)
             {
@@ -291,48 +348,125 @@
 
     private async Task OnPointerDown(PointerEventArgs e)
     {
-        if (!Editable || Vertices.Count == 0)
+        if (e.Button != 0)
         {
             return;
         }
 
         benchRect = await Js.InvokeAsync<double[]>("caustikonSvg.rect", SvgId);
-        Vector2 scene = ToScene(e.ClientX, e.ClientY);
-        double best = double.PositiveInfinity;
-        for (int i = 0; i < Vertices.Count; i++)
+        if (!HasRect)
         {
-            double d = Vector2.DistanceSquared(Vertices[i], scene);
-            if (d < best)
+            return;
+        }
+
+        Vector2 scene = ToScene(e.ClientX, e.ClientY);
+        dragging = -1;
+        if (Drawing)
+        {
+            // The second click of a double click lands on the last corner; it must not become a corner of its own.
+            if (Vertices.Count == 0 || Vector2.Distance(Vertices[^1], scene) * scale > 6)
             {
-                best = d;
-                dragging = i;
+                await VerticesChanged.InvokeAsync([.. Vertices, scene]);
+            }
+
+            return;
+        }
+
+        if (Editable)
+        {
+            double best = double.PositiveInfinity;
+            for (int i = 0; i < Vertices.Count; i++)
+            {
+                double d = Vector2.DistanceSquared(Vertices[i], scene);
+                if (d < best)
+                {
+                    best = d;
+                    dragging = i;
+                }
+            }
+
+            if (Math.Sqrt(best) * scale > 22)
+            {
+                dragging = -1;
             }
         }
 
-        if (Math.Sqrt(best) * scale > 22)
+        if (dragging < 0)
         {
-            dragging = -1;
+            panning = true;
+            panStartPointer = new Vector2((float)e.ClientX, (float)e.ClientY);
+            panStartValue = pan;
         }
     }
 
     private async Task OnPointerMove(PointerEventArgs e)
     {
-        if (dragging < 0 || benchRect.Length < 4)
+        if (!HasRect)
         {
             return;
         }
 
-        Vector2[] moved = [.. Vertices];
-        Vector2 scene = ToScene(e.ClientX, e.ClientY);
-        moved[dragging] = new Vector2(Math.Clamp(scene.X, -1.5f, 3f), Math.Clamp(scene.Y, -2f, 3f));
-        await VerticesChanged.InvokeAsync(moved);
+        if (dragging >= 0)
+        {
+            Vector2[] moved = [.. Vertices];
+            Vector2 scene = ToScene(e.ClientX, e.ClientY);
+            moved[dragging] = new Vector2(Math.Clamp(scene.X, -10f, 10f), Math.Clamp(scene.Y, -10f, 10f));
+            await VerticesChanged.InvokeAsync(moved);
+        }
+        else if (panning)
+        {
+            double k = W / benchRect[2] / scale;
+            pan = panStartValue + new Vector2((float)((e.ClientX - panStartPointer.X) * k), (float)(-(e.ClientY - panStartPointer.Y) * k));
+            Rebuild();
+        }
     }
 
     private Task OnPointerUp(PointerEventArgs e)
     {
         dragging = -1;
+        panning = false;
         return Task.CompletedTask;
     }
+
+    // Ctrl+wheel zooms about the cursor; a plain wheel still scrolls the page.
+    private async Task OnWheel(WheelEventArgs e)
+    {
+        if (!e.CtrlKey && !e.MetaKey)
+        {
+            return;
+        }
+
+        benchRect = await Js.InvokeAsync<double[]>("caustikonSvg.rect", SvgId);
+        if (!HasRect)
+        {
+            return;
+        }
+
+        double factor = Math.Exp(-e.DeltaY * 0.0015);
+        double next = Math.Clamp(Zoom * factor, MinZoom, MaxZoom);
+        if (next == Zoom)
+        {
+            return;
+        }
+
+        zoomAnchor = (e.ClientX, e.ClientY, ToScene(e.ClientX, e.ClientY));
+        await ZoomChanged.InvokeAsync(next);
+    }
+
+    private async Task OnDoubleClick()
+    {
+        if (Drawing)
+        {
+            await DrawingFinished.InvokeAsync();
+            return;
+        }
+
+        pan = Vector2.Zero;
+        Rebuild();
+    }
+
+    // A hidden or collapsed bench reports a zero-width box; every pointer formula divides by that width.
+    private bool HasRect => benchRect.Length >= 4 && benchRect[2] > 1;
 
     private Vector2 ToScene(double clientX, double clientY)
     {
@@ -411,6 +545,35 @@
         RefractionKind kind = Dielectric.RefractUnit(i, nrm, nIn, nOut, out Vector3 t);
         transmitted = kind == RefractionKind.Refracted ? Vector2.Normalize(new Vector2(t.X, t.Y)) : Vector2.Zero;
         return kind;
+    }
+
+    private static bool CrossesItself(Vector2[] v)
+    {
+        int n = v.Length;
+        for (int i = 0; i < n; i++)
+        {
+            for (int j = i + 2; j < n; j++)
+            {
+                if (i == 0 && j == n - 1)
+                {
+                    continue;
+                }
+
+                if (SegmentsCross(v[i], v[(i + 1) % n], v[j], v[(j + 1) % n]))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool SegmentsCross(Vector2 a, Vector2 b, Vector2 c, Vector2 d)
+    {
+        static float Orient(Vector2 p, Vector2 q, Vector2 r) => (q.X - p.X) * (r.Y - p.Y) - (q.Y - p.Y) * (r.X - p.X);
+        float o1 = Orient(a, b, c), o2 = Orient(a, b, d), o3 = Orient(c, d, a), o4 = Orient(c, d, b);
+        return o1 * o2 < 0 && o3 * o4 < 0;
     }
 
     private static Vector2 Reflect(Vector2 direction, Vector2 normal) => direction - 2 * Vector2.Dot(direction, normal) * normal;
