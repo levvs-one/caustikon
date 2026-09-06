@@ -1,9 +1,10 @@
 @inject NavigationManager Navigation
+@inject IJSRuntime Js
 @inherits LocalizedComponent
 @* The Abbe diagram: every glass placed by its printed νd and nd. Points are the catalog; nothing is drawn that is not a glass. *@
 
 <div class="abbe">
-    <svg class="chart abbe-chart" viewBox="0 0 @W @Hgt" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Abbe diagram of the catalog">
+    <svg id="abbe-svg" class="chart abbe-chart" viewBox="0 0 @W @Hgt" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Abbe diagram of the catalog" @onclick="OnClick">
         @((MarkupString)axes)
         <g class="dim">
             @foreach (Glass g in dimmed)
@@ -13,7 +14,7 @@
         </g>
         @foreach (Glass g in lit)
         {
-            <circle class="pt" cx="@F(X(g.CatalogAbbeD!.Value))" cy="@F(Y(g.CatalogIndexD!.Value))" r="3.2" fill="@VendorColour(g.Vendor)" @onclick="() => Navigation.NavigateTo(Catalog.GlassLink(g))"><title>@g.VendorDisplayName @g.Name · nd @g.CatalogIndexD?.ToString("0.#####", CultureInfo.InvariantCulture) · νd @g.CatalogAbbeD?.ToString("0.##", CultureInfo.InvariantCulture)</title></circle>
+            <circle class="pt" cx="@F(X(g.CatalogAbbeD!.Value))" cy="@F(Y(g.CatalogIndexD!.Value))" r="3.2" fill="@VendorColour(g.Vendor)"><title>@g.VendorDisplayName @g.Name · nd @g.CatalogIndexD?.ToString("0.#####", CultureInfo.InvariantCulture) · νd @g.CatalogAbbeD?.ToString("0.##", CultureInfo.InvariantCulture)</title></circle>
         }
     </svg>
     <div class="legend">
@@ -90,4 +91,27 @@
     private static string DisplayName(string vendor) => GlassCatalog.ByVendor(vendor).FirstOrDefault()?.VendorDisplayName ?? vendor;
 
     private static string F(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+
+    // One handler for the whole diagram: find the nearest highlighted glass to the click and open it.
+    private async Task OnClick(MouseEventArgs e)
+    {
+        double[] user = await Js.InvokeAsync<double[]>("caustikonSvg.toUser", "abbe-svg", e.ClientX, e.ClientY);
+        Glass? best = null;
+        double bestDistance = 12 * 12;
+        foreach (Glass g in lit)
+        {
+            double dx = X(g.CatalogAbbeD!.Value) - user[0], dy = Y(g.CatalogIndexD!.Value) - user[1];
+            double d = dx * dx + dy * dy;
+            if (d < bestDistance)
+            {
+                bestDistance = d;
+                best = g;
+            }
+        }
+
+        if (best is not null)
+        {
+            Navigation.NavigateTo(Catalog.GlassLink(best));
+        }
+    }
 }

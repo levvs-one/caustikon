@@ -137,7 +137,7 @@ vec3 ground(float x, float z) {
     if (uBackdrop == 3) return vec3(0.88, 0.85, 0.78);
     if (uBackdrop == 4) return vec3(0.04, 0.045, 0.05);
     bool dark = mod(floor(u) + floor(v), 2.0) == 0.0;
-    return dark ? vec3(0.08, 0.085, 0.09) : vec3(0.86, 0.80, 0.68);
+    return dark ? vec3(0.30, 0.31, 0.32) : vec3(0.86, 0.80, 0.68);
 }
 
 // The studio: a gradient dome, a key softbox where the lamp stands, a cooler fill opposite, a thin rim from behind.
@@ -224,8 +224,9 @@ uniform bool uLinear;
 void main() {
     vec3 colour;
     if (uSamples >= 4) {
-        colour = (shade(gl_FragCoord.xy + vec2(-0.25, -0.25)) + shade(gl_FragCoord.xy + vec2(0.25, -0.25))
-                + shade(gl_FragCoord.xy + vec2(-0.25, 0.25)) + shade(gl_FragCoord.xy + vec2(0.25, 0.25))) * 0.25;
+        vec2 o = gl_FragCoord.xy + uJitter * 0.5;
+        colour = (shade(o + vec2(-0.25, -0.25)) + shade(o + vec2(0.25, -0.25))
+                + shade(o + vec2(-0.25, 0.25)) + shade(o + vec2(0.25, 0.25))) * 0.25;
     } else {
         colour = shade(gl_FragCoord.xy + uJitter);
     }
@@ -252,7 +253,9 @@ void main() {
 }`;
 
     const views = new Map();
-    const STILL_SAMPLES = 64;
+    // Each still frame takes four jittered taps; sixteen frames make sixty-four samples per pixel.
+    const STILL_SAMPLES = 16;
+    const narrowScreen = () => Math.min(window.innerWidth, document.documentElement.clientWidth) < 700;
     const DEFAULT_PITCH = Math.atan2(0.7, 3.6);
     const DEFAULT_DISTANCE = Math.hypot(0.7, 3.6);
     const TAN_HALF = Math.tan(30 * Math.PI / 360);
@@ -395,7 +398,8 @@ void main() {
 
     function fit(view) {
         const c = view.canvas;
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        // Phones draw at one device pixel per CSS pixel: four times fewer rays, and the picture is small anyway.
+        const dpr = narrowScreen() ? 1 : Math.min(window.devicePixelRatio || 1, 2);
         const width = Math.max(1, Math.min(1600, Math.round(c.clientWidth * dpr)));
         const height = Math.max(1, Math.round(width * 0.625));
         if (c.width !== width || c.height !== height) {
@@ -494,7 +498,7 @@ void main() {
         }
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE);
-        gl.uniform1i(loc.samples, 1);
+        gl.uniform1i(loc.samples, 4);
         gl.uniform2f(loc.jitter, Math.random() - 0.5, Math.random() - 0.5);
         gl.uniform1i(loc.linear, 1);
         gl.drawArrays(gl.TRIANGLES, 0, 3);

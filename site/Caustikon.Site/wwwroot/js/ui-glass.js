@@ -277,7 +277,8 @@ void main() {
         const spec = view.spec;
         if (!spec) return;
         const { gl, loc, canvas } = view;
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const narrow = Math.min(window.innerWidth, document.documentElement.clientWidth) < 700;
+        const dpr = narrow ? 1 : Math.min(window.devicePixelRatio || 1, 2);
         const w = Math.max(1, Math.min(1800, Math.round(canvas.clientWidth * dpr)));
         const h = Math.max(1, Math.round(w * 0.5625));
         if (canvas.width !== w || canvas.height !== h) {

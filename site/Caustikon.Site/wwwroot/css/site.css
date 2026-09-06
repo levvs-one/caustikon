@@ -1595,3 +1595,69 @@ a.github:hover {
     margin-top: 0.25rem;
     font-variant-numeric: tabular-nums;
 }
+
+.bench-title {
+    margin-bottom: 0.9rem;
+}
+
+/* Phones */
+
+@media (max-width: 720px) {
+    .readout.compact {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem 0.6rem;
+    }
+
+    .readout.compact > div {
+        min-width: 0;
+    }
+
+    .readout.compact .value {
+        font-size: 1rem;
+    }
+
+    .readout.compact .label {
+        font-size: 0.7rem;
+        line-height: 1.2;
+    }
+
+    .figures {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.7rem 1rem;
+    }
+
+    .figure .value {
+        font-size: 1.2rem;
+    }
+
+    .bench-hint,
+    .bench-note {
+        font-size: 0.85rem;
+    }
+
+    .bench-controls {
+        gap: 0.45rem 1rem;
+    }
+
+    .lede {
+        font-size: 1rem;
+    }
+
+    .snippet pre {
+        font-size: 0.78rem;
+    }
+
+    nav.primary {
+        gap: 0.6rem;
+        font-size: 0.88rem;
+    }
+
+    .strips {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .give-list {
+        min-width: 220px;
+    }
+}

@@ -318,7 +318,7 @@ public sealed class GlassRenderer
             default:
             {
                 bool dark = ((int)MathF.Floor(u) + (int)MathF.Floor(v) & 1) == 0;
-                return dark ? new Vector3(0.08f, 0.085f, 0.09f) : new Vector3(0.86f, 0.80f, 0.68f);
+                return dark ? new Vector3(0.30f, 0.31f, 0.32f) : new Vector3(0.86f, 0.80f, 0.68f);
             }
         }
     }

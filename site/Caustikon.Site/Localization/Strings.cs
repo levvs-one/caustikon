@@ -435,6 +435,12 @@ public static class Strings
         ["formulas.colour.eq1"] = ("likewise Y, Z", "аналогично Y, Z"),
 
         // About
+        ["about.meta"] = ("What Caustikon is, where its 1646 glasses come from, how each number is checked, how to install the packages and what is out of scope.", "Что такое Caustikon, откуда его 1646 стёкол, как проверяется каждое число, как поставить пакеты и что вне рамок."),
+        ["home.map.design"] = ("A glass panel over an interface, traced in a shader; the shader, CSS and .NET to copy.", "Стеклянная панель над интерфейсом, трассировка в шейдере; шейдер, CSS и .NET для копирования."),
+        ["home.map.bench"] = ("The optical bench: any lens, prism or drawn shape, white light through it, the full refraction calculator beneath.", "Оптический стенд: любая линза, призма или нарисованная фигура, белый свет сквозь неё, полный калькулятор преломления под ним."),
+        ["home.map.give"] = ("One page per craft: design, games, 3D and Blender, web, .NET. Pick a glass, get the numbers in every format with each value explained.", "По странице на ремесло: дизайн, игры, 3D и Blender, веб, .NET. Выбери стекло, получи числа в каждом формате с пояснением каждого значения."),
+        ["about.author.h"] = ("Author", "Автор"),
+        ["about.author.p"] = ("Made by <a href=\"https://github.com/levvs-one\" rel=\"noopener\">levvs-one</a>. Source, issues and releases live in the <a href=\"https://github.com/levvs-one/caustikon\" rel=\"noopener\">repository</a>.", "Автор — <a href=\"https://github.com/levvs-one\" rel=\"noopener\">levvs-one</a>. Исходники, задачи и релизы — в <a href=\"https://github.com/levvs-one/caustikon\" rel=\"noopener\">репозитории</a>."),
         ["about.title"] = ("About — Caustikon", "О проекте — Caustikon"),
         ["about.h1"] = ("About", "О проекте"),
         ["about.lede"] = ("Caustikon is two .NET packages and this site. The packages are the product; the site runs them in your browser so the numbers can be inspected without installing anything.", "Caustikon — это два пакета .NET и этот сайт. Продукт — пакеты; сайт запускает их в браузере, чтобы числа можно было разглядеть, ничего не устанавливая."),

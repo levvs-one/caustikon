@@ -9,10 +9,7 @@
     <meta name="description" content="@L["home.meta"]" />
 </HeadContent>
 
-<div class="hero-text">
-    <h1>@L["home.h1"]</h1>
-    <p class="lede">@T("home.lede", SiteInfo.GlassCount)</p>
-</div>
+<h1 class="bench-title">@L["home.h1"]</h1>
 
 <div class="bench-block">
     <PrismScene Glass="prismGlass" Vertices="vertices" BeamAngleDegrees="beamAngle" BeamHeight="beamHeight" RayCount="rayCount" Zoom="zoom"
@@ -131,44 +128,6 @@
 <p class="lede">@L["calc.lede"]</p>
 <OpticsCalculator />
 
-<h2>@L["home.what.h"]</h2>
-<p>@H("home.what.p1", SiteInfo.GlassCount, SiteInfo.VendorCount, withExtinction, withThermal)</p>
-<p>@H("home.what.p2")</p>
-
-<h2>@L["home.map.h"]</h2>
-<dl class="kv map">
-    <dt><a href="catalog">@L["nav.catalog"]</a></dt><dd>@T("home.map.catalog", SiteInfo.GlassCount)</dd>
-    <dt><a href="playground">@L["nav.playground"]</a></dt><dd>@L["home.map.playground"]</dd>
-    <dt><a href="render">@L["nav.render"]</a></dt><dd>@L["home.map.render"]</dd>
-    <dt><a href="use">@L["nav.use"]</a></dt><dd>@L["home.map.use"]</dd>
-    <dt><a href="formulas">@L["nav.formulas"]</a></dt><dd>@L["home.map.formulas"]</dd>
-    <dt><a href="about">@L["nav.about"]</a></dt><dd>@L["home.map.about"]</dd>
-</dl>
-
-<h2>@L["home.install.h"]</h2>
-<pre><code>dotnet add package Caustikon
-dotnet add package Caustikon.Glasses</code></pre>
-<p>@L["home.install.p"]</p>
-
-<h2>@L["home.use.h"]</h2>
-<pre><code>using Caustikon;
-using Caustikon.Glasses;
-
-// The concrete model is a value type: no allocation on the ray path.
-Sellmeier bk7 = Schott.NBK7;
-bk7.EvaluateNanometers(587.5618, out double nd);          // @SiteInfo.Number(nd, 5)
-
-// Refraction and exact reflectance at an air–glass interface.
-Vector3 incident = Vector3.Normalize(new Vector3(0.5f, -0.866f, 0f));
-RefractionKind kind = Dielectric.RefractUnit(incident, Vector3.UnitY, 1f, (float)nd, out Vector3 transmitted);
-FresnelPower r = Dielectric.Fresnel(0.866f, 1f, (float)nd);   // s @SiteInfo.Number(rs, 4), p @SiteInfo.Number(rp, 4)
-
-// By name, with everything the catalog knows about it.
-Glass glass = GlassCatalog.Find("ohara", "S-BSL7")!;
-glass.Extinction!.InternalTransmittance(400, 10, out double t);   // @SiteInfo.Number(tau, 4)
-string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</code></pre>
-<p>@L["home.use.p"]</p>
-
 @code {
     private static readonly (string Key, string Label)[] PrismChoices =
     [
@@ -197,10 +156,6 @@ string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</c
         ("cs2", "carbon disulfide|сероуглерод", 1.6276),
     ];
 
-    private int withExtinction;
-    private int withThermal;
-    private double nd, rs, rp, tau;
-    private string tintHex = "";
     private string prismKeyValue = "schott/N-BK7";
     private string shapeValue = "biconvex";
     private bool editingValue;
@@ -391,15 +346,6 @@ string tint = GlassColour.Transmitted(glass, 25)!.Value.Hex;      // @tintHex</c
             prismKey = wanted;
         }
 
-        withExtinction = GlassCatalog.All.Count(g => g.Extinction is not null);
-        withThermal = GlassCatalog.All.Count(g => g.Thermal is not null);
-        Schott.NBK7.EvaluateNanometers(587.5618d, out nd);
-        FresnelPower r = Dielectric.Fresnel(0.866f, 1f, (float)nd);
-        rs = r.S;
-        rp = r.P;
-        Glass glass = GlassCatalog.Find("ohara", "S-BSL7")!;
-        glass.Extinction!.InternalTransmittance(400d, 10d, out tau);
-        tintHex = GlassColour.Transmitted(glass, 25d)!.Value.Hex;
         ApplyPreset();
     }
 
