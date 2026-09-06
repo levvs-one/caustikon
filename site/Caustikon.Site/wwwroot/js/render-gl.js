@@ -223,8 +223,9 @@ vec3 trace(vec3 origin, vec3 direction, float tEntry, vec3 normal, float n, floa
         travel = reflect(travel, outward);
         position = q + travel * 1e-4;
     }
-    // Light still trapped after twelve bounces leaves the way the last escaping share did, rather than vanishing into black.
-    if (weight > 2e-3 && dot(lastExit, lastExit) > 0.5) result += environment(lastPoint, lastExit) * weight;
+    // Light still trapped after twelve bounces: in real glass it leaves later through some edge, so it is sent out along
+    // the last exit found, or along its current direction when every face reflected it. Neither is black.
+    if (weight > 2e-3) result += (dot(lastExit, lastExit) > 0.5 ? environment(lastPoint, lastExit) : environment(position, travel)) * weight;
     return result;
 }
 

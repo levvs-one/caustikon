@@ -12,13 +12,6 @@
     <meta name="description" content="@L["give." + Key + ".tag"]" />
 </HeadContent>
 
-<nav class="subnav" aria-label="@L["nav.give"]">
-    @foreach ((string slug, string key) in Topics)
-    {
-        <a href="@("give/" + slug + Query)" class="@(key == Key ? "active" : "")">@L["give." + key + ".name"]</a>
-    }
-</nav>
-
 <h1>@L["give." + Key + ".h1"]</h1>
 <p class="lede">@L["give." + Key + ".lede"]</p>
 

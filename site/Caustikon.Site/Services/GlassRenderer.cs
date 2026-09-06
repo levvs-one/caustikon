@@ -291,9 +291,9 @@ public sealed class GlassRenderer
         }
 
         // Light still trapped after twelve bounces leaves the way the last escaping share did, rather than vanishing into black.
-        if (weight > 2e-3 && lastExit != Vector3.Zero)
+        if (weight > 2e-3)
         {
-            result += Environment(lastPoint, lastExit) * (float)weight;
+            result += (lastExit != Vector3.Zero ? Environment(lastPoint, lastExit) : Environment(position, travel)) * (float)weight;
         }
 
         return result;
