@@ -142,7 +142,8 @@ public abstract class RenderShape
         {
             float yaw = yawDegrees * MathF.PI / 180f;
             float c = MathF.Cos(yaw), s = MathF.Sin(yaw);
-            this.planes = planes.Select(p => (new Vector3(p.Normal.X * c - p.Normal.Z * s, p.Normal.Y, p.Normal.X * s + p.Normal.Z * c), p.Distance)).ToArray();
+            (Vector3 Normal, float Distance)[] faces = planes.Select(p => (new Vector3(p.Normal.X * c - p.Normal.Z * s, p.Normal.Y, p.Normal.X * s + p.Normal.Z * c), p.Distance)).ToArray();
+            this.planes = Chamfer(faces, 0.03f * extent);
             this.centre = centre;
             Extent = extent;
             // Rest the solid on the ground: find its lowest point along -y by probing the planes.
@@ -162,6 +163,109 @@ public abstract class RenderShape
         }
 
         public override float Extent { get; }
+
+        /// <summary>
+        /// Real glass has no mathematically sharp edges: a narrow flat along every edge catches the light. For each pair of
+        /// faces that share an edge, a plane through that edge, tilted between the two faces and pushed in by
+        /// <paramref name="depth"/>, is added to the solid.
+        /// </summary>
+        private static (Vector3 Normal, float Distance)[] Chamfer((Vector3 Normal, float Distance)[] faces, float depth)
+        {
+            // Vertices of the polytope: intersections of three faces that satisfy every other face.
+            List<Vector3> vertices = [];
+            List<HashSet<int>> onFaces = [];
+            for (int i = 0; i < faces.Length; i++)
+            {
+                for (int j = i + 1; j < faces.Length; j++)
+                {
+                    for (int k = j + 1; k < faces.Length; k++)
+                    {
+                        if (!Intersect(faces[i], faces[j], faces[k], out Vector3 v))
+                        {
+                            continue;
+                        }
+
+                        bool inside = true;
+                        HashSet<int> touching = [];
+                        for (int m = 0; m < faces.Length && inside; m++)
+                        {
+                            float side = Vector3.Dot(faces[m].Normal, v) - faces[m].Distance;
+                            if (side > 1e-4f)
+                            {
+                                inside = false;
+                            }
+                            else if (side > -1e-4f)
+                            {
+                                touching.Add(m);
+                            }
+                        }
+
+                        if (!inside)
+                        {
+                            continue;
+                        }
+
+                        int existing = vertices.FindIndex(u => Vector3.DistanceSquared(u, v) < 1e-8f);
+                        if (existing >= 0)
+                        {
+                            onFaces[existing].UnionWith(touching);
+                        }
+                        else
+                        {
+                            vertices.Add(v);
+                            onFaces.Add(touching);
+                        }
+                    }
+                }
+            }
+
+            List<(Vector3 Normal, float Distance)> result = [.. faces];
+            for (int i = 0; i < faces.Length; i++)
+            {
+                for (int j = i + 1; j < faces.Length; j++)
+                {
+                    int shared = 0;
+                    for (int v = 0; v < vertices.Count; v++)
+                    {
+                        if (onFaces[v].Contains(i) && onFaces[v].Contains(j))
+                        {
+                            shared++;
+                        }
+                    }
+
+                    if (shared < 2)
+                    {
+                        continue;
+                    }
+
+                    Vector3 sum = faces[i].Normal + faces[j].Normal;
+                    float length = sum.Length();
+                    if (length < 1e-4f)
+                    {
+                        continue;
+                    }
+
+                    // The plane through the edge whose normal bisects the two faces, moved inward by the chamfer depth.
+                    result.Add((sum / length, (faces[i].Distance + faces[j].Distance) / length - depth));
+                }
+            }
+
+            return [.. result];
+        }
+
+        private static bool Intersect((Vector3 Normal, float Distance) a, (Vector3 Normal, float Distance) b, (Vector3 Normal, float Distance) c, out Vector3 point)
+        {
+            Vector3 bc = Vector3.Cross(b.Normal, c.Normal);
+            float det = Vector3.Dot(a.Normal, bc);
+            if (MathF.Abs(det) < 1e-6f)
+            {
+                point = Vector3.Zero;
+                return false;
+            }
+
+            point = (bc * a.Distance + Vector3.Cross(c.Normal, a.Normal) * b.Distance + Vector3.Cross(a.Normal, b.Normal) * c.Distance) / det;
+            return true;
+        }
 
         public override void Describe(out bool sphere, out Vector3 centre, out float extent, out IReadOnlyList<(Vector3 Normal, float Distance)> planes)
         {

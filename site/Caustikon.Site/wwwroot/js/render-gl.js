@@ -8,20 +8,12 @@ void main() {
     gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
-    const FRAGMENT = `#version 300 es
-precision highp float;
-precision highp int;
-out vec4 outColour;
-
-uniform vec2 uResolution;
-uniform int uSamples;
-uniform vec3 uEye, uForward, uRight, uUp;
-uniform float uTanHalf;
-
+    // The solid and the Fresnel split, shared by the camera pass and the photon pass.
+    const SHAPE_GLSL = `
 uniform bool uSphere;
 uniform vec3 uCentre;
 uniform int uPlaneCount;
-uniform vec4 uPlanes[32];
+uniform vec4 uPlanes[64];
 
 uniform float uIndex[9];
 uniform vec3 uWeight[9];
@@ -35,6 +27,10 @@ uniform float uKeyIntensity;
 uniform float uAmbient;
 uniform float uExtent;     // half the solid's extent, for the contact shadow on the table
 uniform float uExposure;
+uniform sampler2D uCaustic;   // photons from the lamp that reached the table, per channel
+uniform float uCausticNorm;   // scales the map so open table reads as 1
+uniform float uRegion;        // the map covers x and z in [-uRegion, uRegion]
+uniform bool uCausticReady;
 
 const vec3 RIM = normalize(vec3(2.4, 1.2, 2.0));
 
@@ -64,7 +60,7 @@ bool enter(vec3 origin, vec3 direction, out float t, out vec3 normal) {
     vec3 o = origin - uCentre;
     float tEntry = -1e30, tExit = 1e30;
     normal = vec3(0.0);
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < 64; i++) {
         if (i >= uPlaneCount) break;
         vec3 n = uPlanes[i].xyz;
         float denominator = dot(n, direction);
@@ -94,7 +90,7 @@ void leave(vec3 origin, vec3 direction, out float t, out vec3 normal) {
     vec3 o = origin - uCentre;
     t = 1e30;
     normal = vec3(0.0, 1.0, 0.0);
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < 64; i++) {
         if (i >= uPlaneCount) break;
         vec3 n = uPlanes[i].xyz;
         float denominator = dot(n, direction);
@@ -115,6 +111,20 @@ float fresnel(float cosI, float n1, float n2) {
     float rp = (n2 * cosI - n1 * cosT) / (n2 * cosI + n1 * cosT);
     return 0.5 * (rs * rs + rp * rp);
 }
+
+`;
+
+    const FRAGMENT = `#version 300 es
+precision highp float;
+precision highp int;
+out vec4 outColour;
+
+uniform vec2 uResolution;
+uniform int uSamples;
+uniform vec3 uEye, uForward, uRight, uUp;
+uniform float uTanHalf;
+
+${SHAPE_GLSL}
 
 vec3 ground(float x, float z) {
     // Half a tile of offset puts a tile centre, not a tile edge, under the solid: an edge there is magnified into a seam.
@@ -160,11 +170,16 @@ vec3 environment(vec3 origin, vec3 direction) {
         vec3 hit = origin + direction * t;
         float distance = length(hit.xz);
         vec3 tile = ground(hit.x, hit.z);
-        float lit = uAmbient + uKeyIntensity * 0.12 * max(0.0, normalize(uKeyPosition - hit).y);
-        // Contact shadow: the table darkens under and around the solid, most where they touch.
-        float contact = 1.0 - 0.62 * (1.0 - smoothstep(0.1 * uExtent, 1.7 * uExtent, distance));
+        // The lamp's share of the table light comes from the photon map: shadow where the solid takes the photons
+        // away, caustic where it focuses them, open table at 1. The room's share is darkened a little under the solid.
+        vec3 lamp = vec3(1.0);
+        if (uCausticReady && abs(hit.x) < uRegion && abs(hit.z) < uRegion) {
+            lamp = texture(uCaustic, hit.xz / uRegion * 0.5 + 0.5).rgb * uCausticNorm;
+        }
+        float contact = 1.0 - 0.35 * (1.0 - smoothstep(0.1 * uExtent, 1.6 * uExtent, distance));
+        vec3 lit = vec3(uAmbient * 0.8 * contact) + uKeyIntensity * 0.9 * max(0.0, uKeyDirection.y) * lamp;
         float fade = exp(-distance * 0.18);
-        return tile * lit * contact * fade + sky(direction) * (1.0 - fade);
+        return tile * lit * fade + sky(direction) * (1.0 - fade);
     }
     return sky(direction);
 }
@@ -241,6 +256,80 @@ void main() {
     outColour = vec4(compand(colour.r), compand(colour.g), compand(colour.b), 1.0);
 }`;
 
+    // Photons from the lamp: a grid on a plane facing the light, one point per cell and colour channel. Each is traced
+    // through the solid with the same code as the camera rays and lands on the table as a point; the sum is the light
+    // the lamp puts on the table, shadow and caustic included. Photons that miss the solid land too and set the scale.
+    const PHOTON_VS = `#version 300 es
+precision highp float;
+precision highp int;
+${SHAPE_GLSL}
+uniform vec3 uTravel;        // unit direction the light travels
+uniform vec3 uIor3;          // n at 610, 550, 465 nm
+uniform vec3 uAlpha3;        // absorption per millimetre at the same wavelengths (uMmPerUnit and uRegion come with the shape block)
+uniform float uEmitter;      // half-size of the emitting square, scene units
+uniform int uGrid;
+uniform vec2 uJitter;
+out vec3 vEnergy;
+
+void park() { gl_Position = vec4(4.0, 4.0, 4.0, 1.0); gl_PointSize = 1.0; vEnergy = vec3(0.0); }
+
+void main() {
+    int channel = gl_VertexID % 3;
+    int cell = gl_VertexID / 3;
+    int ix = cell % uGrid, iy = cell / uGrid;
+    vec3 d = uTravel;
+    vec3 a = normalize(cross(d, abs(d.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+    vec3 b = cross(d, a);
+    vec2 u = ((vec2(float(ix), float(iy)) + 0.5 + uJitter) / float(uGrid) * 2.0 - 1.0) * uEmitter;
+    vec3 origin = -d * 6.0 + a * u.x + b * u.y;
+    vec3 dir = d;
+    float n = channel == 0 ? uIor3.x : (channel == 1 ? uIor3.y : uIor3.z);
+    float alpha = channel == 0 ? uAlpha3.x : (channel == 1 ? uAlpha3.y : uAlpha3.z);
+    float weight = 1.0;
+    float t; vec3 normal;
+    if (enter(origin, dir, t, normal)) {
+        vec3 p = origin + dir * t;
+        float cosI = clamp(-dot(dir, normal), 0.0, 1.0);
+        weight *= 1.0 - fresnel(cosI, 1.0, n);
+        vec3 inside = refract(dir, normal, 1.0 / n);
+        if (dot(inside, inside) < 0.5) { park(); return; }
+        vec3 position = p, travel = inside, exitDir = vec3(0.0), q = p;
+        bool left = false;
+        for (int bounce = 0; bounce < 12; bounce++) {
+            float chord; vec3 outward;
+            leave(position, travel, chord, outward);
+            q = position + travel * chord;
+            weight *= exp(-alpha * max(0.0, chord * uMmPerUnit));
+            float cosInside = clamp(dot(travel, outward), 0.0, 1.0);
+            vec3 e = refract(travel, -outward, n);
+            if (dot(e, e) > 0.5) {
+                weight *= 1.0 - fresnel(cosInside, n, 1.0);
+                exitDir = e;
+                left = true;
+                break;
+            }
+            travel = reflect(travel, outward);
+            position = q + travel * 1e-4;
+        }
+        if (!left) { park(); return; }
+        origin = q;
+        dir = exitDir;
+    }
+    if (dir.y >= -1e-4) { park(); return; }
+    float tg = (-1.0 - origin.y) / dir.y;
+    vec3 hit = origin + dir * tg;
+    if (abs(hit.x) > uRegion || abs(hit.z) > uRegion) { park(); return; }
+    gl_Position = vec4(hit.x / uRegion, hit.z / uRegion, 0.0, 1.0);
+    gl_PointSize = 2.0;
+    vEnergy = weight * 0.25 * (channel == 0 ? vec3(1.0, 0.0, 0.0) : (channel == 1 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0)));
+}`;
+
+    const PHOTON_FS = `#version 300 es
+precision highp float;
+in vec3 vEnergy;
+out vec4 outColour;
+void main() { outColour = vec4(vEnergy, 1.0); }`;
+
     // Shows the running average of the accumulated samples, companded to sRGB.
     const RESOLVE = `#version 300 es
 precision highp float;
@@ -278,9 +367,9 @@ void main() {
         return shader;
     }
 
-    function link(gl, fragment) {
+    function link(gl, fragment, vertex) {
         const program = gl.createProgram();
-        gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, VERTEX));
+        gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, vertex || VERTEX));
         gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, fragment));
         gl.linkProgram(program);
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
@@ -302,7 +391,9 @@ void main() {
         const view = {
             canvas, gl, program,
             resolve: floatTargets ? link(gl, RESOLVE) : null,
+            photon: floatTargets ? link(gl, PHOTON_FS, PHOTON_VS) : null,
             floatTargets,
+            caustic: null, causticFbo: null, causticFrames: 0,
             loc: {
                 resolution: u("uResolution"), samples: u("uSamples"), jitter: u("uJitter"), linear: u("uLinear"),
                 eye: u("uEye"), forward: u("uForward"), right: u("uRight"), up: u("uUp"), tanHalf: u("uTanHalf"),
@@ -310,6 +401,7 @@ void main() {
                 index: u("uIndex"), weight: u("uWeight"), alpha: u("uAlpha"), mmPerUnit: u("uMmPerUnit"),
                 tile: u("uTile"), backdrop: u("uBackdrop"), keyPosition: u("uKeyPosition"), keyDirection: u("uKeyDirection"),
                 keyIntensity: u("uKeyIntensity"), ambient: u("uAmbient"), extent: u("uExtent"), exposure: u("uExposure"),
+                caustic: u("uCaustic"), causticNorm: u("uCausticNorm"), region: u("uRegion"), causticReady: u("uCausticReady"),
             },
             scene: null,
             accum: null, fbo: null, accumWidth: 0, accumHeight: 0, count: 0,
@@ -319,6 +411,14 @@ void main() {
             dragging: false, lastX: 0, lastY: 0, pointers: new Map(), pinch: 0,
             frame: 0, fallback: 0, lastMs: 0, mode: "still",
         };
+        if (view.photon) {
+            const p = name => gl.getUniformLocation(view.photon, name);
+            view.photonLoc = {
+                sphere: p("uSphere"), centre: p("uCentre"), planeCount: p("uPlaneCount"), planes: p("uPlanes"),
+                travel: p("uTravel"), ior3: p("uIor3"), alpha3: p("uAlpha3"), mmPerUnit: p("uMmPerUnit"),
+                region: p("uRegion"), emitter: p("uEmitter"), grid: p("uGrid"), jitter: p("uJitter"),
+            };
+        }
         if (view.resolve) {
             view.resolveLoc = { accum: gl.getUniformLocation(view.resolve, "uAccum"), count: gl.getUniformLocation(view.resolve, "uCount"), exposure: gl.getUniformLocation(view.resolve, "uExposure") };
         }
@@ -481,6 +581,84 @@ void main() {
         view.count = 0;
     }
 
+    const CAUSTIC_SIZE = 512;
+    const REGION = 3.0;
+    const CAUSTIC_FRAMES = 12;
+
+    function ensureCaustic(view) {
+        const { gl } = view;
+        if (view.caustic) return;
+        view.caustic = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, view.caustic);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, CAUSTIC_SIZE, CAUSTIC_SIZE, 0, gl.RGBA, gl.FLOAT, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        view.causticFbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, view.causticFbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, view.caustic, 0);
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+            view.photon = null;
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        view.causticFrames = 0;
+    }
+
+    // One more frame of photons into the map. The grid is jittered each frame, so the map smooths as frames add up.
+    function photonFrame(view) {
+        const { gl, photonLoc: p, scene } = view;
+        ensureCaustic(view);
+        if (!view.photon) return;
+        const grid = narrowScreen() ? 224 : 384;
+        const emitter = REGION * 1.05;
+        gl.useProgram(view.photon);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, view.causticFbo);
+        gl.viewport(0, 0, CAUSTIC_SIZE, CAUSTIC_SIZE);
+        if (view.causticFrames === 0) {
+            gl.disable(gl.BLEND);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE);
+        gl.uniform1i(p.sphere, scene.sphere ? 1 : 0);
+        gl.uniform3fv(p.centre, scene.centre);
+        gl.uniform1i(p.planeCount, scene.planeCount);
+        const planes = new Float32Array(64 * 4);
+        planes.set(scene.planes);
+        gl.uniform4fv(p.planes, planes);
+        const key = normalize(scene.keyPosition);
+        gl.uniform3f(p.travel, -key[0], -key[1], -key[2]);
+        gl.uniform3f(p.ior3, scene.indices[6], scene.indices[4], scene.indices[2]);
+        gl.uniform3f(p.alpha3, scene.alphas[6], scene.alphas[4], scene.alphas[2]);
+        gl.uniform1f(p.mmPerUnit, scene.millimetersPerUnit);
+        gl.uniform1f(p.region, REGION);
+        gl.uniform1f(p.emitter, emitter);
+        gl.uniform1i(p.grid, grid);
+        gl.uniform2f(p.jitter, Math.random() - 0.5, Math.random() - 0.5);
+        gl.drawArrays(gl.POINTS, 0, grid * grid * 3);
+        gl.disable(gl.BLEND);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        view.causticFrames++;
+        // Open table: photons per texel from the grid's density on the emitter, projected onto the table.
+        const perUnitEmitter = (grid * grid) / (4 * emitter * emitter);
+        const texel = (2 * REGION / CAUSTIC_SIZE) ** 2;
+        const expected = perUnitEmitter * Math.abs(key[1]) * texel * view.causticFrames;
+        view.causticNorm = 1 / expected;
+        gl.useProgram(view.program);
+    }
+
+    function bindCaustic(view) {
+        const { gl, loc } = view;
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, view.caustic);
+        gl.uniform1i(loc.caustic, 1);
+        gl.uniform1f(loc.causticNorm, view.causticNorm || 0);
+        gl.uniform1f(loc.region, REGION);
+        gl.uniform1i(loc.causticReady, view.causticFrames > 0 ? 1 : 0);
+    }
+
     function setCamera(view) {
         const { gl, loc } = view;
         const { eye, forward, right, up } = camera(view);
@@ -497,9 +675,13 @@ void main() {
         const { gl, loc } = view;
         fit(view);
         const w = view.canvas.width, h = view.canvas.height;
+        const started = performance.now();
+        if (view.floatTargets && (view.causticFrames === 0 || (view.mode !== "moving" && view.causticFrames < CAUSTIC_FRAMES))) {
+            photonFrame(view);
+        }
         gl.useProgram(view.program);
         setCamera(view);
-        const started = performance.now();
+        if (view.floatTargets) bindCaustic(view);
 
         if (view.mode === "moving" || !view.floatTargets) {
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -558,9 +740,10 @@ void main() {
         gl.uniform1i(loc.sphere, scene.sphere ? 1 : 0);
         gl.uniform3fv(loc.centre, scene.centre);
         gl.uniform1i(loc.planeCount, scene.planeCount);
-        const planes = new Float32Array(32 * 4);
+        const planes = new Float32Array(64 * 4);
         planes.set(scene.planes);
         gl.uniform4fv(loc.planes, planes);
+        view.causticFrames = 0;
         gl.uniform1fv(loc.index, scene.indices);
         gl.uniform3fv(loc.weight, scene.weights);
         gl.uniform1fv(loc.alpha, scene.alphas);

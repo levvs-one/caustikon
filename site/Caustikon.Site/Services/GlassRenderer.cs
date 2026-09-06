@@ -278,11 +278,12 @@ public sealed class GlassRenderer
             Vector3 hit = origin + direction * t;
             float distance = MathF.Sqrt(hit.X * hit.X + hit.Z * hit.Z);
             Vector3 tile = Ground(hit.X, hit.Z);
-            float lit = ambient + keyIntensity * 0.12f * MathF.Max(0f, Vector3.Dot(Vector3.Normalize(keyPosition - hit), Vector3.UnitY));
-            // Contact shadow: the table darkens under and around the solid, most where they touch.
-            float contact = 1f - 0.62f * (1f - SmoothStep(0.1f * shape.Extent, 1.7f * shape.Extent, distance));
+            // The GPU path lights the table through a photon map (shadow and caustic); this fallback has no photons,
+            // so the lamp's share is even and only the room's share is darkened under the solid.
+            float contact = 1f - 0.35f * (1f - SmoothStep(0.1f * shape.Extent, 1.6f * shape.Extent, distance));
+            float lit = ambient * 0.8f * contact + keyIntensity * 0.9f * MathF.Max(0f, keyDirection.Y);
             float fade = MathF.Exp(-distance * 0.18f);
-            return tile * lit * contact * fade + Sky(direction) * (1f - fade);
+            return tile * lit * fade + Sky(direction) * (1f - fade);
         }
 
         return Sky(direction);
