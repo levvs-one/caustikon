@@ -42,6 +42,11 @@ public sealed class GlassRenderer
     private readonly float keyIntensity;
     private readonly float ambient;
     private readonly float exposure;
+    // The lamp's light on the table: photons traced through the solid at three wavelengths and summed per cell,
+    // normalized so that open table reads as one. Shadow where the solid takes photons away, caustic where it focuses them.
+    private const int MapSize = 256;
+    private const float Region = 3f;
+    private readonly Vector3[] photonMap = new Vector3[MapSize * MapSize];
     private static readonly Vector3 RimDirection = Vector3.Normalize(new Vector3(2.4f, 1.2f, 2.0f));
 
     /// <param name="glass">The glass to render; its model and extinction table are sampled at nine wavelengths.</param>
@@ -75,6 +80,7 @@ public sealed class GlassRenderer
         keyIntensity = (float)Math.Clamp(lightIntensity, 0d, 4d);
         this.ambient = (float)Math.Clamp(ambient, 0d, 2d);
         indices = IndicesFor(glass);
+        BuildPhotonMap();
     }
 
     public static IReadOnlyList<double> SampledWavelengths => Wavelengths;
@@ -165,15 +171,18 @@ public sealed class GlassRenderer
     }
 
     /// <summary>Renders rows [<paramref name="firstRow"/>, <paramref name="lastRow"/>) of a <paramref name="size"/>×<paramref name="size"/> image: linear RGB into <paramref name="linear"/> and companded RGBA into <paramref name="rgba"/>.</summary>
-    public void RenderRows(Vector3[] linear, byte[] rgba, int size, int firstRow, int lastRow)
+    public void RenderRows(Vector3[] linear, byte[] rgba, int size, int firstRow, int lastRow) => RenderRows(linear, rgba, size, size, firstRow, lastRow);
+
+    /// <summary>Renders rows [<paramref name="firstRow"/>, <paramref name="lastRow"/>) of a <paramref name="width"/>×<paramref name="height"/> image.</summary>
+    public void RenderRows(Vector3[] linear, byte[] rgba, int width, int height, int firstRow, int lastRow)
     {
         for (int y = firstRow; y < lastRow; y++)
         {
-            for (int x = 0; x < size; x++)
+            for (int x = 0; x < width; x++)
             {
-                Vector3 colour = Shade(x + 0.5d, y + 0.5d, size);
-                linear[y * size + x] = colour;
-                Store(rgba, y * size + x, colour);
+                Vector3 colour = Shade(x + 0.5d, y + 0.5d, width, height);
+                linear[y * width + x] = colour;
+                Store(rgba, y * width + x, colour);
             }
         }
     }
@@ -183,24 +192,26 @@ public sealed class GlassRenderer
     /// the chromatic fringes. Four jittered samples replace one there; smooth areas keep their single sample.
     /// </summary>
     /// <returns>How many pixels were refined.</returns>
-    public int RefineEdges(Vector3[] linear, byte[] rgba, int size, int firstRow, int lastRow)
+    public int RefineEdges(Vector3[] linear, byte[] rgba, int size, int firstRow, int lastRow) => RefineEdges(linear, rgba, size, size, firstRow, lastRow);
+
+    public int RefineEdges(Vector3[] linear, byte[] rgba, int width, int height, int firstRow, int lastRow)
     {
         const float threshold = 0.035f;
         int refined = 0;
-        for (int y = Math.Max(1, firstRow); y < Math.Min(size - 1, lastRow); y++)
+        for (int y = Math.Max(1, firstRow); y < Math.Min(height - 1, lastRow); y++)
         {
-            for (int x = 1; x < size - 1; x++)
+            for (int x = 1; x < width - 1; x++)
             {
-                int i = y * size + x;
+                int i = y * width + x;
                 Vector3 c = linear[i];
                 if (Contrast(c, linear[i - 1]) < threshold && Contrast(c, linear[i + 1]) < threshold &&
-                    Contrast(c, linear[i - size]) < threshold && Contrast(c, linear[i + size]) < threshold)
+                    Contrast(c, linear[i - width]) < threshold && Contrast(c, linear[i + width]) < threshold)
                 {
                     continue;
                 }
 
-                Vector3 sum = Shade(x + 0.25d, y + 0.25d, size) + Shade(x + 0.75d, y + 0.25d, size)
-                    + Shade(x + 0.25d, y + 0.75d, size) + Shade(x + 0.75d, y + 0.75d, size);
+                Vector3 sum = Shade(x + 0.25d, y + 0.25d, width, height) + Shade(x + 0.75d, y + 0.25d, width, height)
+                    + Shade(x + 0.25d, y + 0.75d, width, height) + Shade(x + 0.75d, y + 0.75d, width, height);
                 Store(rgba, i, sum * 0.25f);
                 refined++;
             }
@@ -222,10 +233,12 @@ public sealed class GlassRenderer
     private static readonly Vector3 Up = Vector3.Cross(Forward, Right);
     private static readonly double TanHalf = Math.Tan(30d * Math.PI / 360d);
 
-    private Vector3 Shade(double px, double py, int size)
+    private Vector3 Shade(double px, double py, int size) => Shade(px, py, size, size);
+
+    private Vector3 Shade(double px, double py, int width, int height)
     {
-        double sx = (px / size * 2d - 1d) * TanHalf;
-        double sy = (1d - py / size * 2d) * TanHalf;
+        double sx = (px / width * 2d - 1d) * TanHalf * width / height;
+        double sy = (1d - py / height * 2d) * TanHalf;
         Vector3 direction = Vector3.Normalize(Forward + Right * (float)sx + Up * (float)sy);
 
         // A ray that misses the solid sees the environment, which is not dispersive: one lookup instead of nine.
@@ -311,6 +324,153 @@ public sealed class GlassRenderer
         return t;
     }
 
+    // A grid of photons on a plane facing the lamp, three per cell (one per channel), each traced through the solid with
+    // the same rules as the camera rays and splatted onto the table. Photons that miss the solid land too and set the scale.
+    private void BuildPhotonMap()
+    {
+        const int grid = 900;
+        const float emitter = Region * 1.05f;
+        Vector3 travel = -keyDirection;
+        Vector3 a = Vector3.Normalize(Vector3.Cross(travel, MathF.Abs(travel.Y) < 0.9f ? Vector3.UnitY : Vector3.UnitX));
+        Vector3 b = Vector3.Cross(travel, a);
+        int[] bands = [6, 4, 2];
+        Random random = new(7);
+        for (int iy = 0; iy < grid; iy++)
+        {
+            for (int ix = 0; ix < grid; ix++)
+            {
+                float u = ((ix + 0.5f + (float)random.NextDouble() - 0.5f) / grid * 2f - 1f) * emitter;
+                float v = ((iy + 0.5f + (float)random.NextDouble() - 0.5f) / grid * 2f - 1f) * emitter;
+                Vector3 start = -travel * 6f + a * u + b * v;
+                for (int channel = 0; channel < 3; channel++)
+                {
+                    float n = (float)indices[bands[channel]];
+                    Vector3 origin = start, direction = travel;
+                    double weight = 1d;
+                    if (shape.Enter(origin, direction, out float t, out Vector3 normal))
+                    {
+                        Vector3 p = origin + direction * t;
+                        float cosI = Math.Clamp(-Vector3.Dot(direction, normal), 0f, 1f);
+                        weight *= 1d - Dielectric.Fresnel(cosI, 1f, n).Unpolarized;
+                        if (Dielectric.RefractUnit(direction, normal, 1f, n, out Vector3 inside) != RefractionKind.Refracted)
+                        {
+                            continue;
+                        }
+
+                        Vector3 position = p, going = inside, exit = Vector3.Zero, q = p;
+                        bool left = false;
+                        for (int bounce = 0; bounce < 8; bounce++)
+                        {
+                            shape.Leave(position, going, out float chord, out Vector3 outward);
+                            q = position + going * chord;
+                            weight *= Transmittance(bands[channel], chord * radiusMillimeters / shape.Extent);
+                            float cosInside = Math.Clamp(Vector3.Dot(going, outward), 0f, 1f);
+                            if (Dielectric.RefractUnit(going, -outward, n, 1f, out Vector3 e) == RefractionKind.Refracted)
+                            {
+                                weight *= 1d - Dielectric.Fresnel(cosInside, n, 1f).Unpolarized;
+                                exit = e;
+                                left = true;
+                                break;
+                            }
+
+                            going = Vector3.Reflect(going, outward);
+                            position = q + going * 1e-4f;
+                        }
+
+                        if (!left)
+                        {
+                            continue;
+                        }
+
+                        origin = q;
+                        direction = exit;
+                    }
+
+                    if (direction.Y >= -1e-4f)
+                    {
+                        continue;
+                    }
+
+                    float tg = (-1f - origin.Y) / direction.Y;
+                    Vector3 hit = origin + direction * tg;
+                    if (MathF.Abs(hit.X) >= Region || MathF.Abs(hit.Z) >= Region)
+                    {
+                        continue;
+                    }
+
+                    // Splat over the 2×2 cells around the landing point, as the GPU's two-pixel points do.
+                    float fx = (hit.X / Region * 0.5f + 0.5f) * MapSize - 0.5f, fz = (hit.Z / Region * 0.5f + 0.5f) * MapSize - 0.5f;
+                    int x0 = (int)MathF.Floor(fx), z0 = (int)MathF.Floor(fz);
+                    Vector3 energy = (float)weight * 0.25f * (channel == 0 ? Vector3.UnitX : channel == 1 ? Vector3.UnitY : Vector3.UnitZ);
+                    for (int dz = 0; dz <= 1; dz++)
+                    {
+                        for (int dx = 0; dx <= 1; dx++)
+                        {
+                            int x = x0 + dx, z = z0 + dz;
+                            if (x >= 0 && x < MapSize && z >= 0 && z < MapSize)
+                            {
+                                photonMap[z * MapSize + x] += energy;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Open table: photons per cell from the grid's density on the emitter, projected onto the table.
+        double perUnitEmitter = (double)grid * grid / (4d * emitter * emitter);
+        double cell = 2d * Region / MapSize;
+        float expected = (float)(perUnitEmitter * MathF.Abs(keyDirection.Y) * cell * cell);
+        for (int i = 0; i < photonMap.Length; i++)
+        {
+            photonMap[i] /= expected;
+        }
+
+        // One 3×3 box pass takes the grain out of the map without moving the caustic.
+        Vector3[] smoothed = new Vector3[photonMap.Length];
+        for (int z = 0; z < MapSize; z++)
+        {
+            for (int x = 0; x < MapSize; x++)
+            {
+                Vector3 sum = Vector3.Zero;
+                int count = 0;
+                for (int dz = -1; dz <= 1; dz++)
+                {
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int xx = x + dx, zz = z + dz;
+                        if (xx >= 0 && xx < MapSize && zz >= 0 && zz < MapSize)
+                        {
+                            sum += photonMap[zz * MapSize + xx];
+                            count++;
+                        }
+                    }
+                }
+
+                smoothed[z * MapSize + x] = sum / count;
+            }
+        }
+
+        Array.Copy(smoothed, photonMap, photonMap.Length);
+    }
+
+    private Vector3 Lamp(Vector3 hit)
+    {
+        if (MathF.Abs(hit.X) >= Region || MathF.Abs(hit.Z) >= Region)
+        {
+            return Vector3.One;
+        }
+
+        // Bilinear read of the map, matching the GPU's linear sampler.
+        float fx = (hit.X / Region * 0.5f + 0.5f) * MapSize - 0.5f, fz = (hit.Z / Region * 0.5f + 0.5f) * MapSize - 0.5f;
+        int x0 = Math.Clamp((int)MathF.Floor(fx), 0, MapSize - 1), z0 = Math.Clamp((int)MathF.Floor(fz), 0, MapSize - 1);
+        int x1 = Math.Min(x0 + 1, MapSize - 1), z1 = Math.Min(z0 + 1, MapSize - 1);
+        float tx = Math.Clamp(fx - x0, 0f, 1f), tz = Math.Clamp(fz - z0, 0f, 1f);
+        Vector3 top = Vector3.Lerp(photonMap[z0 * MapSize + x0], photonMap[z0 * MapSize + x1], tx);
+        Vector3 bottom = Vector3.Lerp(photonMap[z1 * MapSize + x0], photonMap[z1 * MapSize + x1], tx);
+        return Vector3.Lerp(top, bottom, tz);
+    }
+
     /// <summary>Linear RGB of the environment along a ray: the ground at y = -1 with the chosen pattern, otherwise a sky with the key light.</summary>
     private Vector3 Environment(Vector3 origin, Vector3 direction)
     {
@@ -320,10 +480,10 @@ public sealed class GlassRenderer
             Vector3 hit = origin + direction * t;
             float distance = MathF.Sqrt(hit.X * hit.X + hit.Z * hit.Z);
             Vector3 tile = Ground(hit.X, hit.Z);
-            // The GPU path lights the table through a photon map (shadow and caustic); this fallback has no photons,
-            // so the lamp's share is even and only the room's share is darkened under the solid.
+            // The lamp's share comes from the photon map: shadow where the solid takes photons away, caustic where it
+            // focuses them, open table at one. The room's share is darkened a little under the solid.
             float contact = 1f - 0.35f * (1f - SmoothStep(0.1f * shape.Extent, 1.6f * shape.Extent, distance));
-            float lit = ambient * 0.8f * contact + keyIntensity * 0.9f * MathF.Max(0f, keyDirection.Y);
+            Vector3 lit = new Vector3(ambient * 0.55f * contact) + Lamp(hit) * (keyIntensity * 0.6f * MathF.Max(0f, keyDirection.Y));
             float fade = MathF.Exp(-distance * 0.18f);
             return tile * lit * fade + Sky(direction) * (1f - fade);
         }

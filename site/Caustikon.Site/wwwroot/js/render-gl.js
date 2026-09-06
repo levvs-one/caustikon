@@ -181,10 +181,14 @@ vec3 environment(vec3 origin, vec3 direction) {
         // away, caustic where it focuses them, open table at 1. The room's share is darkened a little under the solid.
         vec3 lamp = vec3(1.0);
         if (uCausticReady && abs(hit.x) < uRegion && abs(hit.z) < uRegion) {
-            lamp = texture(uCaustic, hit.xz / uRegion * 0.5 + 0.5).rgb * uCausticNorm;
+            // Four bilinear taps half a texel apart: a small blur that takes the grain out of the map.
+            vec2 uv = hit.xz / uRegion * 0.5 + 0.5;
+            vec2 h = vec2(0.5 / 512.0);
+            lamp = (texture(uCaustic, uv + vec2(-h.x, -h.y)).rgb + texture(uCaustic, uv + vec2(h.x, -h.y)).rgb
+                  + texture(uCaustic, uv + vec2(-h.x, h.y)).rgb + texture(uCaustic, uv + vec2(h.x, h.y)).rgb) * 0.25 * uCausticNorm;
         }
         float contact = 1.0 - 0.35 * (1.0 - smoothstep(0.1 * uExtent, 1.6 * uExtent, distance));
-        vec3 lit = vec3(uAmbient * 0.8 * contact) + uKeyIntensity * 0.9 * max(0.0, uKeyDirection.y) * lamp;
+        vec3 lit = vec3(uAmbient * 0.55 * contact) + uKeyIntensity * 0.6 * max(0.0, uKeyDirection.y) * lamp;
         float fade = exp(-distance * 0.18);
         return tile * lit * fade + sky(direction) * (1.0 - fade);
     }

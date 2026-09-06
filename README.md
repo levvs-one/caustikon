@@ -1,18 +1,45 @@
 # Caustikon
 
-Geometric optics for .NET, with the glass included.
+Real optical glass for design, games, 3D and .NET.
+
+[![verify](https://github.com/levvs-one/caustikon/actions/workflows/verify.yml/badge.svg)](https://github.com/levvs-one/caustikon/actions/workflows/verify.yml)
+[![MIT](https://img.shields.io/badge/license-MIT-1d5f74)](LICENSE)
+[![data CC0](https://img.shields.io/badge/data-CC0%201.0-1d5f74)](DATA-LICENSE.md)
 
 `Caustikon` is the mathematics: vector refraction, exact Fresnel power reflectance, Schlick's
 approximation, and dispersion models as allocation-free value types. `Caustikon.Glasses` is a
 catalog of 1646 manufacturer glasses from SCHOTT, OHARA, HOYA, CDGM, HIKARI, SUMITA and others, plus nine
-liquids (water, ethanol, glycerol, benzene and more) from published measurements,
-each with its dispersion fit, tabulated absorption, temperature coefficients where published,
-and a citation for every number. Both target .NET 8 and .NET 10 with no dependencies outside
-the base class library.
+liquids (water, ethanol, glycerol, benzene and more) from published measurements, each with its
+dispersion fit, tabulated absorption, temperature coefficients where published, and a citation for
+every number. Both target .NET 8 and .NET 10 with no dependencies outside the base class library.
 
-The site at <https://levvs-one.github.io/caustikon/> runs the same code in the browser: browse
-the catalog, open a glass, and try refraction, reflectance, dispersion and transmitted colour
-in the playground.
+The site at <https://caustikon.levvs.cc> runs the same code in the browser.
+
+| | |
+| --- | --- |
+| ![N-SF11 sphere on a checkered table](docs/gallery/sphere-n-sf11.png) | ![N-SF66 octahedron](docs/gallery/octahedron-n-sf66.png) |
+| ![N-BK7 hexagonal prism on millimetre paper](docs/gallery/prism-n-bk7.png) | ![SF57 cube on colour bands](docs/gallery/cube-sf57.png) |
+
+Every picture above is traced by `tools/Caustikon.Gallery` with the packages' own refraction,
+Fresnel split and absorption at nine wavelengths, a photon pass from the lamp for the shadow and
+the caustic, and chamfered edges. Nothing in them is painted. The [3D page](https://caustikon.levvs.cc/render)
+does the same on the GPU for any catalog glass, with a stochastic spectrum and up to 48 samples per pixel.
+
+## What the site gives you
+
+- [Catalog](https://caustikon.levvs.cc/catalog): every glass on the Abbe diagram and in a filterable table; each glass
+  page has its curve, the Fraunhofer lines, reflectance against angle, absorption and the colour of daylight after any
+  thickness, temperature coefficients, the model's coefficients and the source of every number.
+- [Design](https://caustikon.levvs.cc/design): a panel of a real glass over an interface, traced in a WebGL2 shader
+  (bevel and dome refraction per colour channel, Fresnel sheen, tint from the k table), with the shader, CSS and .NET to copy.
+- [3D](https://caustikon.levvs.cc/render): a solid of any glass on a table, traced on the GPU; drag to orbit.
+- [Optic](https://caustikon.levvs.cc/): an optical bench: white light through any lens, prism, plate or a shape you draw,
+  in any medium at any temperature, with the full refraction calculator beneath.
+- Give Me!: one page per craft. Pick a glass and a thickness and get the numbers in every format, each value explained:
+  [design](https://caustikon.levvs.cc/give/design) (CSS, Tailwind, Figma, GLSL),
+  [games](https://caustikon.levvs.cc/give/games) (Unity HDRP, Unreal, Godot 4, HLSL/GLSL),
+  [3D and Blender](https://caustikon.levvs.cc/give/blender) (Principled BSDF, glTF, USD),
+  [web](https://caustikon.levvs.cc/give/web) (three.js, glTF, CSS) and [.NET](https://caustikon.levvs.cc/give/dotnet).
 
 ![Six wavelengths refracted through an N-BK7 prism](examples/Prism/prism.svg)
 
