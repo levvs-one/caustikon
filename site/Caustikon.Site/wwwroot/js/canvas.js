@@ -54,6 +54,11 @@ window.caustikonSvg = {
         const r = svg.getBoundingClientRect();
         return [r.left, r.top, r.width, r.height];
     },
+    // Keeps a finger's moves coming to the bench after it slides off the element.
+    capture(id, pointerId) {
+        const el = document.getElementById(id);
+        try { el && el.setPointerCapture(pointerId); } catch { }
+    },
     // Blazor's wheel listener is passive, so the browser's own ctrl+wheel zoom has to be stopped here.
     guardWheel(id) {
         const box = document.getElementById(id);

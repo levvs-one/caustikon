@@ -75,9 +75,11 @@ void main() {
     vec2 p = px - uResolution * 0.5;
     float d = sdRoundRect(p, uHalf, uRadius);
     vec3 plain = toLinear(texture(uBackdrop, px / uResolution).rgb);
-    if (d > 0.0) {
-        // A shadow the panel casts on the page, fading over about forty pixels.
-        outColour = vec4(toSrgb(plain * (1.0 - 0.22 * exp(-d / 18.0))), 1.0);
+    // The page with the panel's shadow; a one-pixel blend along the outline keeps the edge smooth.
+    vec3 outside = plain * (1.0 - 0.22 * exp(-max(d, 0.0) / 18.0));
+    float edgeMix = clamp(0.5 - d, 0.0, 1.0);
+    if (edgeMix <= 0.0) {
+        outColour = vec4(toSrgb(outside), 1.0);
         return;
     }
 
@@ -88,13 +90,15 @@ void main() {
     float thicknessPx = uThickness * uPxPerMm;
     float maxInset = min(uHalf.x, uHalf.y);
     float x = clamp(inset / maxInset, 0.0, 1.0);
-    float bevelSlope = (uBevel > 0.5 && inset < uBevel) ? 0.5 * thicknessPx / uBevel : 0.0;
+    // The bevel's slope eases out over the last two pixels so its border does not show as a hard line.
+    float onBevel = uBevel > 0.5 ? 1.0 - smoothstep(uBevel - 2.0, uBevel, inset) : 0.0;
+    float bevelSlope = onBevel * 0.5 * thicknessPx / uBevel;
     float domeSag = uDome * 0.5 * thicknessPx;
     float domeSlope = 2.0 * domeSag * (1.0 - x) / maxInset;
     float slope = bevelSlope + domeSlope;
     // Height increases inward, so the normal leans outward.
     vec3 normal = normalize(vec3(g * slope, 1.0));
-    float bevelDrop = (uBevel > 0.5 && inset < uBevel) ? 0.5 * thicknessPx * (1.0 - inset / uBevel) : 0.0;
+    float bevelDrop = onBevel * 0.5 * thicknessPx * (1.0 - min(inset, uBevel) / uBevel);
     float depthPx = max(1.0, thicknessPx - bevelDrop - domeSag * (1.0 - x) * (1.0 - x));
 
     vec3 view = vec3(0.0, 0.0, -1.0);
@@ -116,7 +120,7 @@ void main() {
 
     vec3 seen = room(reflect(view, normal));
     vec3 colour = transmitted + seen * reflectance;
-    outColour = vec4(toSrgb(colour), 1.0);
+    outColour = vec4(toSrgb(mix(outside, colour, edgeMix)), 1.0);
 }`;
 
     const views = new Map();

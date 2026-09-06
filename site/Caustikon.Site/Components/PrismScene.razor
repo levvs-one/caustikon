@@ -7,7 +7,7 @@
    inside, and both fade with the energy they carry; absorption over the path in millimetres comes from the glass's own
    k table, the temperature shift from its dn/dT, and the surrounding medium has an index of its own. *@
 
-<div id="@BenchId" class="bench @(Editable ? "editable" : "") @(panning ? "panning" : "") @(Drawing ? "drawing" : "")" @onpointerdown="OnPointerDown" @onpointermove="OnPointerMove" @onpointerup="OnPointerUp" @onpointerleave="OnPointerUp"
+<div id="@BenchId" class="bench @(Editable ? "editable" : "") @(panning ? "panning" : "") @(Drawing ? "drawing" : "")" @onpointerdown="OnPointerDown" @onpointermove="OnPointerMove" @onpointerup="OnPointerUp" @onpointercancel="OnPointerUp" @onpointerleave="OnPointerLeave"
      @onwheel="OnWheel" @ondblclick="OnDoubleClick">
     @((MarkupString)svg)
 </div>
@@ -40,6 +40,10 @@
     private bool panning;
     private Vector2 panStartPointer, panStartValue;
     private (double X, double Y, Vector2 Scene)? zoomAnchor;
+    // Fingers on the bench: one pans or drags a corner, two pinch to zoom about their midpoint.
+    private readonly Dictionary<long, (double X, double Y)> pointers = [];
+    private double pinchDistance;
+    private (double X, double Y) pinchMid;
     private const double AirAtD = 1.000273;
     private Vector2 origin = new(300, 440);
     private double scale = BaseScale;
@@ -359,6 +363,25 @@
             return;
         }
 
+        pointers[e.PointerId] = (e.ClientX, e.ClientY);
+        await Js.InvokeVoidAsync("caustikonSvg.capture", BenchId, e.PointerId);
+        if (pointers.Count == 2)
+        {
+            // A second finger: stop whatever the first was doing and start a pinch.
+            dragging = -1;
+            panning = false;
+            (double ax, double ay) = pointers.Values.First();
+            (double bx, double by) = pointers.Values.Last();
+            pinchDistance = Math.Max(1, Math.Sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by)));
+            pinchMid = ((ax + bx) / 2, (ay + by) / 2);
+            return;
+        }
+
+        if (pointers.Count > 2)
+        {
+            return;
+        }
+
         Vector2 scene = ToScene(e.ClientX, e.ClientY);
         dragging = -1;
         if (Drawing)
@@ -406,6 +429,36 @@
             return;
         }
 
+        if (pointers.ContainsKey(e.PointerId))
+        {
+            pointers[e.PointerId] = (e.ClientX, e.ClientY);
+        }
+
+        if (pointers.Count == 2)
+        {
+            (double ax, double ay) = pointers.Values.First();
+            (double bx, double by) = pointers.Values.Last();
+            double distance = Math.Max(1, Math.Sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by)));
+            (double mx, double my) = ((ax + bx) / 2, (ay + by) / 2);
+            // The midpoint's movement pans; the distance ratio zooms about the midpoint.
+            double k = W / benchRect[2] / scale;
+            pan += new Vector2((float)((mx - pinchMid.X) * k), (float)(-(my - pinchMid.Y) * k));
+            double next = Math.Clamp(Zoom * distance / pinchDistance, MinZoom, MaxZoom);
+            pinchDistance = distance;
+            pinchMid = (mx, my);
+            if (Math.Abs(next - Zoom) > 1e-6)
+            {
+                zoomAnchor = (mx, my, ToScene(mx, my));
+                await ZoomChanged.InvokeAsync(next);
+            }
+            else
+            {
+                Rebuild();
+            }
+
+            return;
+        }
+
         if (dragging >= 0)
         {
             Vector2[] moved = [.. Vertices];
@@ -423,10 +476,14 @@
 
     private Task OnPointerUp(PointerEventArgs e)
     {
+        pointers.Remove(e.PointerId);
         dragging = -1;
         panning = false;
         return Task.CompletedTask;
     }
+
+    // Leaving with the pointer captured still delivers moves; only an uncaptured mouse leaving should end the gesture.
+    private Task OnPointerLeave(PointerEventArgs e) => e.PointerType == "mouse" ? OnPointerUp(e) : Task.CompletedTask;
 
     // Ctrl+wheel zooms about the cursor; a plain wheel still scrolls the page.
     private async Task OnWheel(WheelEventArgs e)

@@ -226,7 +226,8 @@ public sealed class GlassRenderer
         double weight = 1d - entry.Unpolarized;
         Vector3 position = p;
         Vector3 travel = inside;
-        for (int bounce = 0; bounce < 6 && weight > 1e-3; bounce++)
+        Vector3 lastExit = Vector3.Zero, lastPoint = p;
+        for (int bounce = 0; bounce < 12 && weight > 2e-3; bounce++)
         {
             shape.Leave(position, travel, out float chord, out Vector3 outwardNormal);
             Vector3 q = position + travel * chord;
@@ -238,11 +239,19 @@ public sealed class GlassRenderer
                 FresnelPower leaving = Dielectric.Fresnel(cosInside, n, 1f);
                 result += Environment(q, exit) * (float)(weight * (1d - leaving.Unpolarized));
                 weight *= leaving.Unpolarized;
+                lastExit = exit;
+                lastPoint = q;
             }
 
             travel = Vector3.Reflect(travel, outwardNormal);
             // Step just off the surface so the next exit search does not find the face we are leaving.
             position = q + travel * 1e-4f;
+        }
+
+        // Light still trapped after twelve bounces leaves the way the last escaping share did, rather than vanishing into black.
+        if (weight > 2e-3 && lastExit != Vector3.Zero)
+        {
+            result += Environment(lastPoint, lastExit) * (float)weight;
         }
 
         return result;

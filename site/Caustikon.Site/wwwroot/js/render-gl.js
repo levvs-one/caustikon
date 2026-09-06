@@ -182,8 +182,10 @@ vec3 trace(vec3 origin, vec3 direction, float tEntry, vec3 normal, int band) {
     float weight = 1.0 - entry;
     vec3 position = p;
     vec3 travel = inside;
-    for (int bounce = 0; bounce < 6; bounce++) {
-        if (weight <= 1e-3) break;
+    vec3 lastExit = vec3(0.0);
+    vec3 lastPoint = p;
+    for (int bounce = 0; bounce < 12; bounce++) {
+        if (weight <= 2e-3) break;
         float chord; vec3 outward;
         leave(position, travel, chord, outward);
         vec3 q = position + travel * chord;
@@ -194,10 +196,14 @@ vec3 trace(vec3 origin, vec3 direction, float tEntry, vec3 normal, int band) {
             float leaving = fresnel(cosInside, n, 1.0);
             result += environment(q, exitDir) * (weight * (1.0 - leaving));
             weight *= leaving;
+            lastExit = exitDir;
+            lastPoint = q;
         }
         travel = reflect(travel, outward);
         position = q + travel * 1e-4;
     }
+    // Light still trapped after twelve bounces leaves the way the last escaping share did, rather than vanishing into black.
+    if (weight > 2e-3 && dot(lastExit, lastExit) > 0.5) result += environment(lastPoint, lastExit) * weight;
     return result;
 }
 
@@ -310,7 +316,7 @@ void main() {
             // Camera: the default matches the CPU renderer's fixed eye at (0, 0.55, -3.6) looking at (0, -0.15, 0).
             yaw: 0, pitch: DEFAULT_PITCH, distance: DEFAULT_DISTANCE,
             target: [0, -0.15, 0],
-            dragging: false, lastX: 0, lastY: 0,
+            dragging: false, lastX: 0, lastY: 0, pointers: new Map(), pinch: 0,
             frame: 0, fallback: 0, lastMs: 0, mode: "still",
         };
         if (view.resolve) {
@@ -342,14 +348,35 @@ void main() {
 
     function attach(view) {
         const c = view.canvas;
+        const distance = () => {
+            const p = [...view.pointers.values()];
+            return p.length < 2 ? 0 : Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+        };
         c.addEventListener("pointerdown", e => {
             if (e.button !== 0) return;
+            view.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            c.setPointerCapture(e.pointerId);
+            if (view.pointers.size === 2) {
+                view.dragging = false;
+                view.pinch = distance();
+                return;
+            }
             view.dragging = true;
             view.lastX = e.clientX;
             view.lastY = e.clientY;
-            c.setPointerCapture(e.pointerId);
         });
         c.addEventListener("pointermove", e => {
+            if (view.pointers.has(e.pointerId)) view.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (view.pointers.size === 2) {
+                // Two fingers: the distance between them dollies the camera.
+                const d = distance();
+                if (view.pinch > 0 && d > 0) {
+                    view.distance = Math.min(9, Math.max(1.2, view.distance * view.pinch / d));
+                    view.pinch = d;
+                    request(view, "moving");
+                }
+                return;
+            }
             if (!view.dragging) return;
             const dx = e.clientX - view.lastX, dy = e.clientY - view.lastY;
             view.lastX = e.clientX;
@@ -358,9 +385,11 @@ void main() {
             view.pitch = Math.min(1.45, Math.max(0.02, view.pitch + dy * 0.008));
             request(view, "moving");
         });
-        const stop = () => {
-            if (!view.dragging) return;
+        const stop = e => {
+            if (e && e.pointerId !== undefined) view.pointers.delete(e.pointerId);
+            if (!view.dragging && view.pointers.size > 0) return;
             view.dragging = false;
+            view.pinch = 0;
             request(view, "still");
         };
         c.addEventListener("pointerup", stop);

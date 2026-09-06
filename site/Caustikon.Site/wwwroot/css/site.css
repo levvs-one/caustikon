@@ -68,6 +68,7 @@
 
 * {
     box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
 }
 
 html {
@@ -705,7 +706,6 @@ button.primary {
 
 .bench.editable {
     cursor: grab;
-    touch-action: none;
 }
 
 .bench.editable:active {
@@ -862,10 +862,8 @@ button.primary {
     nav.primary {
         margin-left: 0;
         width: 100%;
-        overflow-x: auto;
-        gap: 1rem;
+        gap: 0.6rem 1rem;
         padding-bottom: 0.2rem;
-        -webkit-overflow-scrolling: touch;
     }
 
     nav.primary a {
@@ -1281,9 +1279,9 @@ table.datasheet td.num {
     cursor: grabbing;
 }
 
-.bench:not(.editable) {
+.bench {
     cursor: grab;
-    touch-action: pan-y;
+    touch-action: none;
 }
 
 .bench-controls {
@@ -1343,7 +1341,7 @@ table.datasheet td.num {
     aspect-ratio: 16 / 10;
     height: auto;
     cursor: grab;
-    touch-action: pan-y;
+    touch-action: none;
 }
 
 .render-canvas.gl:active {
@@ -1660,4 +1658,16 @@ a.github:hover {
     .give-list {
         min-width: 220px;
     }
+}
+
+nav.primary {
+    flex-wrap: wrap;
+    overflow: visible;
+}
+
+button:focus:not(:focus-visible),
+.subnav button:focus:not(:focus-visible),
+.give-button:focus:not(:focus-visible),
+.lang-button:focus:not(:focus-visible) {
+    outline: none;
 }
