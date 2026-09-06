@@ -1105,3 +1105,63 @@ button.primary {
         order: 2;
     }
 }
+
+/* Calculator */
+
+.calc {
+    display: grid;
+    grid-template-columns: minmax(250px, 1fr) minmax(0, 3fr);
+    gap: 1.2rem 1.6rem;
+    align-items: start;
+    margin-bottom: 2.5rem;
+}
+
+.calc-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    position: sticky;
+    top: 64px;
+}
+
+.calc-inputs .control {
+    width: 100%;
+}
+
+.calc-inputs select,
+.calc-inputs input[type="number"] {
+    width: 100%;
+    min-width: 0;
+}
+
+table.datasheet td:first-child {
+    white-space: nowrap;
+}
+
+table.datasheet tr.section th {
+    padding-top: 1rem;
+    color: var(--fg);
+    font-weight: 600;
+    position: static;
+    background: transparent;
+    border-bottom: 2px solid var(--line-strong);
+    white-space: normal;
+}
+
+table.datasheet td.num {
+    white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+    .calc {
+        grid-template-columns: 1fr;
+    }
+
+    .calc-inputs {
+        position: static;
+    }
+
+    table.datasheet td.muted {
+        display: none;
+    }
+}

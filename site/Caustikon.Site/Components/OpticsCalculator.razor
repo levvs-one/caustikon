@@ -1,0 +1,254 @@
+@using System.Numerics
+@inherits LocalizedComponent
+@* Every quantity a designer asks of a glass at one wavelength and one angle, from the packages, laid out as a datasheet. *@
+
+<div class="calc">
+    <div class="calc-inputs panel">
+        <label class="control">
+            <span>@L["calc.glass"]</span>
+            <select @bind="selectedKey">
+                <optgroup label="@L["render.common"]">
+                    @foreach ((string key, string label) in Featured)
+                    {
+                        <option value="@key">@label</option>
+                    }
+                </optgroup>
+                @foreach (string vendor in GlassCatalog.Vendors)
+                {
+                    <optgroup label="@(GlassCatalog.ByVendor(vendor).First().VendorDisplayName)">
+                        @foreach (Glass g in GlassCatalog.ByVendor(vendor).Where(g => g.CatalogIndexD is not null))
+                        {
+                            <option value="@(g.Vendor + "/" + g.Name)">@g.Name (@SiteInfo.Number(g.CatalogIndexD!.Value, 4) / @SiteInfo.Number(g.CatalogAbbeD ?? double.NaN, 1))</option>
+                        }
+                    </optgroup>
+                }
+            </select>
+        </label>
+        <label class="control">
+            <span>@L["calc.wavelength"]</span>
+            <input type="number" min="300" max="2500" step="0.1" @bind="wavelength" />
+        </label>
+        <div class="control">
+            <span>@L["calc.lines"]</span>
+            <div class="button-row">
+                <button @onclick="() => wavelength = FraunhoferLines.GNanometers">g</button>
+                <button @onclick="() => wavelength = FraunhoferLines.FNanometers">F</button>
+                <button @onclick="() => wavelength = FraunhoferLines.ENanometers">e</button>
+                <button @onclick="() => wavelength = FraunhoferLines.DNanometers">d</button>
+                <button @onclick="() => wavelength = FraunhoferLines.CNanometers">C</button>
+                <button @onclick="() => wavelength = 1060">1060</button>
+            </div>
+        </div>
+        <label class="control">
+            <span>@L["calc.angle"]</span>
+            <input type="number" min="0" max="89.99" step="0.1" @bind="angle" />
+        </label>
+        <label class="control">
+            <span>@L["calc.apex"]</span>
+            <input type="number" min="1" max="179" step="0.1" @bind="apex" />
+        </label>
+        <label class="control">
+            <span>@L["calc.thickness"]</span>
+            <input type="number" min="0.01" max="1000" step="0.5" @bind="thickness" />
+        </label>
+    </div>
+
+    @if (glass is { } g0)
+    {
+        <div class="calc-results">
+            <table class="compact datasheet">
+                <tbody>
+                    <tr class="section"><th colspan="3">@L["calc.sec.index"] · @g0.VendorDisplayName @g0.Name · λ = @SiteInfo.Number(wavelength, 2) nm</th></tr>
+                    <tr><td>n(λ)</td><td class="num">@Fmt(n, 6)</td><td class="muted">@L["calc.n.note"]</td></tr>
+                    <tr><td>dn/dλ</td><td class="num">@Fmt(dndl * 1000, 5) µm⁻¹</td><td class="muted">@L["calc.dndl.note"]</td></tr>
+                    <tr><td>n<sub>g</sub> = n − λ·dn/dλ</td><td class="num">@Fmt(groupIndex, 6)</td><td class="muted">@L["calc.ng.note"]</td></tr>
+                    <tr><td>v = c/n</td><td class="num">@Fmt(299792.458 / n, 1) km/s</td><td class="muted">@L["calc.v.note"]</td></tr>
+                    <tr><td>λ/n</td><td class="num">@Fmt(wavelength / n, 2) nm</td><td class="muted">@L["calc.lambda.note"]</td></tr>
+
+                    <tr class="section"><th colspan="3">@L["calc.sec.dispersion"]</th></tr>
+                    <tr><td>n<sub>d</sub>, n<sub>F</sub>, n<sub>C</sub></td><td class="num">@Fmt(g0.IndexD, 5), @Fmt(g0.IndexF, 5), @Fmt(g0.IndexC, 5)</td><td class="muted">587.56 · 486.13 · 656.27 nm</td></tr>
+                    <tr><td>ν<sub>d</sub></td><td class="num">@Fmt(g0.AbbeD, 2)</td><td class="muted">@L["calc.vd.note"] @(g0.CatalogAbbeD is { } cv ? SiteInfo.Number(cv, 2) : "—")</td></tr>
+                    <tr><td>n<sub>e</sub>, n<sub>F′</sub>, n<sub>C′</sub></td><td class="num">@Fmt(ne, 5), @Fmt(nFp, 5), @Fmt(nCp, 5)</td><td class="muted">546.07 · 479.99 · 643.85 nm</td></tr>
+                    <tr><td>ν<sub>e</sub></td><td class="num">@Fmt((ne - 1) / (nFp - nCp), 2)</td><td class="muted">@L["calc.ve.note"]</td></tr>
+                    <tr><td>P<sub>g,F</sub></td><td class="num">@Fmt((ng - g0.IndexF) / (g0.IndexF - g0.IndexC), 4)</td><td class="muted">@L["calc.pgf.note"]</td></tr>
+
+                    <tr class="section"><th colspan="3">@L["calc.sec.interface"] · θ = @SiteInfo.Number(angle, 2)°</th></tr>
+                    <tr><td>θ<sub>t</sub> @L["calc.airglass"]</td><td class="num">@Angle(refractedIn)</td><td class="muted">n<sub>i</sub> = 1, n<sub>t</sub> = n(λ)</td></tr>
+                    <tr><td>R<sub>s</sub>, R<sub>p</sub>, R</td><td class="num">@Fmt(fresnelIn.S, 5), @Fmt(fresnelIn.P, 5), @Fmt(fresnelIn.Unpolarized, 5)</td><td class="muted">@L["calc.r.note"]</td></tr>
+                    <tr><td>T = 1 − R</td><td class="num">@Fmt(1 - fresnelIn.Unpolarized, 5)</td><td class="muted">@L["calc.t.note"]</td></tr>
+                    <tr><td>θ<sub>B</sub></td><td class="num">@Fmt(Math.Atan(n) * 180 / Math.PI, 3)°</td><td class="muted">@L["calc.brewster.note"]</td></tr>
+                    <tr><td>θ<sub>c</sub></td><td class="num">@Fmt(Math.Asin(1 / n) * 180 / Math.PI, 3)°</td><td class="muted">@L["calc.critical.note"]</td></tr>
+                    <tr><td>θ<sub>t</sub> @L["calc.glassair"]</td><td class="num">@Angle(refractedOut)</td><td class="muted">@L["calc.out.note"]</td></tr>
+                    <tr><td>R @L["calc.glassair"]</td><td class="num">@Fmt(fresnelOut.Unpolarized, 5)</td><td class="muted">@L["calc.rout.note"]</td></tr>
+
+                    <tr class="section"><th colspan="3">@L["calc.sec.slab"] · d = @SiteInfo.Number(thickness, 2) mm</th></tr>
+                    <tr><td>@L["calc.path"]</td><td class="num">@Fmt(pathMm, 3) mm</td><td class="muted">d / cos θ<sub>t</sub></td></tr>
+                    <tr><td>@L["calc.shift"]</td><td class="num">@Fmt(shiftMm, 4) mm</td><td class="muted">d·sin θ·(1 − cos θ / √(n² − sin² θ))</td></tr>
+                    <tr><td>τ<sub>i</sub></td><td class="num">@Tau()</td><td class="muted">@L["calc.tau.note"]</td></tr>
+                    <tr><td>T<sub>slab</sub></td><td class="num">@SlabT()</td><td class="muted">@L["calc.tslab.note"]</td></tr>
+
+                    <tr class="section"><th colspan="3">@L["calc.sec.prism"] · A = @SiteInfo.Number(apex, 2)°</th></tr>
+                    <tr><td>δ<sub>min</sub></td><td class="num">@MinDeviation()</td><td class="muted">2·asin(n·sin(A/2)) − A</td></tr>
+                    <tr><td>θ<sub>δmin</sub></td><td class="num">@MinDeviationIncidence()</td><td class="muted">@L["calc.dmin.note"]</td></tr>
+                    <tr><td>δ(θ)</td><td class="num">@Deviation(n, angle)</td><td class="muted">@L["calc.dev.note"]</td></tr>
+                    <tr><td>dδ/dλ</td><td class="num">@AngularDispersion()</td><td class="muted">@L["calc.disp.note"]</td></tr>
+                    <tr><td>δ<sub>F</sub> − δ<sub>C</sub></td><td class="num">@Fmt(DeviationValue(g0.IndexF, angle) - DeviationValue(g0.IndexC, angle), 4)°</td><td class="muted">@L["calc.spreadFC.note"]</td></tr>
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly (string Key, string Label)[] Featured =
+    [
+        ("schott/N-BK7", "SCHOTT N-BK7"), ("schott/N-SF11", "SCHOTT N-SF11"), ("schott/SF57", "SCHOTT SF57"), ("schott/N-SF66", "SCHOTT N-SF66"),
+        ("schott/N-LASF9", "SCHOTT N-LASF9"), ("schott/N-FK58", "SCHOTT N-FK58"), ("ohara/S-FPL53", "OHARA S-FPL53"), ("ohara/S-LAH79", "OHARA S-LAH79"),
+        ("hoya/TAFD55", "HOYA TAFD55"), ("cdgm/H-ZF88", "CDGM H-ZF88"),
+    ];
+
+    private string selectedKeyValue = "schott/N-BK7";
+    private double wavelengthValue = FraunhoferLines.DNanometers;
+    private double angleValue = 45;
+    private double apexValue = 60;
+    private double thicknessValue = 10;
+    private Glass? glass;
+    private double n, dndl, groupIndex, ne, nFp, nCp, ng, pathMm, shiftMm;
+    private (RefractionKind Kind, double Degrees) refractedIn, refractedOut;
+    private FresnelPower fresnelIn, fresnelOut;
+
+    private string selectedKey { get => selectedKeyValue; set { selectedKeyValue = value; Recompute(); } }
+    private double wavelength { get => wavelengthValue; set { wavelengthValue = value; Recompute(); } }
+    private double angle { get => angleValue; set { angleValue = Math.Clamp(value, 0, 89.99); Recompute(); } }
+    private double apex { get => apexValue; set { apexValue = Math.Clamp(value, 1, 179); Recompute(); } }
+    private double thickness { get => thicknessValue; set { thicknessValue = Math.Max(0.01, value); Recompute(); } }
+
+    protected override void OnInitialized() => Recompute();
+
+    private void Recompute()
+    {
+        int slash = selectedKeyValue.IndexOf('/');
+        glass = slash > 0 ? GlassCatalog.Find(selectedKeyValue[..slash], selectedKeyValue[(slash + 1)..]) : null;
+        if (glass is null)
+        {
+            return;
+        }
+
+        n = Index(wavelengthValue);
+        // Central difference over ±1 nm, in per-nanometer units.
+        dndl = (Index(wavelengthValue + 1) - Index(wavelengthValue - 1)) / 2;
+        groupIndex = n - wavelengthValue * dndl;
+        ne = Index(FraunhoferLines.ENanometers);
+        nFp = Index(479.9914);
+        nCp = Index(643.8469);
+        ng = Index(FraunhoferLines.GNanometers);
+
+        float nf = (float)n;
+        refractedIn = Refract(angleValue, 1f, nf);
+        refractedOut = Refract(angleValue, nf, 1f);
+        float cos = (float)Math.Cos(angleValue * Math.PI / 180);
+        fresnelIn = Dielectric.Fresnel(cos, 1f, nf);
+        fresnelOut = Dielectric.Fresnel(cos, nf, 1f);
+
+        double s = Math.Sin(angleValue * Math.PI / 180), c = Math.Cos(angleValue * Math.PI / 180);
+        double inside = Math.Sqrt(Math.Max(0, n * n - s * s));
+        pathMm = refractedIn.Kind == RefractionKind.Refracted ? thicknessValue / Math.Cos(refractedIn.Degrees * Math.PI / 180) : double.NaN;
+        shiftMm = thicknessValue * s * (1 - c / inside);
+    }
+
+    private double Index(double nm)
+    {
+        IDispersionModel model = glass!.Model;
+        double clamped = Math.Clamp(nm, model.MinimumWavelengthNanometers, model.MaximumWavelengthNanometers);
+        return model.EvaluateNanometers(clamped, out double value) == DispersionStatus.Success ? value : double.NaN;
+    }
+
+    private static (RefractionKind Kind, double Degrees) Refract(double incidenceDegrees, float nIn, float nOut)
+    {
+        double radians = incidenceDegrees * Math.PI / 180d;
+        Vector3 incident = new((float)Math.Sin(radians), -(float)Math.Cos(radians), 0f);
+        RefractionKind kind = Dielectric.RefractUnit(incident, Vector3.UnitY, nIn, nOut, out Vector3 transmitted);
+        double exit = kind == RefractionKind.Refracted ? Math.Atan2(Math.Abs(transmitted.X), Math.Abs(transmitted.Y)) * 180d / Math.PI : double.NaN;
+        return (kind, exit);
+    }
+
+    private string Angle((RefractionKind Kind, double Degrees) r) => r.Kind switch
+    {
+        RefractionKind.Refracted => Fmt(r.Degrees, 4) + "°",
+        RefractionKind.CriticalAngle => L["play.critical"],
+        RefractionKind.TotalInternalReflection => L["play.tir"],
+        _ => "—",
+    };
+
+    private string Tau()
+    {
+        if (glass?.Extinction is not { } extinction || double.IsNaN(pathMm))
+        {
+            return "—";
+        }
+
+        double clamped = Math.Clamp(wavelengthValue, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers);
+        extinction.InternalTransmittance(clamped, pathMm, out double t);
+        return Fmt(t, 5);
+    }
+
+    private string SlabT()
+    {
+        if (refractedIn.Kind != RefractionKind.Refracted)
+        {
+            return "—";
+        }
+
+        double tau = 1;
+        if (glass?.Extinction is { } extinction)
+        {
+            double clamped = Math.Clamp(wavelengthValue, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers);
+            extinction.InternalTransmittance(clamped, pathMm, out tau);
+        }
+
+        float cosInside = (float)Math.Cos(refractedIn.Degrees * Math.PI / 180);
+        FresnelPower exit = Dielectric.Fresnel(cosInside, (float)n, 1f);
+        double s = (1 - fresnelIn.S) * tau * (1 - exit.S);
+        double p = (1 - fresnelIn.P) * tau * (1 - exit.P);
+        return Fmt(0.5 * (s + p), 5);
+    }
+
+    private double DeviationValue(double index, double incidenceDegrees)
+    {
+        double a = apexValue * Math.PI / 180, t1 = incidenceDegrees * Math.PI / 180;
+        double sin2 = Math.Sin(t1) / index;
+        if (sin2 > 1) return double.NaN;
+        double t2 = Math.Asin(sin2), t3 = a - t2;
+        double sin4 = index * Math.Sin(t3);
+        if (Math.Abs(sin4) > 1) return double.NaN;
+        return (t1 + Math.Asin(sin4) - a) * 180 / Math.PI;
+    }
+
+    private string Deviation(double index, double incidenceDegrees)
+    {
+        double d = DeviationValue(index, incidenceDegrees);
+        return double.IsNaN(d) ? L["play.tir"] : Fmt(d, 4) + "°";
+    }
+
+    private string MinDeviation()
+    {
+        double x = n * Math.Sin(apexValue * Math.PI / 360);
+        return x > 1 ? L["calc.noPass"] : Fmt((2 * Math.Asin(x) - apexValue * Math.PI / 180) * 180 / Math.PI, 4) + "°";
+    }
+
+    private string MinDeviationIncidence()
+    {
+        double x = n * Math.Sin(apexValue * Math.PI / 360);
+        return x > 1 ? "—" : Fmt(Math.Asin(x) * 180 / Math.PI, 4) + "°";
+    }
+
+    private string AngularDispersion()
+    {
+        double plus = DeviationValue(Index(wavelengthValue + 1), angleValue);
+        double minus = DeviationValue(Index(wavelengthValue - 1), angleValue);
+        if (double.IsNaN(plus) || double.IsNaN(minus)) return "—";
+        return Fmt((plus - minus) / 2 * 100, 4) + " °/100 nm";
+    }
+
+    private static string Fmt(double value, int decimals) => double.IsNaN(value) ? "—" : value.ToString("F" + decimals, CultureInfo.InvariantCulture);
+}
