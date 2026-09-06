@@ -23,7 +23,10 @@ public sealed record GpuScene(
     float[] KeyPosition,
     float KeyIntensity,
     float Ambient,
-    float Exposure)
+    float Exposure,
+    double[] SpectrumIndices,
+    double[] SpectrumAlphas,
+    float[] SpectrumWeights)
 {
     public static GpuScene Build(
         Glass glass,
@@ -56,6 +59,7 @@ public sealed record GpuScene(
         }
 
         Vector3 key = GlassRenderer.KeyLightPosition(lightAzimuthDegrees, lightElevationDegrees);
+        (double[] spectrumIndices, double[] spectrumAlphas, float[] spectrumWeights) = GlassRenderer.SpectrumTable(glass);
         return new GpuScene(
             sphere,
             [centre.X, centre.Y, centre.Z],
@@ -71,6 +75,9 @@ public sealed record GpuScene(
             [key.X, key.Y, key.Z],
             (float)Math.Clamp(lightIntensity, 0d, 4d),
             (float)Math.Clamp(ambient, 0d, 2d),
-            (float)Math.Clamp(exposure, 0.1d, 8d));
+            (float)Math.Clamp(exposure, 0.1d, 8d),
+            spectrumIndices,
+            spectrumAlphas,
+            spectrumWeights);
     }
 }

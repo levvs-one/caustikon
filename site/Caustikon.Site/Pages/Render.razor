@@ -16,7 +16,13 @@
 <p class="lede">@L["render.lede"]</p>
 
 <div class="bench-block">
-    <canvas id="render-canvas" class="render-canvas gl"></canvas>
+    <div class="stage">
+        <canvas id="render-canvas" class="render-canvas gl"></canvas>
+        <div class="zoom-buttons" aria-label="@L["render.zoom"]">
+            <button type="button" @onclick="@(() => Dolly(0.8))" title="@L["render.zoom.in"]" aria-label="@L["render.zoom.in"]">+</button>
+            <button type="button" @onclick="@(() => Dolly(1.25))" title="@L["render.zoom.out"]" aria-label="@L["render.zoom.out"]">−</button>
+        </div>
+    </div>
     <p class="bench-hint">@(gpu ? L["render.orbit"] : L["render.cpu"])</p>
     <div class="bench-controls">
         <label class="control">
@@ -179,6 +185,8 @@
 
         pushQueued = true;
     }
+
+    private async Task Dolly(double factor) => await Js.InvokeVoidAsync("caustikonGl.dolly", "render-canvas", factor);
 
     private async Task PushNowAsync()
     {

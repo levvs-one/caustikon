@@ -18,6 +18,13 @@ uniform vec4 uPlanes[64];
 uniform float uIndex[9];
 uniform vec3 uWeight[9];
 uniform float uAlpha[9];
+// The stochastic spectrum: 33 points from 400 to 700 nm, sampled at uBands wavelengths per pixel with a random offset
+// inside each band, so discrete colour speckle on strongly dispersing edges averages into a continuous spectrum.
+uniform float uIndexTable[33];
+uniform vec3 uWeightTable[33];
+uniform float uAlphaTable[33];
+uniform float uLambdaJitter;
+uniform int uBands;
 uniform float uMmPerUnit;
 uniform float uTile;
 uniform int uBackdrop;
@@ -147,18 +154,18 @@ vec3 ground(float x, float z) {
     if (uBackdrop == 3) return vec3(0.88, 0.85, 0.78);
     if (uBackdrop == 4) return vec3(0.04, 0.045, 0.05);
     bool dark = mod(floor(u) + floor(v), 2.0) == 0.0;
-    return dark ? vec3(0.30, 0.31, 0.32) : vec3(0.86, 0.80, 0.68);
+    return dark ? vec3(0.42, 0.43, 0.44) : vec3(0.86, 0.80, 0.68);
 }
 
 // The studio: a gradient dome, a key softbox where the lamp stands, a cooler fill opposite, a thin rim from behind.
 vec3 sky(vec3 direction) {
     float t = clamp(direction.y * 0.5 + 0.5, 0.0, 1.0);
-    vec3 horizon = (uBackdrop == 4 ? vec3(0.05, 0.06, 0.08) : vec3(0.34, 0.36, 0.39)) * uAmbient;
-    vec3 zenith = (uBackdrop == 4 ? vec3(0.02, 0.025, 0.035) : vec3(0.10, 0.12, 0.15)) * uAmbient;
+    vec3 horizon = (uBackdrop == 4 ? vec3(0.05, 0.06, 0.08) : vec3(0.44, 0.46, 0.49)) * uAmbient;
+    vec3 zenith = (uBackdrop == 4 ? vec3(0.02, 0.025, 0.035) : vec3(0.30, 0.33, 0.38)) * uAmbient;
     vec3 s = horizon * (1.0 - t) + zenith * t;
-    s += vec3(1.0, 0.97, 0.92) * uKeyIntensity * (5.0 * softbox(direction, uKeyDirection, 0.28) + 12.0 * softbox(direction, uKeyDirection, 0.06));
+    s += vec3(1.0, 0.97, 0.92) * uKeyIntensity * (3.0 * softbox(direction, uKeyDirection, 0.45) + 6.0 * softbox(direction, uKeyDirection, 0.08));
     vec3 fill = normalize(vec3(-uKeyDirection.x, max(0.25, uKeyDirection.y * 0.6), -uKeyDirection.z));
-    s += vec3(0.80, 0.86, 1.0) * uAmbient * 1.6 * softbox(direction, fill, 0.5);
+    s += vec3(0.80, 0.86, 1.0) * uAmbient * 1.4 * softbox(direction, fill, 0.7);
     s += vec3(0.55, 0.65, 0.80) * 3.0 * softbox(direction, RIM, 0.12);
     return s;
 }
@@ -184,8 +191,7 @@ vec3 environment(vec3 origin, vec3 direction) {
     return sky(direction);
 }
 
-vec3 trace(vec3 origin, vec3 direction, float tEntry, vec3 normal, int band) {
-    float n = uIndex[band];
+vec3 trace(vec3 origin, vec3 direction, float tEntry, vec3 normal, float n, float alpha) {
     vec3 p = origin + direction * tEntry;
     float cosIncident = clamp(-dot(direction, normal), 0.0, 1.0);
     float entry = fresnel(cosIncident, 1.0, n);
@@ -204,7 +210,7 @@ vec3 trace(vec3 origin, vec3 direction, float tEntry, vec3 normal, int band) {
         float chord; vec3 outward;
         leave(position, travel, chord, outward);
         vec3 q = position + travel * chord;
-        weight *= exp(-uAlpha[band] * max(0.0, chord * uMmPerUnit));
+        weight *= exp(-alpha * max(0.0, chord * uMmPerUnit));
         float cosInside = clamp(dot(travel, outward), 0.0, 1.0);
         vec3 exitDir = refract(travel, -outward, n);
         if (dot(exitDir, exitDir) > 0.5) {
@@ -230,7 +236,18 @@ vec3 shade(vec2 pixel) {
     float tEntry; vec3 normal;
     if (!enter(uEye, direction, tEntry, normal)) return environment(uEye, direction);
     vec3 colour = vec3(0.0);
-    for (int i = 0; i < 9; i++) colour += trace(uEye, direction, tEntry, normal, i) * uWeight[i];
+    float scale = 9.0 / float(uBands);
+    for (int i = 0; i < 9; i++) {
+        if (i >= uBands) break;
+        float t = (float(i) + uLambdaJitter) / float(uBands) * 32.0;
+        int j = int(floor(t));
+        int k = min(j + 1, 32);
+        float f = t - float(j);
+        float n = mix(uIndexTable[j], uIndexTable[k], f);
+        float alpha = mix(uAlphaTable[j], uAlphaTable[k], f);
+        vec3 w = mix(uWeightTable[j], uWeightTable[k], f) * scale;
+        colour += trace(uEye, direction, tEntry, normal, n, alpha) * w;
+    }
     return colour;
 }
 
@@ -244,10 +261,9 @@ uniform bool uLinear;
 
 void main() {
     vec3 colour;
-    if (uSamples >= 4) {
+    if (uSamples >= 2) {
         vec2 o = gl_FragCoord.xy + uJitter * 0.5;
-        colour = (shade(o + vec2(-0.25, -0.25)) + shade(o + vec2(0.25, -0.25))
-                + shade(o + vec2(-0.25, 0.25)) + shade(o + vec2(0.25, 0.25))) * 0.25;
+        colour = (shade(o + vec2(-0.25, -0.25)) + shade(o + vec2(0.25, 0.25))) * 0.5;
     } else {
         colour = shade(gl_FragCoord.xy + uJitter);
     }
@@ -295,7 +311,7 @@ void main() {
         if (dot(inside, inside) < 0.5) { park(); return; }
         vec3 position = p, travel = inside, exitDir = vec3(0.0), q = p;
         bool left = false;
-        for (int bounce = 0; bounce < 12; bounce++) {
+        for (int bounce = 0; bounce < 8; bounce++) {
             float chord; vec3 outward;
             leave(position, travel, chord, outward);
             q = position + travel * chord;
@@ -349,10 +365,11 @@ void main() {
 
     const views = new Map();
     // Each still frame takes four jittered taps; sixteen frames make sixty-four samples per pixel.
-    const STILL_SAMPLES = 16;
+    const STILL_SAMPLES = 24;
     const narrowScreen = () => Math.min(window.innerWidth, document.documentElement.clientWidth) < 700;
     const DEFAULT_PITCH = Math.atan2(0.7, 3.6);
-    const DEFAULT_DISTANCE = Math.hypot(0.7, 3.6);
+    const DEFAULT_DISTANCE = 5.2;
+    const MIN_DISTANCE = 1.2, MAX_DISTANCE = 14;
     const TAN_HALF = Math.tan(30 * Math.PI / 360);
 
     function compile(gl, type, source) {
@@ -402,6 +419,7 @@ void main() {
                 tile: u("uTile"), backdrop: u("uBackdrop"), keyPosition: u("uKeyPosition"), keyDirection: u("uKeyDirection"),
                 keyIntensity: u("uKeyIntensity"), ambient: u("uAmbient"), extent: u("uExtent"), exposure: u("uExposure"),
                 caustic: u("uCaustic"), causticNorm: u("uCausticNorm"), region: u("uRegion"), causticReady: u("uCausticReady"),
+                indexTable: u("uIndexTable"), weightTable: u("uWeightTable"), alphaTable: u("uAlphaTable"), lambdaJitter: u("uLambdaJitter"), bands: u("uBands"),
             },
             scene: null,
             accum: null, fbo: null, accumWidth: 0, accumHeight: 0, count: 0,
@@ -471,7 +489,7 @@ void main() {
                 // Two fingers: the distance between them dollies the camera.
                 const d = distance();
                 if (view.pinch > 0 && d > 0) {
-                    view.distance = Math.min(9, Math.max(1.2, view.distance * view.pinch / d));
+                    view.distance = Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, view.distance * view.pinch / d));
                     view.pinch = d;
                     request(view, "moving");
                 }
@@ -500,7 +518,7 @@ void main() {
             // Dolly toward the point under the cursor: the eye slides along that ray and the target follows,
             // so whatever the cursor is on stays under it while the view closes in.
             const factor = Math.exp(e.deltaY * 0.0012);
-            const next = Math.min(9, Math.max(1.2, view.distance * factor));
+            const next = Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, view.distance * factor));
             const f = next / view.distance;
             const rect = c.getBoundingClientRect();
             const dir = rayThrough(view, e.clientX - rect.left, e.clientY - rect.top);
@@ -528,8 +546,8 @@ void main() {
     function fit(view) {
         const c = view.canvas;
         // Phones draw at one device pixel per CSS pixel: four times fewer rays, and the picture is small anyway.
-        const dpr = narrowScreen() ? 1 : Math.min(window.devicePixelRatio || 1, 2);
-        const width = Math.max(1, Math.min(1600, Math.round(c.clientWidth * dpr)));
+        const dpr = narrowScreen() ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
+        const width = Math.max(1, Math.min(1400, Math.round(c.clientWidth * dpr)));
         const height = Math.max(1, Math.round(width * 0.625));
         if (c.width !== width || c.height !== height) {
             c.width = width;
@@ -583,7 +601,7 @@ void main() {
 
     const CAUSTIC_SIZE = 512;
     const REGION = 3.0;
-    const CAUSTIC_FRAMES = 12;
+    const CAUSTIC_FRAMES = 8;
 
     function ensureCaustic(view) {
         const { gl } = view;
@@ -610,7 +628,7 @@ void main() {
         const { gl, photonLoc: p, scene } = view;
         ensureCaustic(view);
         if (!view.photon) return;
-        const grid = narrowScreen() ? 224 : 384;
+        const grid = narrowScreen() ? 192 : 288;
         const emitter = REGION * 1.05;
         gl.useProgram(view.photon);
         gl.bindFramebuffer(gl.FRAMEBUFFER, view.causticFbo);
@@ -687,8 +705,10 @@ void main() {
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.viewport(0, 0, w, h);
             gl.disable(gl.BLEND);
-            gl.uniform1i(loc.samples, view.mode === "moving" ? 1 : 4);
+            gl.uniform1i(loc.samples, view.mode === "moving" ? 1 : 2);
             gl.uniform2f(loc.jitter, 0, 0);
+            gl.uniform1i(loc.bands, view.mode === "moving" ? 3 : 9);
+            gl.uniform1f(loc.lambdaJitter, 0.5);
             gl.uniform1i(loc.linear, 0);
             gl.drawArrays(gl.TRIANGLES, 0, 3);
             view.lastMs = performance.now() - started;
@@ -709,8 +729,10 @@ void main() {
         }
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE);
-        gl.uniform1i(loc.samples, 4);
+        gl.uniform1i(loc.samples, 2);
         gl.uniform2f(loc.jitter, Math.random() - 0.5, Math.random() - 0.5);
+        gl.uniform1i(loc.bands, 9);
+        gl.uniform1f(loc.lambdaJitter, Math.random());
         gl.uniform1i(loc.linear, 1);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         view.count++;
@@ -747,6 +769,9 @@ void main() {
         gl.uniform1fv(loc.index, scene.indices);
         gl.uniform3fv(loc.weight, scene.weights);
         gl.uniform1fv(loc.alpha, scene.alphas);
+        gl.uniform1fv(loc.indexTable, scene.spectrumIndices);
+        gl.uniform3fv(loc.weightTable, scene.spectrumWeights);
+        gl.uniform1fv(loc.alphaTable, scene.spectrumAlphas);
         gl.uniform1f(loc.mmPerUnit, scene.millimetersPerUnit);
         gl.uniform1f(loc.tile, scene.tileUnits);
         gl.uniform1i(loc.backdrop, scene.backdrop);
@@ -788,6 +813,14 @@ void main() {
             upload(view, scene);
             request(view, "still");
             return true;
+        },
+        // Steps the camera closer (factor below 1) or farther, as the + and − buttons do.
+        dolly(id, factor) {
+            const canvas = document.getElementById(id);
+            const view = canvas && views.get(canvas);
+            if (!view) return;
+            view.distance = Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, view.distance * factor));
+            request(view, "still");
         },
         // Backing width and height, the last frame's time in ms, and how many samples per pixel the picture holds.
         stats(id) {

@@ -1671,3 +1671,35 @@ button:focus:not(:focus-visible),
 .lang-button:focus:not(:focus-visible) {
     outline: none;
 }
+
+/* + and − over the 3D stage, as on a map */
+
+.stage {
+    position: relative;
+}
+
+.zoom-buttons {
+    position: absolute;
+    right: 0.7rem;
+    top: 0.7rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.zoom-buttons button {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    font-size: 1.15rem;
+    line-height: 1;
+    border-radius: 4px;
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    color: var(--fg);
+    cursor: pointer;
+}
+
+.zoom-buttons button:hover {
+    background: var(--bg);
+}

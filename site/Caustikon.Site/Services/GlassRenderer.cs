@@ -114,6 +114,48 @@ public sealed class GlassRenderer
         return result;
     }
 
+    /// <summary>
+    /// A finer table for the GPU's stochastic spectrum: index, absorption per millimetre and linear-RGB weight at 33
+    /// wavelengths from 400 to 700 nm. Weights are scaled so that nine samples with a random offset inside their bands
+    /// estimate the same white as the nine fixed samples: summing nine interpolated weights gives (1, 1, 1) on average.
+    /// </summary>
+    public static (double[] Indices, double[] Alphas, float[] Weights) SpectrumTable(Glass glass)
+    {
+        const int count = 33;
+        double[] indices = new double[count];
+        double[] alphas = new double[count];
+        Vector3[] linear = new Vector3[count];
+        Vector3 total = Vector3.Zero;
+        for (int i = 0; i < count; i++)
+        {
+            double wavelength = 400d + 300d * i / (count - 1);
+            double clamped = Math.Clamp(wavelength, glass.Model.MinimumWavelengthNanometers, glass.Model.MaximumWavelengthNanometers);
+            indices[i] = glass.Model.EvaluateNanometers(clamped, out double n) == DispersionStatus.Success ? n : 1.5d;
+            if (glass.Extinction is { } extinction)
+            {
+                double c = Math.Clamp(wavelength, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers);
+                extinction.InternalTransmittance(c, 1d, out double t);
+                alphas[i] = t > 0d ? -Math.Log(t) : 50d;
+            }
+
+            (double r, double g, double b) = GlassColour.Monochromatic(wavelength);
+            linear[i] = new Vector3((float)Decompand(r), (float)Decompand(g), (float)Decompand(b));
+            // Trapezoid weights: the end points count half.
+            total += linear[i] * (i == 0 || i == count - 1 ? 0.5f : 1f);
+        }
+
+        // total is the integral in table steps; nine samples spaced 32/9 steps apart each stand for 32/9 steps of it.
+        float[] weights = new float[count * 3];
+        for (int i = 0; i < count; i++)
+        {
+            weights[i * 3] = linear[i].X / total.X * (32f / 9f);
+            weights[i * 3 + 1] = linear[i].Y / total.Y * (32f / 9f);
+            weights[i * 3 + 2] = linear[i].Z / total.Z * (32f / 9f);
+        }
+
+        return (indices, alphas, weights);
+    }
+
     /// <summary>Where the key light stands, 3.8 units from the solid: azimuth 0 behind the camera, 90 to its left.</summary>
     public static Vector3 KeyLightPosition(double azimuthDegrees, double elevationDegrees)
     {
@@ -174,7 +216,7 @@ public sealed class GlassRenderer
     }
 
     // Camera: slightly above the solid, looking down at it; the solid's lowest point touches y = -1.
-    private static readonly Vector3 Eye = new(0f, 0.55f, -3.6f);
+    private static readonly Vector3 Eye = new(0f, 0.85f, -5.15f);
     private static readonly Vector3 Forward = Vector3.Normalize(new Vector3(0f, -0.15f, 0f) - Eye);
     private static readonly Vector3 Right = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, Forward));
     private static readonly Vector3 Up = Vector3.Cross(Forward, Right);
@@ -328,7 +370,7 @@ public sealed class GlassRenderer
             default:
             {
                 bool dark = ((int)MathF.Floor(u) + (int)MathF.Floor(v) & 1) == 0;
-                return dark ? new Vector3(0.30f, 0.31f, 0.32f) : new Vector3(0.86f, 0.80f, 0.68f);
+                return dark ? new Vector3(0.42f, 0.43f, 0.44f) : new Vector3(0.86f, 0.80f, 0.68f);
             }
         }
     }
@@ -337,12 +379,12 @@ public sealed class GlassRenderer
     private Vector3 Sky(Vector3 direction)
     {
         float t = Math.Clamp(direction.Y * 0.5f + 0.5f, 0f, 1f);
-        Vector3 horizon = (backdrop == Backdrop.Night ? new Vector3(0.05f, 0.06f, 0.08f) : new Vector3(0.34f, 0.36f, 0.39f)) * ambient;
-        Vector3 zenith = (backdrop == Backdrop.Night ? new Vector3(0.02f, 0.025f, 0.035f) : new Vector3(0.10f, 0.12f, 0.15f)) * ambient;
+        Vector3 horizon = (backdrop == Backdrop.Night ? new Vector3(0.05f, 0.06f, 0.08f) : new Vector3(0.44f, 0.46f, 0.49f)) * ambient;
+        Vector3 zenith = (backdrop == Backdrop.Night ? new Vector3(0.02f, 0.025f, 0.035f) : new Vector3(0.30f, 0.33f, 0.38f)) * ambient;
         Vector3 sky = horizon * (1f - t) + zenith * t;
-        sky += new Vector3(1.0f, 0.97f, 0.92f) * keyIntensity * (5f * Softbox(direction, keyDirection, 0.28f) + 12f * Softbox(direction, keyDirection, 0.06f));
+        sky += new Vector3(1.0f, 0.97f, 0.92f) * keyIntensity * (3f * Softbox(direction, keyDirection, 0.45f) + 6f * Softbox(direction, keyDirection, 0.08f));
         Vector3 fill = Vector3.Normalize(new Vector3(-keyDirection.X, MathF.Max(0.25f, keyDirection.Y * 0.6f), -keyDirection.Z));
-        sky += new Vector3(0.80f, 0.86f, 1.0f) * ambient * 1.6f * Softbox(direction, fill, 0.5f);
+        sky += new Vector3(0.80f, 0.86f, 1.0f) * ambient * 1.4f * Softbox(direction, fill, 0.7f);
         sky += new Vector3(0.55f, 0.65f, 0.80f) * 3f * Softbox(direction, RimDirection, 0.12f);
         return sky;
     }
