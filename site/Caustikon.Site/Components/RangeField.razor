@@ -1,0 +1,60 @@
+@* A slider with its value in an editable number box; both move the same value. Scale shows the value in other units
+   (bench units → millimetres) without changing what is stored. *@
+<div class="control field">
+    <div class="field-head">
+        <span>@Label</span>
+        <span class="field-value">
+            <input type="number" inputmode="decimal" value="@Text" min="@Fmt(Min * Scale)" max="@Fmt(Max * Scale)" step="@Fmt(Step * Scale)"
+                   @onchange="OnTyped" aria-label="@Label" />
+            @if (!string.IsNullOrEmpty(Unit))
+            {
+                <span class="unit">@Unit</span>
+            }
+        </span>
+    </div>
+    <input type="range" min="@Fmt(Min)" max="@Fmt(Max)" step="@Fmt(Step)" value="@Fmt(Value)" @oninput="OnSlid" aria-label="@Label" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public double Value { get; set; }
+    [Parameter] public EventCallback<double> ValueChanged { get; set; }
+    [Parameter] public double Min { get; set; }
+    [Parameter] public double Max { get; set; } = 1;
+    [Parameter] public double Step { get; set; } = 0.01;
+    [Parameter] public string? Unit { get; set; }
+    /// <summary>Multiplier between the stored value and the number shown.</summary>
+    [Parameter] public double Scale { get; set; } = 1;
+    /// <summary>Decimals in the number box; taken from the step when not given.</summary>
+    [Parameter] public int? Decimals { get; set; }
+
+    private int Places => Decimals ?? Math.Clamp((int)Math.Ceiling(-Math.Log10(Step * Scale) - 1e-9), 0, 5);
+
+    private string Text => (Value * Scale).ToString("F" + Places, CultureInfo.InvariantCulture);
+
+    private static string Fmt(double v) => v.ToString("0.#####", CultureInfo.InvariantCulture);
+
+    private Task OnSlid(ChangeEventArgs e) => Apply(e.Value?.ToString(), 1);
+
+    private Task OnTyped(ChangeEventArgs e) => Apply(e.Value?.ToString(), Scale);
+
+    private async Task Apply(string? raw, double divisor)
+    {
+        if (raw is null)
+        {
+            return;
+        }
+
+        raw = raw.Trim().Replace(',', '.');
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double typed))
+        {
+            return;
+        }
+
+        double next = Math.Clamp(typed / divisor, Min, Max);
+        if (next != Value)
+        {
+            await ValueChanged.InvokeAsync(next);
+        }
+    }
+}

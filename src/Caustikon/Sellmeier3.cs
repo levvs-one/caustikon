@@ -11,7 +11,7 @@ namespace Caustikon;
 /// convention. No conversion of the reference medium or measurement conditions is performed.
 /// The default value is uninitialized and evaluations return <see cref="DispersionStatus.InvalidInput"/>.
 /// </remarks>
-public readonly record struct Sellmeier3
+public readonly record struct Sellmeier3 : IDispersionModel
 {
     /// <summary>Creates a Sellmeier model with three coefficient pairs and a pole-free inclusive wavelength interval.</summary>
     /// <param name="b1">Finite, dimensionless strength of the first resonance. Zero disables the term.</param>

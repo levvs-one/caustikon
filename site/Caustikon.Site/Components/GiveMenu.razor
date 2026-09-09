@@ -1,0 +1,47 @@
+@using Caustikon.Site.Localization
+@using Caustikon.Site.Services
+@inject Locale L
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@* "Give Me!" with an arrow: one entry per craft, each leading to its own page of code, explanations and examples. *@
+<div class="give @(MenuState.IsOpen("give") ? "open" : "")">
+    <button class="give-button" @onclick="Toggle" aria-haspopup="menu" aria-expanded="@MenuState.IsOpen("give")">
+        <span>@L["nav.give"]</span>
+        <svg class="chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+    </button>
+    @if (MenuState.IsOpen("give"))
+    {
+        <ul class="give-list" role="menu">
+            @foreach ((string slug, string key) in Give.Topics)
+            {
+                <li role="menuitem" @onclick="() => Go(slug)">
+                    <strong>@L["give." + key + ".name"]</strong>
+                    <span>@L["give." + key + ".tag"]</span>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        L.Changed += StateHasChanged;
+        MenuState.Changed += StateHasChanged;
+    }
+
+    private void Toggle() => MenuState.Toggle("give");
+
+    private void Go(string slug)
+    {
+        MenuState.Close();
+        Navigation.NavigateTo("give/" + slug);
+    }
+
+    public void Dispose()
+    {
+        L.Changed -= StateHasChanged;
+        MenuState.Changed -= StateHasChanged;
+    }
+}

@@ -1,0 +1,396 @@
+@page "/"
+@using System.Numerics
+@using Caustikon.Site.Services
+@inject NavigationManager Navigation
+@inherits LocalizedComponent
+
+<PageTitle>@L["home.title"]</PageTitle>
+<HeadContent>
+    <meta name="description" content="@L["home.meta"]" />
+</HeadContent>
+
+<h1 class="bench-title">@L["home.h1"]</h1>
+
+<div class="bench-block">
+    <PrismScene Glass="prismGlass" Vertices="vertices" BeamAngleDegrees="beamAngle" BeamHeight="beamHeight" RayCount="rayCount" Zoom="zoom"
+                    MillimetersPerUnit="mmPerUnit" MediumIndex="MediumIndexValue" TemperatureCelsius="temperature" ShowReflections="reflections"
+                    Editable="editing" VerticesChanged="OnVerticesChanged" Traced="OnTraced" ZoomChanged="OnZoomChanged" Drawing="drawing" DrawingFinished="FinishDrawing" />
+    <div class="readout compact">
+    <div><div class="value">@SiteInfo.Number(minDeviation, 2)°</div><div class="label">@L["home.readout.min"]</div></div>
+    <div><div class="value">@SiteInfo.Number(maxDeviation, 2)°</div><div class="label">@L["home.readout.max"]</div></div>
+    <div><div class="value">@SiteInfo.Number(maxDeviation - minDeviation, 3)°</div><div class="label">@L["home.readout.spread"]</div></div>
+    <div><div class="value">@SiteInfo.Number(double.IsNaN(maxDeviation) ? double.NaN : 1000 * Math.Tan((maxDeviation - minDeviation) * Math.PI / 180), 0) mm</div><div class="label">@L["home.readout.screen"]</div></div>
+    <div><div class="value">@SiteInfo.Number(energyOut * 100, 1)%</div><div class="label">@L["home.readout.energy"]</div></div>
+    <div><div class="value">@SiteInfo.Number(energyReflected * 100, 1)%</div><div class="label">@L["home.readout.reflected"]</div></div>
+    <div><div class="value">@SiteInfo.Number(energyAbsorbed * 100, 2)%</div><div class="label">@L["home.readout.absorbed"]</div></div>
+    <div><div class="value">@SiteInfo.Number(indexD, 5)</div><div class="label">@L["home.readout.index"]</div></div>
+    <div><div class="value">@(double.IsNaN(indexShift) ? L["home.thermal.none"] : (indexShift > 0 ? "+" : "") + SiteInfo.Number(indexShift, 5))</div><div class="label">@L["home.readout.shift"]</div></div>
+</div>
+    @if (selfIntersecting)
+    {
+        <p class="notice">@L["home.bench.crossing"]</p>
+    }
+    <p class="bench-hint">@(drawing ? L["home.bench.drawing"] : L["home.bench.hint"])</p>
+    <div class="bench-controls">
+        <label class="control">
+            <span>@L["home.bench.glass"]</span>
+            <select @bind="prismKey">
+                <optgroup label="@L["render.common"]">
+                    @foreach ((string key, string label) in PrismChoices)
+                    {
+                        <option value="@key">@label</option>
+                    }
+                </optgroup>
+                @foreach (string vendor in GlassCatalog.Vendors)
+                {
+                    <optgroup label="@(GlassCatalog.ByVendor(vendor).First().VendorDisplayName)">
+                        @foreach (Glass g in GlassCatalog.ByVendor(vendor).Where(g => g.CatalogIndexD is not null))
+                        {
+                            <option value="@(g.Vendor + "/" + g.Name)">@g.Name</option>
+                        }
+                    </optgroup>
+                }
+            </select>
+        </label>
+        <label class="control">
+            <span>@L["home.bench.shape"]</span>
+            <select @bind="shape">
+                <option value="biconvex">@L["home.shape.biconvex"]</option>
+                <option value="planoconvex">@L["home.shape.planoconvex"]</option>
+                <option value="biconcave">@L["home.shape.biconcave"]</option>
+                <option value="meniscus">@L["home.shape.meniscus"]</option>
+                <option value="polygon">@L["home.shape.polygon"]</option>
+                <option value="rightangle">@L["home.shape.rightangle"]</option>
+                <option value="plate">@L["home.shape.plate"]</option>
+                <option value="custom">@L["home.shape.custom"]</option>
+            </select>
+        </label>
+        @if (shape is "biconvex" or "planoconvex" or "biconcave" or "meniscus")
+        {
+            <RangeField Label="@L["home.lens.left"]" @bind-Value="leftCurvature" Min="-6" Max="6" Step="0.05" />
+            <RangeField Label="@L["home.lens.right"]" @bind-Value="rightCurvature" Min="-6" Max="6" Step="0.05" />
+            <RangeField Label="@L["home.lens.thickness"]" @bind-Value="lensThickness" Min="0.02" Max="1.5" Step="0.01" Scale="mmPerUnit" Unit="mm" Decimals="1" />
+        }
+        @if (shape == "polygon")
+        {
+            <RangeField Label="@L["home.bench.corners"]" @bind-Value="sidesValueAsDouble" Min="3" Max="24" Step="1" />
+            <RangeField Label="@L["home.polygon.rotation"]" @bind-Value="rotation" Min="0" Max="180" Step="1" Unit="°" />
+        }
+        @if (shape == "plate")
+        {
+            <RangeField Label="@L["home.plate.tilt"]" @bind-Value="plateTilt" Min="-85" Max="85" Step="1" Unit="°" />
+            <RangeField Label="@L["home.lens.thickness"]" @bind-Value="plateThickness" Min="0.02" Max="1.2" Step="0.01" Scale="mmPerUnit" Unit="mm" Decimals="1" />
+        }
+        <RangeField Label="@L["home.size"]" @bind-Value="sizeFactor" Min="0.1" Max="4" Step="0.02" Scale="baseHeightMm()" Unit="mm" Decimals="0" />
+        <RangeField Label="@L["home.bench.angle"]" @bind-Value="beamAngle" Min="-80" Max="80" Step="0.5" Unit="°" />
+        <div class="control">
+            <label class="check"><input type="checkbox" @bind="editing" disabled="@drawing" /> @L["home.bench.drag"]</label>
+            <div class="button-row">
+                @if (drawing)
+                {
+                    <button @onclick="FinishDrawing">@L["home.bench.done"]</button>
+                }
+                else
+                {
+                    <button @onclick="StartDrawing">@L["home.bench.draw"]</button>
+                }
+                <button @onclick="AddCorner" disabled="@(drawing || vertices.Length < 3)">@L["home.bench.add"]</button>
+                <button @onclick="RemoveCorner" disabled="@(drawing || vertices.Length <= 3)">@L["home.bench.remove"]</button>
+                <button @onclick="ResetShape">@L["home.bench.reset"]</button>
+            </div>
+        </div>
+    </div>
+    <details class="more">
+        <summary>@L["ui.more"]</summary>
+        <div class="bench-controls">
+            <RangeField Label="@L["home.height"]" @bind-Value="heightFactor" Min="0.2" Max="4" Step="0.02" Unit="×" />
+            <RangeField Label="@L["home.bench.height"]" @bind-Value="beamHeight" Min="-2" Max="2" Step="0.01" Scale="mmPerUnit" Unit="mm" Decimals="1" />
+            <RangeField Label="@L["home.rays"]" @bind-Value="rayCountAsDouble" Min="1" Max="241" Step="2" />
+            <label class="control">
+                <span>@L["home.medium"]</span>
+                <select @bind="medium">
+                    @foreach ((string key, string label, double index) in Media)
+                    {
+                        <option value="@key">@(L.IsRussian ? label.Split('|')[1] : label.Split('|')[0]), n @F(index, 4)</option>
+                    }
+                </select>
+            </label>
+            <RangeField Label="@(L["home.temperature"] + (prismGlass.Thermal is null ? " (" + L["home.thermal.none"] + ")" : ""))" @bind-Value="temperature" Min="-100" Max="300" Step="1" Unit="°C" />
+            <RangeField Label="@L["home.scale"]" @bind-Value="mmPerUnit" Min="1" Max="500" Step="1" Unit="mm" />
+            <RangeField Label="@L["home.zoom"]" @bind-Value="zoom" Min="0.25" Max="40" Step="0.05" Unit="×" />
+            <label class="check"><input type="checkbox" @bind="reflections" /> @L["home.reflections"]</label>
+        </div>
+    </details>
+    <p class="bench-note">@L["home.bench.note"]</p>
+</div>
+
+<h2>@L["calc.h"]</h2>
+<p class="lede">@L["calc.lede"]</p>
+<OpticsCalculator />
+
+@code {
+    private static readonly (string Key, string Label)[] PrismChoices =
+    [
+        ("schott/N-BK7", "SCHOTT N-BK7, νd 64"),
+        ("schott/N-FK58", "SCHOTT N-FK58, νd 91"),
+        ("schott/N-LASF9", "SCHOTT N-LASF9, νd 32"),
+        ("schott/SF57", "SCHOTT SF57, νd 24"),
+        ("schott/N-SF66", "SCHOTT N-SF66, νd 21"),
+        ("ohara/S-FPL53", "OHARA S-FPL53, νd 95"),
+        ("hoya/TAFD55", "HOYA TAFD55, νd 27"),
+        ("cdgm/H-ZF88", "CDGM H-ZF88, νd 20"),
+    ];
+
+    // Surrounding media at the d line, 20 °C: gases from Ciddor/Edlén-type data, liquids from standard tables.
+    private static readonly (string Key, string Label, double Index)[] Media =
+    [
+        ("vacuum", "vacuum|вакуум", 1.0),
+        ("air", "air|воздух", 1.000273),
+        ("helium", "helium|гелий", 1.000035),
+        ("co2", "carbon dioxide|углекислый газ", 1.000449),
+        ("water", "water|вода", 1.3330),
+        ("ethanol", "ethanol|этанол", 1.3614),
+        ("glycerol", "glycerol|глицерин", 1.4730),
+        ("benzene", "benzene|бензол", 1.5011),
+        ("oil", "immersion oil|иммерсионное масло", 1.5150),
+        ("cs2", "carbon disulfide|сероуглерод", 1.6276),
+    ];
+
+    private string prismKeyValue = "schott/N-BK7";
+    private string shapeValue = "biconvex";
+    private bool editingValue;
+
+    private bool editing
+    {
+        get => editingValue;
+        set
+        {
+            editingValue = value;
+            if (value && vertices.Length > 16)
+            {
+                // A lens outline has dozens of points; a dozen handles is what a hand can work with.
+                OnVerticesChanged(Decimate(vertices, 12));
+            }
+        }
+    }
+
+    private static Vector2[] Decimate(Vector2[] source, int target)
+    {
+        List<Vector2> list = [.. source];
+        while (list.Count > target)
+        {
+            list.RemoveAt(LeastImportant(list));
+        }
+
+        return [.. list];
+    }
+
+    // The vertex whose removal moves the outline least: closest to the line between its neighbours.
+    private static int LeastImportant(List<Vector2> list)
+    {
+        int index = 0;
+        float best = float.PositiveInfinity;
+        for (int i = 0; i < list.Count; i++)
+        {
+            Vector2 a = list[(i + list.Count - 1) % list.Count], b = list[(i + 1) % list.Count], p = list[i];
+            Vector2 ab = b - a;
+            float length = ab.Length();
+            float distance = length < 1e-6f ? 0f : MathF.Abs((p.X - a.X) * ab.Y - (p.Y - a.Y) * ab.X) / length;
+            if (distance < best)
+            {
+                best = distance;
+                index = i;
+            }
+        }
+
+        return index;
+    }
+    private int sidesValue = 3;
+    private double rotationValue = 0;
+    private double leftCurvatureValue = 1.3, rightCurvatureValue = 1.3, lensThicknessValue = 0.16;
+    private double plateTiltValue = 20, plateThicknessValue = 0.22;
+    private double sizeFactorValue = 1, heightFactorValue = 1;
+    private double beamAngle = 0;
+    private double beamHeight = 0.25;
+    private int rayCount = 61;
+    private double zoom = 1;
+    private double mmPerUnit = 25;
+    private string medium = "air";
+    private double temperature = 20;
+    private bool reflections = true;
+    private Glass prismGlass = GlassCatalog.Find("schott", "N-BK7")!;
+    private double minDeviation = double.NaN, maxDeviation = double.NaN, energyOut = double.NaN, energyAbsorbed = double.NaN, energyReflected = double.NaN;
+    private Vector2[] vertices = [];
+    private Vector2[] baseVertices = [];
+
+    private double MediumIndexValue => Media.First(m => m.Key == medium).Index;
+
+    private string prismKey
+    {
+        get => prismKeyValue;
+        set
+        {
+            prismKeyValue = value;
+            int slash = value.IndexOf('/');
+            prismGlass = GlassCatalog.Find(value[..slash], value[(slash + 1)..]) ?? prismGlass;
+        }
+    }
+
+    private string shape { get => shapeValue; set { shapeValue = value; ApplyPreset(); } }
+    private int sides { get => sidesValue; set { sidesValue = value; Rebuild(); } }
+    private double sidesValueAsDouble { get => sidesValue; set => sides = (int)Math.Round(value); }
+    private double rayCountAsDouble { get => rayCount; set => rayCount = (int)Math.Round(value); }
+    private double rotation { get => rotationValue; set { rotationValue = value; Rebuild(); } }
+    private double leftCurvature { get => leftCurvatureValue; set { leftCurvatureValue = value; Rebuild(); } }
+    private double rightCurvature { get => rightCurvatureValue; set { rightCurvatureValue = value; Rebuild(); } }
+    private double lensThickness { get => lensThicknessValue; set { lensThicknessValue = value; Rebuild(); } }
+    private double plateTilt { get => plateTiltValue; set { plateTiltValue = value; Rebuild(); } }
+    private double plateThickness { get => plateThicknessValue; set { plateThicknessValue = value; Rebuild(); } }
+    private double sizeFactor { get => sizeFactorValue; set { sizeFactorValue = value; Rebuild(); } }
+    private double heightFactor { get => heightFactorValue; set { heightFactorValue = value; Rebuild(); } }
+
+    private double baseHeightMm() => 0.9 * mmPerUnit;
+
+    private void ApplyPreset()
+    {
+        switch (shapeValue)
+        {
+            case "biconvex": leftCurvatureValue = 1.3; rightCurvatureValue = 1.3; lensThicknessValue = 0.16; break;
+            case "planoconvex": leftCurvatureValue = 0; rightCurvatureValue = 1.6; lensThicknessValue = 0.14; break;
+            case "biconcave": leftCurvatureValue = -1.3; rightCurvatureValue = -1.3; lensThicknessValue = 0.1; break;
+            case "meniscus": leftCurvatureValue = 1.8; rightCurvatureValue = -1.1; lensThicknessValue = 0.12; break;
+        }
+
+        Rebuild();
+    }
+
+    private void Rebuild()
+    {
+        if (shapeValue == "custom")
+        {
+            if (baseVertices.Length == 0 && !drawing)
+            {
+                baseVertices = BenchShapes.Polygon(4, 0.5f, 45f).Select(v => v + new Vector2(0.5f, 0.35f)).ToArray();
+            }
+
+            vertices = BenchShapes.Scaled(baseVertices, (float)sizeFactorValue, (float)heightFactorValue);
+            return;
+        }
+
+        baseVertices = shapeValue switch
+        {
+            "polygon" => BenchShapes.Polygon(sidesValue, 0.55f, (float)rotationValue),
+            "rightangle" => BenchShapes.RightAnglePrism(),
+            "plate" => BenchShapes.Plate((float)plateTiltValue, (float)plateThicknessValue),
+            _ => BenchShapes.Lens((float)leftCurvatureValue, (float)rightCurvatureValue, (float)lensThicknessValue, 0.9f),
+        };
+        // Centre the element on the bench, then apply size and height; the beam passes at y ≈ 0.25 by default.
+        Vector2[] placed = BenchShapes.Scaled(baseVertices, (float)sizeFactorValue, (float)heightFactorValue);
+        vertices = placed.Select(v => v + new Vector2(0.5f, 0.35f)).ToArray();
+    }
+
+    // A hand-edited outline becomes the new base: size and height start again from ×1.
+    private void OnVerticesChanged(Vector2[] moved)
+    {
+        vertices = moved;
+        baseVertices = moved;
+        sizeFactorValue = 1;
+        heightFactorValue = 1;
+        shapeValue = "custom";
+    }
+
+    private void AddCorner()
+    {
+        int longest = 0;
+        float best = -1;
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            float length = Vector2.Distance(vertices[i], vertices[(i + 1) % vertices.Length]);
+            if (length > best)
+            {
+                best = length;
+                longest = i;
+            }
+        }
+
+        List<Vector2> list = [.. vertices];
+        list.Insert(longest + 1, (vertices[longest] + vertices[(longest + 1) % vertices.Length]) / 2f);
+        OnVerticesChanged([.. list]);
+    }
+
+    private void RemoveCorner()
+    {
+        if (vertices.Length > 3)
+        {
+            List<Vector2> list = [.. vertices];
+            list.RemoveAt(LeastImportant(list));
+            OnVerticesChanged([.. list]);
+        }
+    }
+
+    private void ResetShape()
+    {
+        drawing = false;
+        baseVertices = [];
+        sizeFactorValue = 1;
+        heightFactorValue = 1;
+        shapeValue = "biconvex";
+        ApplyPreset();
+    }
+
+    protected override void OnInitialized()
+    {
+        string wanted = SiteInfo.ReadGlassQuery(Navigation, "");
+        if (wanted.Length > 0)
+        {
+            prismKey = wanted;
+        }
+
+        ApplyPreset();
+    }
+
+    private bool selfIntersecting;
+    private bool drawing;
+    private double indexD = double.NaN, indexShift = double.NaN;
+
+    private void StartDrawing()
+    {
+        vertices = [];
+        baseVertices = [];
+        shapeValue = "custom";
+        sizeFactorValue = 1;
+        heightFactorValue = 1;
+        editingValue = true;
+        drawing = true;
+    }
+
+    private void FinishDrawing()
+    {
+        drawing = false;
+        if (vertices.Length < 3)
+        {
+            ResetShape();
+        }
+    }
+
+    private Task OnZoomChanged(double value)
+    {
+        zoom = value;
+        return Task.CompletedTask;
+    }
+
+    private void OnTraced(PrismScene scene)
+    {
+        selfIntersecting = scene.SelfIntersecting;
+        indexD = scene.IndexD;
+        indexShift = scene.IndexShiftD;
+        minDeviation = scene.MinimumDeviation;
+        maxDeviation = scene.MaximumDeviation;
+        energyOut = scene.EnergyOut;
+        energyAbsorbed = scene.EnergyAbsorbed;
+        energyReflected = scene.EnergyReflectedAtEntry;
+        StateHasChanged();
+    }
+
+    private static string F(double v, int decimals) => SiteInfo.Number(v, decimals);
+}

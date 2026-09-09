@@ -1,0 +1,21 @@
+@* The visible spectrum with the brightness of each wavelength set by a transmittance function: what the glass lets through. *@
+
+<svg class="spectrum" viewBox="0 0 @Steps 60" preserveAspectRatio="none" role="img" aria-label="@Label">
+    @for (int i = 0; i < Steps; i++)
+    {
+        double wavelength = 380 + 400.0 * i / (Steps - 1);
+        double t = Transmittance?.Invoke(wavelength) ?? 1;
+        (double r, double g, double b) = GlassColour.Monochromatic(wavelength);
+        <rect x="@i" y="0" width="1.02" height="60" fill="@Rgb(r * t, g * t, b * t)" />
+    }
+</svg>
+<div class="spectrum-axis"><span>380 nm</span><span>480</span><span>580</span><span>680</span><span>780 nm</span></div>
+
+@code {
+    [Parameter] public Func<double, double>? Transmittance { get; set; }
+    [Parameter] public string Label { get; set; } = "spectrum";
+    [Parameter] public int Steps { get; set; } = 200;
+
+    private static string Rgb(double r, double g, double b) =>
+        $"rgb({(int)Math.Round(Math.Clamp(r, 0, 1) * 255)},{(int)Math.Round(Math.Clamp(g, 0, 1) * 255)},{(int)Math.Round(Math.Clamp(b, 0, 1) * 255)})";
+}

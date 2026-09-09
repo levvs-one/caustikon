@@ -1,0 +1,29 @@
+@* Small flags drawn as SVG with rounded corners; no emoji, so they look the same on every platform. *@
+@if (Code == "ru")
+{
+    <svg class="flag" viewBox="0 0 24 16" aria-hidden="true">
+        <clipPath id="flag-round-ru"><rect width="24" height="16" rx="3" /></clipPath>
+        <g clip-path="url(#flag-round-ru)">
+            <rect width="24" height="16" fill="#ffffff" />
+            <rect y="5.33" width="24" height="5.34" fill="#0039a6" />
+            <rect y="10.67" width="24" height="5.33" fill="#d52b1e" />
+        </g>
+    </svg>
+}
+else
+{
+    <svg class="flag" viewBox="0 0 24 16" aria-hidden="true">
+        <clipPath id="flag-round-en"><rect width="24" height="16" rx="3" /></clipPath>
+        <g clip-path="url(#flag-round-en)">
+            <rect width="24" height="16" fill="#012169" />
+            <path d="M0 0l24 16M24 0L0 16" stroke="#ffffff" stroke-width="3.2" />
+            <path d="M0 0l24 16M24 0L0 16" stroke="#c8102e" stroke-width="1.2" />
+            <path d="M12 0v16M0 8h24" stroke="#ffffff" stroke-width="5" />
+            <path d="M12 0v16M0 8h24" stroke="#c8102e" stroke-width="3" />
+        </g>
+    </svg>
+}
+
+@code {
+    [Parameter] public string Code { get; set; } = "en";
+}

@@ -6,3 +6,6 @@ BenchmarkDotNet.Artifacts/
 *.suo
 .vs/
 .idea/
+
+# Local tool configuration
+.claude/

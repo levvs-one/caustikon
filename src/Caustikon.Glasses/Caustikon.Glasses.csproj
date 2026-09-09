@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Caustikon.Glasses</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>levvs-one</Authors>
+    <Description>Optical glass catalog for Caustikon: 1600+ manufacturer glasses with dispersion, absorption and thermal data, each entry traceable to its source.</Description>
+    <PackageTags>optics;glass;catalog;dispersion;sellmeier;schott;ohara;hoya;cdgm</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/levvs-one/caustikon</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/levvs-one/caustikon</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Caustikon/Caustikon.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="../../DATA-LICENSE.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>

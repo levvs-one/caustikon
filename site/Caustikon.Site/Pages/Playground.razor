@@ -1,0 +1,322 @@
+@page "/playground"
+@using System.Numerics
+@inherits LocalizedComponent
+
+<PageTitle>@L["play.title"]</PageTitle>
+
+<h1>@L["play.h1"]</h1>
+<p class="lede">@L["play.lede"]</p>
+
+<div class="controls">
+    <label class="control">
+        <span>@L["play.find"]</span>
+        <input type="search" placeholder="@L["play.find.hint"]" @bind="filter" @bind:event="oninput" />
+    </label>
+    <label class="control">
+        <span>@L["play.glass"]</span>
+        <select @bind="selectedKey">
+            @foreach (Glass g in Choices)
+            {
+                <option value="@Key(g)">@g.VendorDisplayName @g.Name (@Printed(g.CatalogIndexD, 4) / @Printed(g.CatalogAbbeD, 1))</option>
+            }
+        </select>
+    </label>
+    <label class="control">
+        <span>@L["play.direction"]</span>
+        <select @bind="glassToAir">
+            <option value="false">@L["play.airglass"]</option>
+            <option value="true">@L["play.glassair"]</option>
+        </select>
+    </label>
+    <label class="control">
+        <span class="range-label"><span>@L["play.angle"]</span><output>@angle°</output></span>
+        <input type="range" min="0" max="89.9" step="0.1" @bind="angle" @bind:event="oninput" />
+    </label>
+    <label class="control">
+        <span class="range-label"><span>@L["play.thickness"]</span><output>@thickness mm</output></span>
+        <input type="range" min="1" max="100" step="1" @bind="thickness" @bind:event="oninput" />
+    </label>
+</div>
+
+@if (glass is { } g0)
+{
+    <h2>@g0.VendorDisplayName <a href="@Catalog.GlassLink(g0)">@g0.Name</a> @T("play.at", angle, glassToAir ? L["play.fromInside"] : L["play.fromAir"])</h2>
+
+    <div class="table-scroll">
+        <table class="compact">
+            <thead>
+                <tr><th>@L["glass.line"]</th><th class="num">λ, nm</th><th class="num">n</th><th class="num">@L["play.col.refracted"]</th><th class="num">R<sub>s</sub></th><th class="num">R<sub>p</sub></th><th class="num">R</th><th class="num">T</th></tr>
+            </thead>
+            <tbody>
+                @foreach (LineResult r in lineResults)
+                {
+                    <tr>
+                        <td>@r.Label</td>
+                        <td class="num">@SiteInfo.Number(r.Wavelength, 1)</td>
+                        <td class="num">@SiteInfo.Number(r.Index, 5)</td>
+                        <td class="num">@Outcome(r)</td>
+                        <td class="num">@SiteInfo.Number(r.Rs, 4)</td>
+                        <td class="num">@SiteInfo.Number(r.Rp, 4)</td>
+                        <td class="num">@SiteInfo.Number(r.R, 4)</td>
+                        <td class="num">@SiteInfo.Number(1 - r.R, 4)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="muted">@H("play.note", SiteInfo.Number(spread, 3))</p>
+
+    <div class="columns">
+        <div class="panel">
+            <LineChart Series="reflectanceSeries" Title="@L["play.chart.r"]" XLabel="@L["play.chart.r.x"]" YLabel="@L["play.chart.r.y"]" YMin="0" YMax="1" Markers="angleMarker" />
+        </div>
+        <div class="panel">
+            <LineChart Series="angleSeries" Title="@L["play.chart.a"]" XLabel="@L["play.chart.r.x"]" YLabel="@L["play.chart.a.y"]" YMin="0" YMax="90" Markers="angleMarker" />
+        </div>
+    </div>
+    @if (criticalAngle is { } critical)
+    {
+        <p class="muted">@T("play.critical.note", SiteInfo.Number(critical, 2))</p>
+    }
+
+    @if (slabColour is { } c)
+    {
+        <h2>@T("play.slab.h", thickness)</h2>
+        <div class="columns">
+            <div>
+                <SpectrumStrip Transmittance="SlabTransmittance" Label="@T("spectrum.slab", thickness)" />
+                <div class="swatch-block" style="background: @c.Hex; margin-top: 0.8rem"></div>
+                <dl class="kv">
+                    <dt>@L["play.slab.colour"]</dt><dd>@c.Hex, rgb(@c.Rgb8.Red, @c.Rgb8.Green, @c.Rgb8.Blue)</dd>
+                    <dt>@L["play.slab.y"]</dt><dd>@SiteInfo.Number(c.Y, 4)</dd>
+                    <dt>@L["play.slab.path"]</dt><dd>@SiteInfo.Number(pathLength, 2) mm</dd>
+                </dl>
+            </div>
+            <div>
+                <p>@T("play.slab.text", angle, SiteInfo.Number((1 - entryPass) * 100, 2), SiteInfo.Number(pathLength, 2))</p>
+                @if (c.CoverageMinimumNanometers > 380 || c.CoverageMaximumNanometers < 780)
+                {
+                    <p class="notice">@T("play.slab.coverage", SiteInfo.Compact(c.CoverageMinimumNanometers), SiteInfo.Compact(c.CoverageMaximumNanometers))</p>
+                }
+            </div>
+        </div>
+    }
+    else if (g0.Extinction is null)
+    {
+        <p class="notice">@L["play.slab.nok"]</p>
+    }
+}
+
+@code {
+    private sealed record LineResult(string Label, double Wavelength, double Index, RefractionKind Kind, double ExitDegrees, double Rs, double Rp, double R);
+
+    private static readonly (string Label, double Wavelength)[] Lines =
+    [
+        ("g", FraunhoferLines.GNanometers), ("F", FraunhoferLines.FNanometers), ("e", FraunhoferLines.ENanometers),
+        ("d", FraunhoferLines.DNanometers), ("C", FraunhoferLines.CNanometers), ("r", FraunhoferLines.RNanometers),
+    ];
+
+    private string filter = "";
+    private string selectedKeyValue = "schott/N-BK7";
+    private bool glassToAirValue;
+    private double angleValue = 45;
+    private double thicknessValue = 10;
+
+    private Glass? glass;
+    private List<LineResult> lineResults = [];
+    private List<ChartSeries> reflectanceSeries = [];
+    private List<ChartSeries> angleSeries = [];
+    private double[] angleMarker = [45];
+    private double? criticalAngle;
+    private double spread;
+    private TransmittedColour? slabColour;
+    private double pathLength;
+    private double entryPass = 1;
+    private double[] slabSpectrum = new double[471];
+
+    private string selectedKey { get => selectedKeyValue; set { selectedKeyValue = value; Recompute(); } }
+    private bool glassToAir { get => glassToAirValue; set { glassToAirValue = value; Recompute(); } }
+    private double angle { get => angleValue; set { angleValue = value; Recompute(); } }
+    private double thickness { get => thicknessValue; set { thicknessValue = value; RecomputeSlab(); } }
+
+    private IEnumerable<Glass> Choices
+    {
+        get
+        {
+            string needle = GlassCatalog.NormalizeName(filter);
+            IEnumerable<Glass> all = GlassCatalog.All.Where(g => g.CatalogIndexD is not null);
+            if (needle.Length > 0)
+            {
+                all = all.Where(g => GlassCatalog.NormalizeName(g.Name).Contains(needle, StringComparison.Ordinal) || g.VendorDisplayName.Contains(filter, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (glass is not null && !all.Contains(glass))
+            {
+                all = all.Prepend(glass);
+            }
+
+            return all;
+        }
+    }
+
+    protected override void OnInitialized() => Recompute();
+
+    private static string Key(Glass g) => g.Vendor + "/" + g.Name;
+
+    private string Outcome(LineResult r) => r.Kind switch
+    {
+        RefractionKind.Refracted => SiteInfo.Number(r.ExitDegrees, 3) + "°",
+        RefractionKind.CriticalAngle => L["play.critical"],
+        RefractionKind.TotalInternalReflection => L["play.tir"],
+        _ => L["play.invalid"],
+    };
+
+    private void Recompute()
+    {
+        int slash = selectedKeyValue.IndexOf('/');
+        glass = slash > 0 ? GlassCatalog.Find(selectedKeyValue[..slash], selectedKeyValue[(slash + 1)..]) : null;
+        if (glass is null)
+        {
+            return;
+        }
+
+        angleMarker = [angleValue];
+        lineResults = [];
+        double? minExit = null, maxExit = null;
+        foreach ((string label, double wavelength) in Lines)
+        {
+            if (glass.IndexAt(wavelength, out double n) != DispersionStatus.Success)
+            {
+                continue;
+            }
+
+            (float nIn, float nOut) = glassToAirValue ? ((float)n, 1f) : (1f, (float)n);
+            (RefractionKind kind, double exitDegrees) = Refract(angleValue, nIn, nOut);
+            FresnelPower power = Dielectric.Fresnel((float)Math.Cos(angleValue * Math.PI / 180d), nIn, nOut);
+            if (kind == RefractionKind.Refracted && wavelength >= FraunhoferLines.FNanometers && wavelength <= FraunhoferLines.CNanometers)
+            {
+                minExit = Math.Min(minExit ?? exitDegrees, exitDegrees);
+                maxExit = Math.Max(maxExit ?? exitDegrees, exitDegrees);
+            }
+
+            lineResults.Add(new LineResult(label, wavelength, n, kind, exitDegrees, power.S, power.P, power.Unpolarized));
+        }
+
+        spread = minExit is { } lo && maxExit is { } hi ? hi - lo : double.NaN;
+
+        glass.IndexAt(FraunhoferLines.DNanometers, out double nd);
+        (float dIn, float dOut) = glassToAirValue ? ((float)nd, 1f) : (1f, (float)nd);
+        criticalAngle = glassToAirValue && nd > 1 ? Math.Asin(1d / nd) * 180d / Math.PI : null;
+
+        List<(double, double)> rs = [], rp = [], ru = [];
+        for (int i = 0; i <= 180; i++)
+        {
+            double a = i * 0.5d;
+            FresnelPower p = Dielectric.Fresnel((float)Math.Cos(a * Math.PI / 180d), dIn, dOut);
+            rs.Add((a, p.S));
+            rp.Add((a, p.P));
+            ru.Add((a, p.Unpolarized));
+        }
+
+        reflectanceSeries = [new ChartSeries("s", rs, "var(--chart-1)"), new ChartSeries("p", rp, "var(--chart-2)"), new ChartSeries(L["play.unpolarized"], ru, "var(--chart-3)")];
+
+        angleSeries = [];
+        string[] colours = ["var(--chart-4)", "var(--chart-3)", "var(--chart-2)"];
+        int c = 0;
+        foreach ((string label, double wavelength) in new[] { ("F", FraunhoferLines.FNanometers), ("d", FraunhoferLines.DNanometers), ("C", FraunhoferLines.CNanometers) })
+        {
+            if (glass.IndexAt(wavelength, out double n) != DispersionStatus.Success)
+            {
+                continue;
+            }
+
+            (float nIn, float nOut) = glassToAirValue ? ((float)n, 1f) : (1f, (float)n);
+            List<(double, double)> points = [];
+            for (int i = 0; i <= 180; i++)
+            {
+                double a = i * 0.5d;
+                (RefractionKind kind, double exit) = Refract(a, nIn, nOut);
+                points.Add((a, kind == RefractionKind.Refracted ? exit : double.NaN));
+            }
+
+            angleSeries.Add(new ChartSeries(label, points, colours[c++]));
+        }
+
+        RecomputeSlab();
+    }
+
+    private double SlabTransmittance(double wavelength)
+    {
+        int i = (int)Math.Round(wavelength) - 360;
+        return i >= 0 && i < slabSpectrum.Length ? slabSpectrum[i] : 0;
+    }
+
+    private void RecomputeSlab()
+    {
+        slabColour = null;
+        if (glass?.Extinction is not { } extinction)
+        {
+            return;
+        }
+
+        // Air → slab → air regardless of the direction chosen above: a slab always has two faces.
+        glass.IndexAt(FraunhoferLines.DNanometers, out double nd);
+        (RefractionKind kindD, double insideDegrees) = Refract(angleValue, 1f, (float)nd);
+        if (kindD != RefractionKind.Refracted)
+        {
+            return;
+        }
+
+        pathLength = thicknessValue / Math.Cos(insideDegrees * Math.PI / 180d);
+        double cosIncident = Math.Cos(angleValue * Math.PI / 180d);
+        double[] transmittance = new double[471];
+        double coverageMin = Math.Max(extinction.MinimumWavelengthNanometers, 360);
+        double coverageMax = Math.Min(extinction.MaximumWavelengthNanometers, 830);
+        for (int i = 0; i < transmittance.Length; i++)
+        {
+            double wavelength = 360 + i;
+            double clamped = Math.Clamp(wavelength, extinction.MinimumWavelengthNanometers, extinction.MaximumWavelengthNanometers);
+            double n = IndexOrNearest(glass, wavelength);
+            (RefractionKind kind, double inside) = Refract(angleValue, 1f, (float)n);
+            double path = kind == RefractionKind.Refracted ? thicknessValue / Math.Cos(inside * Math.PI / 180d) : pathLength;
+            extinction.InternalTransmittance(clamped, path, out double bulk);
+            FresnelPower entry = Dielectric.Fresnel((float)cosIncident, 1f, (float)n);
+            double cosInside = Math.Cos(inside * Math.PI / 180d);
+            FresnelPower exit = Dielectric.Fresnel((float)cosInside, (float)n, 1f);
+            // Track s and p separately through both faces; light is partially polarized after the first one.
+            double s = (1 - entry.S) * bulk * (1 - exit.S);
+            double p = (1 - entry.P) * bulk * (1 - exit.P);
+            transmittance[i] = Math.Clamp(0.5 * (s + p), 0, 1);
+            if (wavelength == 588)
+            {
+                entryPass = 1 - entry.Unpolarized;
+            }
+        }
+
+        slabSpectrum = transmittance;
+        TransmittedColour colour = GlassColour.FromTransmittance(transmittance);
+        slabColour = colour with { CoverageMinimumNanometers = coverageMin, CoverageMaximumNanometers = coverageMax };
+    }
+
+    private static double IndexOrNearest(Glass glass, double wavelength)
+    {
+        if (glass.IndexAt(wavelength, out double n) == DispersionStatus.Success)
+        {
+            return n;
+        }
+
+        double clamped = Math.Clamp(wavelength, glass.Model.MinimumWavelengthNanometers, glass.Model.MaximumWavelengthNanometers);
+        return glass.IndexAt(clamped, out n) == DispersionStatus.Success ? n : 1.5;
+    }
+
+    private static (RefractionKind Kind, double ExitDegrees) Refract(double incidenceDegrees, float nIn, float nOut)
+    {
+        double radians = incidenceDegrees * Math.PI / 180d;
+        Vector3 incident = new((float)Math.Sin(radians), -(float)Math.Cos(radians), 0f);
+        RefractionKind kind = Dielectric.RefractUnit(incident, Vector3.UnitY, nIn, nOut, out Vector3 transmitted);
+        double exit = kind == RefractionKind.Refracted ? Math.Atan2(Math.Abs(transmitted.X), Math.Abs(transmitted.Y)) * 180d / Math.PI : double.NaN;
+        return (kind, exit);
+    }
+
+    private static string Printed(double? value, int decimals) => value is { } v ? SiteInfo.Number(v, decimals) : "—";
+}
