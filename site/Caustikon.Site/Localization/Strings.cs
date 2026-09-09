@@ -259,6 +259,7 @@ public static class Strings
         ["render.faces"] = ("Prism faces", "Граней призмы"),
         ["render.size"] = ("Size", "Размер"),
         ["render.backdrop"] = ("Backdrop", "Фон"),
+        ["render.backdrop.forest"] = ("forest", "лес"),
         ["render.backdrop.checker"] = ("checker", "клетка"),
         ["render.backdrop.stripes"] = ("colour bands", "цветные полосы"),
         ["render.backdrop.grid"] = ("millimetre paper", "миллиметровка"),

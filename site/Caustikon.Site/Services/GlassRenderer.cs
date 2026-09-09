@@ -12,6 +12,9 @@ public enum Backdrop
     Grid,
     Paper,
     Night,
+
+    /// <summary>A forest around the solid: on the GPU a traced panorama of spruces; the CPU fallback shows its floor and sky.</summary>
+    Forest,
 }
 
 /// <summary>
@@ -526,6 +529,10 @@ public sealed class GlassRenderer
 
             case Backdrop.Night:
                 return new Vector3(0.04f, 0.045f, 0.05f);
+
+            case Backdrop.Forest:
+                // The forest floor's mean moss; the GPU renderer has the wood itself.
+                return new Vector3(0.24f, 0.29f, 0.11f);
 
             default:
             {

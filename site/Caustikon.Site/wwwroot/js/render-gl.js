@@ -133,7 +133,28 @@ uniform float uTanHalf;
 
 ${SHAPE_GLSL}
 
+uniform sampler2D uPanorama;   // the forest around the solid, by direction
+uniform bool uPanoramaReady;
+
+float hashF(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+float noiseF(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hashF(i), hashF(i + vec2(1.0, 0.0)), f.x), mix(hashF(i + vec2(0.0, 1.0)), hashF(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbmF(vec2 p) { return 0.5 * noiseF(p) + 0.25 * noiseF(p * 2.03) + 0.125 * noiseF(p * 4.1) + 0.0625 * noiseF(p * 8.3); }
+
+vec3 panorama(vec3 d) {
+    vec2 uv = vec2(atan(d.z, d.x) / 6.2831853 + 0.5, asin(clamp(d.y, -1.0, 1.0)) / 3.14159265 + 0.5);
+    return texture(uPanorama, uv).rgb;
+}
+
 vec3 ground(float x, float z) {
+    if (uBackdrop == 5) {
+        // The forest floor, as in the panorama: moss and needles in patches, in millimetres.
+        float n = fbmF(vec2(x, z) * uMmPerUnit * 0.0006);
+        return mix(vec3(0.16, 0.22, 0.08), vec3(0.32, 0.36, 0.14), n);
+    }
     // Half a tile of offset puts a tile centre, not a tile edge, under the solid: an edge there is magnified into a seam.
     float u = x / uTile + 0.5, v = z / uTile + 0.5;
     if (uBackdrop == 1) {
@@ -170,8 +191,30 @@ vec3 sky(vec3 direction) {
     return s;
 }
 
-// The ground at y = -1 with its pattern, otherwise the sky with the lamp.
+// The ground at y = -1 with its pattern, otherwise the sky with the lamp. In the forest the surroundings come from
+// the panorama, with the sun's disc on top and the near floor lit as the table is; the far floor is the panorama's.
 vec3 environment(vec3 origin, vec3 direction) {
+    if (uBackdrop == 5 && uPanoramaReady) {
+        vec3 around = panorama(direction);
+        if (direction.y >= -1e-4) {
+            return around + vec3(1.0, 0.97, 0.92) * uKeyIntensity * (2.0 * softbox(direction, uKeyDirection, 0.06) + 8.0 * softbox(direction, uKeyDirection, 0.012));
+        }
+        float t = (-1.0 - origin.y) / direction.y;
+        vec3 hit = origin + direction * t;
+        float distance = length(hit.xz);
+        float near = 1200.0 / uMmPerUnit;
+        if (distance > 2.0 * near) return around;
+        vec3 lamp = vec3(1.0);
+        if (uCausticReady && abs(hit.x) < uRegion && abs(hit.z) < uRegion) {
+            vec2 uv = hit.xz / uRegion * 0.5 + 0.5;
+            vec2 h = vec2(0.5 / 512.0);
+            lamp = (texture(uCaustic, uv + vec2(-h.x, -h.y)).rgb + texture(uCaustic, uv + vec2(h.x, -h.y)).rgb
+                  + texture(uCaustic, uv + vec2(-h.x, h.y)).rgb + texture(uCaustic, uv + vec2(h.x, h.y)).rgb) * 0.25 * uCausticNorm;
+        }
+        float contact = 1.0 - 0.35 * (1.0 - smoothstep(0.1 * uExtent, 1.6 * uExtent, distance));
+        vec3 lit = vec3(uAmbient * 0.6 * contact) + uKeyIntensity * 0.9 * max(0.0, uKeyDirection.y) * lamp;
+        return mix(ground(hit.x, hit.z) * lit, around, smoothstep(near, 2.0 * near, distance));
+    }
     if (direction.y < -1e-4) {
         float t = (-1.0 - origin.y) / direction.y;
         vec3 hit = origin + direction * t;
@@ -302,7 +345,9 @@ void main() {
     vec3 a = normalize(cross(d, abs(d.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
     vec3 b = cross(d, a);
     vec2 u = ((vec2(float(ix), float(iy)) + 0.5 + uJitter) / float(uGrid) * 2.0 - 1.0) * uEmitter;
-    vec3 origin = -d * 6.0 + a * u.x + b * u.y;
+    // Start above the table's centre, not the solid's: the beam lands on y = -1, and from the origin it would land
+    // shifted by the lamp's slant, leaving the corner of the map nearest the lamp unlit.
+    vec3 origin = vec3(0.0, -1.0, 0.0) - d * 6.0 + a * u.x + b * u.y;
     vec3 dir = d;
     float n = channel == 0 ? uIor3.x : (channel == 1 ? uIor3.y : uIor3.z);
     float alpha = channel == 0 ? uAlpha3.x : (channel == 1 ? uAlpha3.y : uAlpha3.z);
@@ -372,6 +417,130 @@ void main() {
     // Each still frame takes four jittered taps; sixteen frames make sixty-four samples per pixel.
     const STILL_SAMPLES = 24;
     const narrowScreen = () => Math.min(window.innerWidth, document.documentElement.clientWidth) < 700;
+
+    // The forest: a panorama traced once from where the solid stands, spruces on the ground around it, and looked
+    // up by direction wherever a ray leaves the scene. The trees are in millimetres and scaled to the solid's units,
+    // so a bigger solid stands in the same wood, not a smaller one. Lit by the same sun and sky as the solid.
+    const FOREST_FS = `#version 300 es
+precision highp float;
+out vec4 outColour;
+uniform vec3 uKeyDirection;    // towards the sun
+uniform float uKeyIntensity;
+uniform float uAmbient;
+uniform vec2 uSize;
+uniform float uMmPerUnit;
+
+float hash1(float n) { return fract(sin(n) * 43758.5453123); }
+float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+float noise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), f.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p) { return 0.5 * noise(p) + 0.25 * noise(p * 2.03) + 0.125 * noise(p * 4.1) + 0.0625 * noise(p * 8.3); }
+
+// A clear sky without its sun: haze at the horizon, blue overhead.
+vec3 daylight(vec3 d) {
+    float t = clamp(d.y, 0.0, 1.0);
+    return mix(vec3(0.78, 0.84, 0.92), vec3(0.24, 0.42, 0.82), pow(t, 0.6)) * uAmbient;
+}
+
+struct Hit { float t; vec3 n; };
+
+bool cylinder(vec3 o, vec3 d, vec2 c, float r, float y0, float y1, inout Hit h) {
+    vec2 oc = o.xz - c;
+    float a = dot(d.xz, d.xz);
+    if (a < 1e-9) return false;
+    float b = dot(oc, d.xz), cc = dot(oc, oc) - r * r;
+    float disc = b * b - a * cc;
+    if (disc < 0.0) return false;
+    float t = (-b - sqrt(disc)) / a;
+    if (t <= 0.0 || t >= h.t) return false;
+    float y = o.y + d.y * t;
+    if (y < y0 || y > y1) return false;
+    vec3 p = o + d * t;
+    h.t = t;
+    h.n = normalize(vec3(p.x - c.x, 0.0, p.z - c.y));
+    return true;
+}
+
+// A cone of needles: apex at apexY over c, radius k per unit of height below the apex, down to baseY.
+bool cone(vec3 o, vec3 d, vec2 c, float apexY, float k, float baseY, inout Hit h) {
+    vec3 co = vec3(o.x - c.x, o.y - apexY, o.z - c.y);
+    float k2 = k * k;
+    float a = d.x * d.x + d.z * d.z - k2 * d.y * d.y;
+    float b = co.x * d.x + co.z * d.z - k2 * co.y * d.y;
+    float cc = co.x * co.x + co.z * co.z - k2 * co.y * co.y;
+    if (abs(a) < 1e-9) return false;
+    float disc = b * b - a * cc;
+    if (disc < 0.0) return false;
+    float s = sqrt(disc);
+    float t1 = (-b - s) / a, t2 = (-b + s) / a;
+    if (t1 > t2) { float tmp = t1; t1 = t2; t2 = tmp; }
+    for (int i = 0; i < 2; i++) {
+        float t = i == 0 ? t1 : t2;
+        if (t <= 0.0 || t >= h.t) continue;
+        float y = o.y + d.y * t;
+        if (y < baseY || y > apexY) continue;
+        vec3 p = o + d * t;
+        vec2 radial = normalize(vec2(p.x - c.x, p.z - c.y));
+        h.t = t;
+        h.n = normalize(vec3(radial.x, k, radial.y));
+        return true;
+    }
+    return false;
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / uSize;
+    float phi = (uv.x - 0.5) * 6.2831853, theta = (uv.y - 0.5) * 3.14159265;
+    vec3 d = vec3(cos(theta) * cos(phi), sin(theta), cos(theta) * sin(phi));
+    vec3 o = vec3(0.0);
+    float mm = 1.0 / uMmPerUnit;          // units per millimetre
+    Hit h;
+    h.t = 1e9;
+    h.n = vec3(0.0, 1.0, 0.0);
+    int what = 0;                         // 0 sky, 1 ground, 2 trunk, 3 needles
+    if (d.y < 0.0) { h.t = -1.0 / d.y; what = 1; }
+    vec3 albedo = vec3(0.0);
+    // Seventy-two spruces on three rings, 2.4 to 33 metres out, placed by a hash so the same wood stands every time;
+    // 6.6 to 14 metres tall, trunks 12 to 27 centimetres across.
+    for (int i = 0; i < 72; i++) {
+        float fi = float(i);
+        float ring = floor(fi / 24.0);
+        float ang = (mod(fi, 24.0) + hash1(fi * 3.1 + 1.0) * 0.9) / 24.0 * 6.2831853;
+        float dist = (2400.0 + ring * 6000.0) * (1.0 + 0.6 * hash1(fi * 7.7 + 2.0)) * mm;
+        vec2 c = vec2(cos(ang), sin(ang)) * dist;
+        float height = (6600.0 + 7800.0 * hash1(fi * 5.3 + 3.0)) * mm;
+        float trunkR = (120.0 + 150.0 * hash1(fi * 2.9 + 4.0)) * mm;
+        float crownBase = -1.0 + height * 0.18, apex = -1.0 + height;
+        float k = 0.22 + 0.08 * hash1(fi * 4.4 + 5.0);
+        if (cylinder(o, d, c, trunkR, -1.0, crownBase + 150.0 * mm, h)) { what = 2; albedo = vec3(0.30, 0.22, 0.16); }
+        if (cone(o, d, c, apex, k, crownBase, h)) { what = 3; albedo = vec3(0.10, 0.20, 0.08) * (0.8 + 0.4 * hash1(fi * 6.6 + 7.0)); }
+    }
+    vec3 sun = normalize(uKeyDirection);
+    if (what == 0) { outColour = vec4(daylight(d), 1.0); return; }
+    vec3 p = o + d * h.t;
+    vec3 colour;
+    if (what == 1) {
+        // The forest floor: moss and needles in patches.
+        float n = fbm(p.xz * 0.02 / mm * 0.03);
+        vec3 moss = mix(vec3(0.16, 0.22, 0.08), vec3(0.32, 0.36, 0.14), n);
+        colour = moss * (uAmbient * 0.6 + uKeyIntensity * 0.9 * max(0.0, sun.y));
+    } else {
+        float n = fbm((p.xz * 0.15 + p.y * 0.05) / mm * 0.03);
+        vec3 a = albedo * (0.7 + 0.6 * n);
+        float diffuse = max(0.0, dot(h.n, sun));
+        float skyLight = 0.5 + 0.5 * h.n.y;
+        colour = a * (uAmbient * 0.7 * skyLight + uKeyIntensity * 1.1 * diffuse);
+    }
+    // Aerial perspective: the far trees pale into the horizon's haze.
+    float fog = 1.0 - exp(-h.t * uMmPerUnit / 27000.0);
+    colour = mix(colour, daylight(vec3(d.x, max(d.y, 0.02), d.z)), fog);
+    outColour = vec4(colour, 1.0);
+}`;
+    const PANORAMA_WIDTH = 1536, PANORAMA_HEIGHT = 768;
+
     const DEFAULT_PITCH = Math.atan2(0.7, 3.6);
     const DEFAULT_DISTANCE = 5.2;
     const MIN_DISTANCE = 1.2, MAX_DISTANCE = 14;
@@ -413,6 +582,8 @@ void main() {
         const view = {
             canvas, gl, program,
             resolve: floatTargets ? link(gl, RESOLVE) : null,
+            forest: link(gl, FOREST_FS),
+            panorama: null, panoramaFbo: null, panoramaKey: "",
             photon: floatTargets ? link(gl, PHOTON_FS, PHOTON_VS) : null,
             floatTargets,
             caustic: null, causticFbo: null, causticFrames: 0,
@@ -425,6 +596,7 @@ void main() {
                 keyIntensity: u("uKeyIntensity"), ambient: u("uAmbient"), extent: u("uExtent"), exposure: u("uExposure"),
                 caustic: u("uCaustic"), causticNorm: u("uCausticNorm"), region: u("uRegion"), causticReady: u("uCausticReady"),
                 indexTable: u("uIndexTable"), weightTable: u("uWeightTable"), alphaTable: u("uAlphaTable"), lambdaJitter: u("uLambdaJitter"), bands: u("uBands"),
+                panorama: u("uPanorama"), panoramaReady: u("uPanoramaReady"),
             },
             scene: null,
             accum: null, fbo: null, accumWidth: 0, accumHeight: 0, count: 0,
@@ -444,6 +616,10 @@ void main() {
         }
         if (view.resolve) {
             view.resolveLoc = { accum: gl.getUniformLocation(view.resolve, "uAccum"), count: gl.getUniformLocation(view.resolve, "uCount"), exposure: gl.getUniformLocation(view.resolve, "uExposure") };
+        }
+        {
+            const f = name => gl.getUniformLocation(view.forest, name);
+            view.forestLoc = { keyDirection: f("uKeyDirection"), keyIntensity: f("uKeyIntensity"), ambient: f("uAmbient"), size: f("uSize"), mmPerUnit: f("uMmPerUnit") };
         }
         attach(view);
         return view;
@@ -614,8 +790,11 @@ void main() {
         view.caustic = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, view.caustic);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, CAUSTIC_SIZE, CAUSTIC_SIZE, 0, gl.RGBA, gl.FLOAT, null);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        // Nearest, not linear: a 32-bit float texture is only filterable with OES_texture_float_linear, and without
+        // it a linear-filtered one is incomplete and reads as zero, which put the whole map in shadow on such GPUs.
+        // The shader takes four taps half a texel apart, which is the smoothing the map needs.
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         view.causticFbo = gl.createFramebuffer();
@@ -634,7 +813,9 @@ void main() {
         ensureCaustic(view);
         if (!view.photon) return;
         const grid = narrowScreen() ? 192 : 288;
-        const emitter = REGION * 1.05;
+        // The emitter is a square across the beam, so on the table it lies turned by the lamp's azimuth: its half-width
+        // must reach the map's corners, √2 of the region, whatever the azimuth.
+        const emitter = REGION * 1.5;
         gl.useProgram(view.photon);
         gl.bindFramebuffer(gl.FRAMEBUFFER, view.causticFbo);
         gl.viewport(0, 0, CAUSTIC_SIZE, CAUSTIC_SIZE);
@@ -662,14 +843,67 @@ void main() {
         gl.uniform2f(p.jitter, Math.random() - 0.5, Math.random() - 0.5);
         gl.drawArrays(gl.POINTS, 0, grid * grid * 3);
         gl.disable(gl.BLEND);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         view.causticFrames++;
         // Open table: photons per texel from the grid's density on the emitter, projected onto the table.
         const perUnitEmitter = (grid * grid) / (4 * emitter * emitter);
         const texel = (2 * REGION / CAUSTIC_SIZE) ** 2;
         const expected = perUnitEmitter * Math.abs(key[1]) * texel * view.causticFrames;
         view.causticNorm = 1 / expected;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.useProgram(view.program);
+    }
+
+    // The forest panorama, traced again only when the sun, the room or the solid's scale changes.
+    function ensurePanorama(view) {
+        const { gl, scene } = view;
+        if (!scene || scene.backdrop !== 5) return;
+        const key = normalize(scene.keyPosition);
+        const stamp = key.map(v => v.toFixed(3)).join(",") + "|" + scene.keyIntensity + "|" + scene.ambient + "|" + scene.millimetersPerUnit;
+        if (view.panorama && view.panoramaKey === stamp) return;
+        if (!view.panorama) {
+            view.panorama = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, view.panorama);
+            if (view.floatTargets) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, PANORAMA_WIDTH, PANORAMA_HEIGHT, 0, gl.RGBA, gl.HALF_FLOAT, null);
+            else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, PANORAMA_WIDTH, PANORAMA_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            view.panoramaFbo = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, view.panoramaFbo);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, view.panorama, 0);
+            if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                gl.deleteTexture(view.panorama);
+                view.panorama = null;
+                view.panoramaKey = "failed";
+                return;
+            }
+        }
+        const f = view.forestLoc;
+        gl.useProgram(view.forest);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, view.panoramaFbo);
+        gl.viewport(0, 0, PANORAMA_WIDTH, PANORAMA_HEIGHT);
+        gl.disable(gl.BLEND);
+        gl.uniform3fv(f.keyDirection, key);
+        gl.uniform1f(f.keyIntensity, scene.keyIntensity);
+        gl.uniform1f(f.ambient, scene.ambient);
+        gl.uniform2f(f.size, PANORAMA_WIDTH, PANORAMA_HEIGHT);
+        gl.uniform1f(f.mmPerUnit, scene.millimetersPerUnit);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        view.panoramaKey = stamp;
+        gl.useProgram(view.program);
+    }
+
+    function bindPanorama(view) {
+        const { gl, loc } = view;
+        const ready = view.scene && view.scene.backdrop === 5 && view.panorama && view.panoramaKey !== "failed";
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, ready ? view.panorama : null);
+        gl.uniform1i(loc.panorama, 2);
+        gl.uniform1i(loc.panoramaReady, ready ? 1 : 0);
+        gl.activeTexture(gl.TEXTURE0);
     }
 
     function bindCaustic(view) {
@@ -702,9 +936,11 @@ void main() {
         if (view.floatTargets && (view.causticFrames === 0 || (view.mode !== "moving" && view.causticFrames < CAUSTIC_FRAMES))) {
             photonFrame(view);
         }
+        ensurePanorama(view);
         gl.useProgram(view.program);
         setCamera(view);
         if (view.floatTargets) bindCaustic(view);
+        bindPanorama(view);
 
         if (view.mode === "moving" || !view.floatTargets) {
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
